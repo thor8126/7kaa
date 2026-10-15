@@ -409,6 +409,7 @@ void Unit::ask_team_help_attack(Unit* attackerUnit)
 			if( config_adv.unit_ai_team_help && (unitPtr->ai_unit||!nation_recno) &&
 				unitPtr->is_visible() &&
 				unitPtr->hit_points > 15.0f &&
+				!unitPtr->is_retreating_wounded() &&		// don't call back a wounded soldier falling back to a camp
 				(unitPtr->action_mode==ACTION_STOP ||
 				unitPtr->action_mode==ACTION_ASSIGN_TO_FIRM ||
 				unitPtr->action_mode==ACTION_ASSIGN_TO_TOWN ||

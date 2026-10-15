@@ -25,6 +25,8 @@
 #include <OCONFIG.h>
 #include <OTECHRES.h>
 #include <ONATION.h>
+#include <ConfigAdv.h>
+#include <OAIWAR.h>
 
 
 //----- Begin of function Nation::think_diplomacy -----//
@@ -253,7 +255,8 @@ void Nation::ai_notify_reply(int talkMsgRecno)
 		{
 			//--------- declare war ---------//
 
-			if( config.ai_aggressiveness >= OPTION_HIGH || pref_peacefulness < 50 )
+			if( ( config.ai_aggressiveness >= OPTION_HIGH || pref_peacefulness < 50 ) &&
+				 ai_war_state.can_declare_war(nation_recno, talkMsg->to_nation_recno) )		// don't start a war out of spite when it is not the right time
 			{
 				talk_res.ai_send_talk_msg(talkMsg->to_nation_recno, nation_recno, TALK_DECLARE_WAR);
 
@@ -667,12 +670,23 @@ int Nation::think_declare_war()
 		if( nationRelation->ai_relation_level >= 10 )
 			continue;
 
+		if( !ai_war_state.can_declare_war(nation_recno, i) )		// in a truce, still weary from the last war, or not in an expanding posture
+			continue;
+
 		if( !ai_should_spend( 100-trade_rating(i) ) )		// if trade_rating is 0, importanceRating will be 100, if trade_rating is 100, importanceRating will be 0
 			continue;
 
 		//----------------------------------------//
 
 		Nation* targetNation = nation_array[i];
+
+		//--- don't pick a fight with a kingdom stronger than us ---//
+
+		if( config_adv.nation_ai_posture &&
+			 targetNation->military_rank_rating() > military_rank_rating() )
+		{
+			continue;
+		}
 
 		targetStrength = targetNation->military_rank_rating() +
 							  targetNation->population_rank_rating()/2 +

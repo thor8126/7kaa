@@ -23,6 +23,8 @@
 
 #include <OSYS.h>
 #include <ONATION.h>
+#include <ConfigAdv.h>
+#include <OAIWAR.h>
 #include <OWORLD.h>
 #include <OGAME.h>
 #include <OSPY.h>
@@ -370,7 +372,34 @@ void Nation::process_ai_main()
 	if( game.game_mode == GAME_TUTORIAL )
 		intervalDays = 120;
 
-	switch( (info.game_date-nation_recno*4) % intervalDays )
+	int thinkId = (info.game_date-nation_recno*4) % intervalDays;
+
+	//--- the strategic posture replaces aggressive thinking with more useful thinking ---//
+
+	if( game.game_mode != GAME_TUTORIAL )
+	{
+		switch( ai_war_state.get_posture(nation_recno) )
+		{
+			case AI_POSTURE_DEFEND:
+				if( thinkId == 5 )			// think_secret_attack
+					thinkId = 4;				// think_military
+				break;
+
+			case AI_POSTURE_RECOVER:
+				if( thinkId == 5 )			// think_secret_attack
+					thinkId = 10;				// think_reduce_expense
+				else if( thinkId == 6 )		// think_attack_monster
+					thinkId = 1;				// think_trading
+				break;
+
+			case AI_POSTURE_CONSOLIDATE:
+				if( thinkId == 5 )			// think_secret_attack
+					thinkId = 0;				// think_build_firm
+				break;
+		}
+	}
+
+	switch( thinkId )
    {
       case 0:
 #if defined(DEBUG) && defined(ENABLE_LOG)

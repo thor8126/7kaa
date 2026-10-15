@@ -67,6 +67,7 @@ public:
 	// nation settings
 	char			nation_ai_coalition;
 	char			nation_ai_posture;
+	char			nation_ai_smart_diplomacy;
 	char			nation_ai_war_weariness;
 	char			nation_ai_unite_min_relation_level;
 	int			nation_start_god_level;

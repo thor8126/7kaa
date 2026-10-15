@@ -563,6 +563,9 @@ public:
 	int 	 		think_against_mine_monopoly();
 	int 	 		think_ally_against_big_enemy();
 	int 	 		think_unite_against_big_enemy();
+	int			think_form_coalition(int enemyNationRecno);
+	int			is_coalition_target(int leaderNationRecno);
+	int			common_threat_rating(int withNationRecno);
 
 	void 			think_deal_with_all_enemy();
 	void 			think_deal_with_one_enemy(int enemyNationRecno);
@@ -612,6 +615,7 @@ public:
 	int 			consider_sell_food(TalkMsg* talkMsg);
 	int 			consider_take_tribute(TalkMsg* talkMsg);
 	int 			consider_give_tribute(TalkMsg* talkMsg);
+	int 			consider_give_tribute_by_power(TalkMsg* talkMsg);
 	int 			consider_take_aid(TalkMsg* talkMsg);
 	int 			consider_give_aid(TalkMsg* talkMsg);
 	int 			consider_take_tech(TalkMsg* talkMsg);

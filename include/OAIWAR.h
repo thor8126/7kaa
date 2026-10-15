@@ -96,6 +96,10 @@ public:
 	int			write_file(File* filePtr);
 	int			read_file(File* filePtr);
 
+	//------ optional event log for tuning, enabled by the SKAI_LOG environment variable ------//
+
+	static void	log(const char* format, ...);
+
 private:
 	void			add_weariness(int nationRecno, int withNationRecno, float amount);
 	void			update_posture(int nationRecno);

@@ -26,6 +26,8 @@
 #include <OTECHRES.h>
 #include <OF_MARK.h>
 #include <ONATION.h>
+#include <ConfigAdv.h>
+#include <OAIWAR.h>
 
 
 //-------- Declare static functions ---------//
@@ -361,16 +363,30 @@ int Nation::consider_cease_war(int withNationRecno)
 	if( nationRelation->status != NATION_HOSTILE )
 		return -1;			// -1 means don't reply
 
+	//--- a nation exhausted by the war wants peace even in the middle of an offensive ---//
+
+	int isWarWeary = config_adv.nation_ai_war_weariness &&
+						  ai_war_state.weariness(nation_recno, withNationRecno) >= WEARINESS_FORCE_PEACE;
+
    //---- if we are attacking the nation, don't cease fire ----//
 
-	if( ai_attack_target_nation_recno == withNationRecno )
+	if( ai_attack_target_nation_recno == withNationRecno && !isWarWeary )
 		return -1;
+
+	//--- an exhausted nation will not launch new offensives anyway, so peace is better than a stalemate ---//
+
+	if( isWarWeary &&
+		 info.game_date >= nationRelation->last_change_status_date + 60 )
+	{
+		return 1;
+	}
 
 	//---- if we are planning to capture the enemy's town ---//
 
 	if( ai_capture_enemy_town_recno &&
 		 !town_array.is_deleted(ai_capture_enemy_town_recno) &&
-		 town_array[ai_capture_enemy_town_recno]->nation_recno == withNationRecno )
+		 town_array[ai_capture_enemy_town_recno]->nation_recno == withNationRecno &&
+		 !isWarWeary )
 	{
 		return -1;
 	}
@@ -410,6 +426,8 @@ int Nation::consider_cease_war(int withNationRecno)
 	curRating -= (military_rank_rating()-50)/2;					// if our military ranking is high, we may like to continue the war, otherwise the nation should try to cease-fire
 
 	curRating -= nationRelation->started_war_on_us_count*10;		// the number of times this nation has started a war with us, the higher the number, the more unlikely we will accept cease-fire
+
+	curRating += ai_war_state.cease_war_rating(nation_recno, withNationRecno);		// long and costly wars make a nation want peace
 
 	int acceptRating = pref_peacefulness/4;
 
@@ -565,6 +583,10 @@ int Nation::consider_alliance_rating(int nationRecno)
 
 	if( powerRating > 0 )
 		allianceRating += powerRating;
+
+	//---- kingdoms trailing far behind the same leader tend to stand together ----//
+
+	allianceRating += common_threat_rating(nationRecno);
 
 	return allianceRating;
 }
@@ -752,6 +774,9 @@ int Nation::consider_give_aid(TalkMsg* talkMsg)
 //
 int Nation::consider_give_tribute(TalkMsg* talkMsg)
 {
+	if( config_adv.nation_ai_smart_diplomacy )
+		return consider_give_tribute_by_power(talkMsg);
+
 	//-------- don't give tribute too frequently -------//
 
 	NationRelation* nationRelation = get_relation(talkMsg->from_nation_recno);
@@ -786,6 +811,75 @@ int Nation::consider_give_tribute(TalkMsg* talkMsg)
 	return 0;
 }
 //------ End of function Nation::consider_give_tribute ------//
+
+
+//----- Begin of function Nation::consider_give_tribute_by_power -----//
+//
+// Decide on a tribute demand by weighing the threat posed by the
+// demanding nation against how much the tribute costs us.
+//
+// talkMsg->talk_para1 - amount of the tribute.
+//
+int Nation::consider_give_tribute_by_power(TalkMsg* talkMsg)
+{
+	int tributeAmt = talkMsg->talk_para1;
+	int fromNationRecno = talkMsg->from_nation_recno;
+
+	if( tributeAmt <= 0 || nation_array.is_deleted(fromNationRecno) )
+		return 0;
+
+	//------- we must be able to afford it without going broke -------//
+
+	float monthlyExpense = expense_365days() / 12;
+
+	if( cash < tributeAmt || cash - tributeAmt < monthlyExpense )
+		return 0;
+
+	//------- don't let the same nation squeeze us repeatedly -------//
+
+	NationRelation* nationRelation = get_relation(fromNationRecno);
+
+	if( nationRelation->last_give_gift_date > 0 &&
+		 info.game_date < nationRelation->last_give_gift_date + 60 )
+	{
+		return 0;
+	}
+
+	//------- how much is the demanding nation a threat to us -------//
+
+	Nation* fromNation = nation_array[fromNationRecno];
+
+	int threatRating = fromNation->military_rank_rating() - military_rank_rating();
+
+	int relationStatus = get_relation_status(fromNationRecno);
+
+	if( relationStatus == NATION_HOSTILE )
+		threatRating += 5;		// paying tribute does not end a war, so it is little help
+	else if( relationStatus == NATION_TENSE )
+		threatRating += 10;		// paying may keep a hostile neighbor from going to war
+
+	//------- how much does it cost us -------//
+
+	int costRating = (int) (100.0f * tributeAmt / cash);					// percentage of our treasury
+
+	if( costRating > 30 )		// never hand over a large part of the treasury
+		return 0;
+
+	int givenAmount = nationRelation->total_given_gift_amount;		// a short which can wrap around after large payments
+
+	int appeasedRating = givenAmount < 0 ? 30 : MIN( 30, givenAmount / 100 );		// the more we have paid, the more stubborn we get
+
+	int acceptRating = 5 + pref_military_courage/4;		// 5 to 30
+
+	int rc = threatRating - costRating - appeasedRating > acceptRating;
+
+	AiWarState::log( "TRIBUTE     nation %d %s %d demanded by %d (threat %d, cost %d%%, appeased %d, needs > %d)",
+						  nation_recno, rc ? "pays" : "refuses", tributeAmt, fromNationRecno,
+						  threatRating, costRating, appeasedRating, acceptRating );
+
+	return rc;
+}
+//------ End of function Nation::consider_give_tribute_by_power ------//
 
 
 //----- Begin of function Nation::consider_give_tech -----//

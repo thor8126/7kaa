@@ -28,6 +28,8 @@
 #include <OFIRMALL.h>
 #include <OTALKRES.h>
 #include <ONATION.h>
+#include <ConfigAdv.h>
+#include <OAIWAR.h>
 
 
 //------ Declare static functions --------//
@@ -842,6 +844,15 @@ int Nation::think_secret_attack()
 
 		tradeRating = trade_rating(i)/2 +        // existing trade
 			      ai_trade_with_rating(i)/2; // possible trade
+
+		//--- don't plan a surprise war when in a truce, weary of war or not expanding ---//
+
+		if( nationRelation->status != NATION_HOSTILE &&
+			 !ai_war_state.can_declare_war(nation_recno, i) )
+		{
+			nationRelation->ai_secret_attack = 0;
+			continue;
+		}
 
 		//---- if the secret attack flag is not enabled yet ----//
 

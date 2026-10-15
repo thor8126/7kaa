@@ -30,6 +30,9 @@
 // decides whether it may start new wars and offensives.
 
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
 #include <OAIWAR.h>
 #include <ONATION.h>
 #include <OUNIT.h>
@@ -46,13 +49,48 @@
 #define IDLE_WAR_DAYS					90
 #define DAILY_PEACE_RECOVERY			0.25f
 #define LOSS_WEARINESS_MULTIPLIER	0.6f
-#define KILL_WEARINESS_MULTIPLIER	0.15f
+#define KILL_WEARINESS_MULTIPLIER	0.25f
 #define FIRM_LOST_WEARINESS			2.0f
 #define TOWN_LOST_WEARINESS			12.0f
 #define TOWN_GAINED_WEARINESS			6.0f
 #define MIN_TRUCE_DAYS					180
 #define POSTURE_MIN_DAYS				60			// minimum days before leaving a non-emergency posture
 #define CONSOLIDATE_MIN_DAYS			180
+
+//------- Begin of function AiWarState::log -------//
+//
+// Append a line to the file named by the SKAI_LOG environment variable.
+// It only writes a file and never affects the game.
+//
+void AiWarState::log(const char* format, ...)
+{
+	static int   initFlag = 0;
+	static FILE* logFile = NULL;
+
+	if( !initFlag )
+	{
+		initFlag = 1;
+		const char* logPath = getenv("SKAI_LOG");
+
+		if( logPath && logPath[0] )
+			logFile = fopen(logPath, "a");
+	}
+
+	if( !logFile )
+		return;
+
+	fprintf( logFile, "%04d-%02d-%02d ", info.game_year, info.game_month, info.game_day );
+
+	va_list args;
+	va_start(args, format);
+	vfprintf(logFile, format, args);
+	va_end(args);
+
+	fputc('\n', logFile);
+	fflush(logFile);
+}
+//-------- End of function AiWarState::log --------//
+
 
 //------- Begin of function AiWarState::init -------//
 //
@@ -186,12 +224,20 @@ void AiWarState::status_changed(int nationRecno, int withNationRecno, int oldSta
 		warRecord->last_combat_date  = info.game_date;
 		warRecord->weariness         = lastWeariness;
 		warRecord->no_war_until_date = noWarUntilDate;
+
+		log( "WAR START   nation %d vs %d (weariness carried %.1f)", nationRecno, withNationRecno, lastWeariness );
 	}
 
 	//------- a war ends ---------//
 
 	else if( oldStatus == NATION_HOSTILE )
 	{
+		log( "WAR END     nation %d vs %d -> status %d, %d days, lost %.1f killed %.1f, towns -%d +%d, firms -%d, weariness %.1f",
+			  nationRecno, withNationRecno, newStatus,
+			  warRecord->start_date ? info.game_date - warRecord->start_date : 0,
+			  warRecord->losses, warRecord->kills, warRecord->towns_lost, warRecord->towns_gained,
+			  warRecord->firms_lost, warRecord->weariness );
+
 		warRecord->start_date        = 0;
 		warRecord->losses            = 0.0f;
 		warRecord->kills             = 0.0f;
@@ -269,7 +315,14 @@ void AiWarState::unit_killed(int attackerNationRecno, Unit* targetUnit)
 	attackerRecord->kills += warValue;
 	attackerRecord->last_combat_date = info.game_date;
 
-	add_weariness( victimNationRecno, attackerNationRecno, warValue * LOSS_WEARINESS_MULTIPLIER );
+	//--- losses weigh less on a dominant military, 0.3 for the strongest to 0.75 for the weakest ---//
+
+	float lossMultiplier = LOSS_WEARINESS_MULTIPLIER;
+
+	if( !nation_array.is_deleted(victimNationRecno) )
+		lossMultiplier = lossMultiplier * (125 - nation_array[victimNationRecno]->military_rank_rating()*3/4) / 100;
+
+	add_weariness( victimNationRecno, attackerNationRecno, warValue * lossMultiplier );
 	add_weariness( attackerNationRecno, victimNationRecno, -warValue * KILL_WEARINESS_MULTIPLIER );
 }
 //-------- End of function AiWarState::unit_killed --------//
@@ -445,19 +498,18 @@ void AiWarState::update_posture(int nationRecno)
 
 	//------ non-emergency postures ------//
 
-	else if( curPosture != AI_POSTURE_EXPAND && curPosture != AI_POSTURE_CONSOLIDATE &&
-				daysInPosture < POSTURE_MIN_DAYS )
+	else if( daysInPosture < POSTURE_MIN_DAYS )
 	{
-		newPosture = curPosture;		// stay a while before leaving an emergency posture
+		newPosture = curPosture;		// a posture is kept for a while before it is changed
 	}
 	else if( curPosture == AI_POSTURE_CONSOLIDATE && !hasEnemy && daysInPosture < CONSOLIDATE_MIN_DAYS )
 	{
 		newPosture = curPosture;
 	}
 	else if( !hasEnemy && curPosture != AI_POSTURE_CONSOLIDATE &&
-				( nationPtr->profit_365days() < 0 ||											// the economy needs attention
-				  nationPtr->cash < 1000 + 2000 * nationPtr->pref_cash_reserve / 100 ||
-				  recently_at_war(nationRecno) ) )												// rebuild after a war
+				( ( nationPtr->profit_365days() < 0 &&													// the economy is in trouble
+					 nationPtr->cash < 1000 + 2000 * nationPtr->pref_cash_reserve / 100 ) ||
+				  recently_at_war(nationRecno) ) )														// rebuild after a war
 	{
 		newPosture = AI_POSTURE_CONSOLIDATE;
 	}
@@ -468,6 +520,12 @@ void AiWarState::update_posture(int nationRecno)
 
 	if( newPosture != curPosture )
 	{
+		static const char* postureName[AI_POSTURE_COUNT] = { "EXPAND", "CONSOLIDATE", "DEFEND", "RECOVER" };
+
+		log( "POSTURE     nation %d: %s -> %s (cash %.0f, food %.0f, own mil %d, enemy mil %d, max weariness %.1f)",
+			  nationRecno, postureName[curPosture], postureName[newPosture],
+			  nationPtr->cash, nationPtr->food, ownMilitary, enemyMilitary, maxWeariness );
+
 		posture[nationRecno-1] = newPosture;
 		posture_date[nationRecno-1] = info.game_date;
 	}

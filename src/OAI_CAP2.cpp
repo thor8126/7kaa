@@ -29,6 +29,8 @@
 #include <OFIRMALL.h>
 #include <OTALKRES.h>
 #include <ONATION.h>
+#include <ConfigAdv.h>
+#include <OAIWAR.h>
 
 //--------- Begin of function Nation::think_capture_new_enemy_town --------//
 //
@@ -54,6 +56,11 @@ int Nation::think_capture_new_enemy_town(Town* capturerTown, int useAllCamp)
 	Town* targetTown = think_capture_enemy_town_target(capturerTown);
 
 	if( !targetTown )
+		return 0;
+
+	//--- don't start a new offensive when weary of the war or busy defending/recovering ---//
+
+	if( !ai_war_state.can_start_offensive(nation_recno, targetTown->nation_recno) )
 		return 0;
 
 	//---- attack enemy's defending forces on the target town ----//

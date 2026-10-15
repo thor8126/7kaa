@@ -244,6 +244,7 @@ void ConfigAdv::reset()
 
 	nation_ai_coalition = 1;
 	nation_ai_posture = 1;
+	nation_ai_smart_diplomacy = 1;
 	nation_ai_war_weariness = 1;
 	nation_ai_unite_min_relation_level = NATION_NEUTRAL;
 	nation_start_god_level = 0;
@@ -372,6 +373,12 @@ int ConfigAdv::set(char *name, char *value)
 	else if( !strcmp(name, "nation_ai_posture") )
 	{
 		if( !read_bool(value, &nation_ai_posture) )
+			return 0;
+		update_check_sum(name, value);
+	}
+	else if( !strcmp(name, "nation_ai_smart_diplomacy") )
+	{
+		if( !read_bool(value, &nation_ai_smart_diplomacy) )
 			return 0;
 		update_check_sum(name, value);
 	}

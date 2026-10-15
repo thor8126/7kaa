@@ -404,6 +404,8 @@ public:
 			  void think_spy_action();
 			  int  think_king_flee();
 			  int  think_general_flee();
+			  int  think_retreat_wounded();
+			  int  is_retreating_wounded();
 			  int  think_stop_chase();
 
 			  void ai_move_to_nearby_town();

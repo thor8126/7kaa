@@ -28,6 +28,7 @@
 #include <OF_CAMP.h>
 #include <ONATION.h>
 #include <ConfigAdv.h>
+#include <OAIWAR.h>
 
 
 //----- Begin of function Nation::think_grand_plan -----//
@@ -198,8 +199,11 @@ void Nation::think_deal_with_all_enemy()
 		{
 			int enemyMilitary = nationPtr->military_rank_rating();
 
-			if( enemyMilitary < 20 && ai_should_spend_war(enemyMilitary) )
+			if( enemyMilitary < 20 && ai_should_spend_war(enemyMilitary) &&
+				 ai_war_state.can_start_offensive(nation_recno, i) )		// not when weary of the war or busy defending/recovering
+			{
 				rc = 1;
+			}
 		}
 
 		if( rc )
@@ -372,6 +376,11 @@ int Nation::think_surrender()
 //
 int Nation::think_unite_against_big_enemy()
 {
+	//--- with coalitions, trailing kingdoms ally against the leader in think_ally_against_big_enemy() instead of surrendering to each other ---//
+
+	if( config_adv.nation_ai_coalition )
+		return 0;
+
 	if( info.game_date - info.game_start_date <
 		 365 * 3 * (100+pref_military_development) / 100 )		// only do this after 3 to 6 years into the game
 	{
@@ -685,6 +694,11 @@ int Nation::think_ally_against_big_enemy()
 		change_ai_relation_level( i, thisIncLevel );
 	}
 
+	//--- form treaties with other kingdoms that trail behind the same leader ---//
+
+	if( config_adv.nation_ai_coalition && think_form_coalition(enemyNationRecno) )
+		return 1;
+
 	//---- don't have all nations doing it the same time ----//
 
 	if( misc.random(nation_array.ai_nation_count)==0 )
@@ -747,6 +761,131 @@ int Nation::think_ally_against_big_enemy()
 	return 0;
 }
 //------ End of function Nation::think_ally_against_big_enemy ------//
+
+
+//----- Begin of function Nation::is_coalition_target -----//
+//
+// Whether the given leading nation is one AI kingdoms should form a
+// coalition against. Follows the same AI aggressiveness rules as
+// think_ally_against_big_enemy().
+//
+int Nation::is_coalition_target(int leaderNationRecno)
+{
+	if( !leaderNationRecno || leaderNationRecno == nation_recno ||
+		 nation_array.is_deleted(leaderNationRecno) )
+	{
+		return 0;
+	}
+
+	int leaderIsAi = nation_array[leaderNationRecno]->is_ai();
+
+	if( config.ai_aggressiveness >= OPTION_HIGH )		// only against the human player
+		return !leaderIsAi;
+
+	if( config.ai_aggressiveness == OPTION_LOW )		// never against the human player
+		return leaderIsAi;
+
+	return 1;
+}
+//------ End of function Nation::is_coalition_target ------//
+
+
+//----- Begin of function Nation::common_threat_rating -----//
+//
+// Return a rating of how much this nation and the given nation are
+// both threatened by the same leading kingdom, 0 if not.
+//
+int Nation::common_threat_rating(int withNationRecno)
+{
+	int leaderNationRecno = nation_array.max_overall_nation_recno;
+
+	if( !config_adv.nation_ai_coalition ||
+		 leaderNationRecno == withNationRecno ||
+		 nation_array.is_deleted(withNationRecno) ||
+		 !is_coalition_target(leaderNationRecno) )
+	{
+		return 0;
+	}
+
+	Nation* withNation = nation_array[withNationRecno];
+
+	//--- only kingdoms far behind the leader feel threatened ---//
+
+	if( overall_rank_rating() > 60 || withNation->overall_rank_rating() > 60 )
+		return 0;
+
+	//--- a kingdom friendly to the leader will not join a coalition ---//
+
+	if( withNation->get_relation_status(leaderNationRecno) >= NATION_FRIENDLY )
+		return 0;
+
+	int rating = 20;
+
+	if( get_relation_status(leaderNationRecno) == NATION_HOSTILE &&
+		 withNation->get_relation_status(leaderNationRecno) == NATION_HOSTILE )
+	{
+		rating += 15;		// already fighting the same enemy
+	}
+
+	return rating;
+}
+//------ End of function Nation::common_threat_rating ------//
+
+
+//----- Begin of function Nation::think_form_coalition -----//
+//
+// Propose friendly and alliance treaties to other kingdoms which
+// trail far behind the same leading kingdom.
+//
+// <int> enemyNationRecno - the leading kingdom
+//
+// return : <int> 1 - a proposal has been sent
+//                0 - no proposal
+//
+int Nation::think_form_coalition(int enemyNationRecno)
+{
+	if( !is_coalition_target(enemyNationRecno) )
+		return 0;
+
+	if( overall_rank_rating() > 60 )		// not threatened enough
+		return 0;
+
+	for( int i=nation_array.size() ; i>0 ; i-- )
+	{
+		if( nation_array.is_deleted(i) || i==nation_recno || i==enemyNationRecno )
+			continue;
+
+		if( !get_relation(i)->has_contact )
+			continue;
+
+		if( common_threat_rating(i) == 0 )
+			continue;
+
+		int relationStatus = get_relation_status(i);
+		int talkId;
+
+		if( relationStatus == NATION_HOSTILE )		// cease-fire is handled by think_request_cease_war()
+			continue;
+		else if( relationStatus < NATION_FRIENDLY )
+			talkId = TALK_PROPOSE_FRIENDLY_TREATY;
+		else if( relationStatus == NATION_FRIENDLY )
+			talkId = TALK_PROPOSE_ALLIANCE_TREATY;
+		else
+			continue;		// already allied
+
+		if( should_diplomacy_retry(talkId, i) )
+		{
+			AiWarState::log( "COALITION   nation %d proposes %s to %d against leader %d",
+								  nation_recno, talkId==TALK_PROPOSE_ALLIANCE_TREATY ? "alliance" : "friendship", i, enemyNationRecno );
+
+			talk_res.ai_send_talk_msg(i, nation_recno, talkId);
+			return 1;
+		}
+	}
+
+	return 0;
+}
+//------ End of function Nation::think_form_coalition ------//
 
 
 //----- Begin of function Nation::ai_should_attack_friendly -----//
@@ -964,6 +1103,15 @@ int Nation::think_against_mine_monopoly()
 
 	if( !targetNationRecno )
 		return 0;
+
+	//--- don't start a fight over mines when weary of war, defending, recovering or in a truce ---//
+
+	if( get_relation_status(targetNationRecno) == NATION_HOSTILE ?
+		 !ai_war_state.can_start_offensive(nation_recno, targetNationRecno) :
+		 !ai_war_state.can_declare_war(nation_recno, targetNationRecno) )
+	{
+		return 0;
+	}
 
 	//--- if the relationship with this nation is still good, don't attack yet, ask for aid first ---//
 

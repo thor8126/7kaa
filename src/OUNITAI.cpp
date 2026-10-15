@@ -29,6 +29,9 @@
 #include <OREGIONS.h>
 #include <OF_CAMP.h>
 #include <ONATION.h>
+#include <ConfigAdv.h>
+#include <OAIWAR.h>
+#include <OMISC.h>
 
 #ifdef NO_DEBUG_UNIT
 #undef err_when
@@ -63,7 +66,9 @@ void Unit::process_ai()
 
 	//------ the aggressive_mode of AI units is always 1 ------//
 
-	aggressive_mode = 1;
+	//--- except for a badly wounded soldier falling back to a camp, it shouldn't turn back to fight ---//
+
+	aggressive_mode = !is_retreating_wounded();
 
 	//------- handle Seek Path failures ------//
 
@@ -136,6 +141,9 @@ void Unit::process_ai()
 
 	if( !is_ai_all_stop() )
 	{
+		if( think_retreat_wounded() )		// badly wounded soldiers fall back to recover
+			return;
+
 		think_stop_chase();
 		return;
 	}
@@ -222,6 +230,97 @@ void Unit::process_ai()
 	}
 }
 //---------- End of function Unit::process_ai --------//
+
+
+//--------- Begin of function Unit::think_retreat_wounded --------//
+//
+// A badly wounded soldier on an attack falls back to the nearest
+// own camp with room, where it recovers its hit points.
+//
+// return : <int> 1 - the unit is retreating
+//                0 - no retreat
+//
+int Unit::think_retreat_wounded()
+{
+	if( !config_adv.unit_ai_retreat_wounded )
+		return 0;
+
+	//--- only ordinary soldiers, kings and generals have their own flee logic ---//
+
+	if( !race_id || rank_id != RANK_SOLDIER || spy_recno || mobile_type != UNIT_LAND )
+		return 0;
+
+	if( ai_action_id )		// don't abandon an action the nation is keeping track of
+		return 0;
+
+	if( action_mode != ACTION_ATTACK_UNIT && action_mode != ACTION_ATTACK_FIRM &&
+		 action_mode != ACTION_ATTACK_TOWN && action_mode != ACTION_ATTACK_WALL )
+	{
+		return 0;
+	}
+
+	if( in_auto_defense_mode() || in_defend_town_mode() || in_monster_defend_mode() )		// these modes have their own return logic
+		return 0;
+
+	if( hit_points >= max_hit_points / 4 )
+		return 0;
+
+	//------ find the nearest own camp with room in this region ------//
+
+	int    unitRegionId = region_id();
+	int    bestCampRecno = 0, minDistance = 0x7FFF;
+	Firm*  firmPtr;
+
+	for( int i=firm_array.size() ; i>0 ; i-- )
+	{
+		if( firm_array.is_deleted(i) )
+			continue;
+
+		firmPtr = firm_array[i];
+
+		if( firmPtr->firm_id != FIRM_CAMP || firmPtr->nation_recno != nation_recno ||
+			 firmPtr->under_construction || firmPtr->region_id != unitRegionId ||
+			 firmPtr->worker_count >= MAX_WORKER )
+		{
+			continue;
+		}
+
+		int curDistance = misc.points_distance( next_x_loc(), next_y_loc(), firmPtr->center_x, firmPtr->center_y );
+
+		if( curDistance < minDistance )
+		{
+			minDistance   = curDistance;
+			bestCampRecno = i;
+		}
+	}
+
+	if( !bestCampRecno )
+		return 0;
+
+	home_camp_firm_recno = bestCampRecno;
+
+	if( !return_camp() )
+		return 0;
+
+	AiWarState::log( "RETREAT     nation %d soldier %d (%.0f/%d hp) falls back to camp %d",
+						  nation_recno, sprite_recno, hit_points, max_hit_points, bestCampRecno );
+	return 1;
+}
+//---------- End of function Unit::think_retreat_wounded --------//
+
+
+//--------- Begin of function Unit::is_retreating_wounded --------//
+//
+// return : <int> 1 if this is a badly wounded AI soldier falling back
+//			  to a camp, which shouldn't be drawn back into fights.
+//
+int Unit::is_retreating_wounded()
+{
+	return config_adv.unit_ai_retreat_wounded && ai_unit && race_id &&
+			 rank_id == RANK_SOLDIER && action_mode == ACTION_ASSIGN_TO_FIRM &&
+			 hit_points < max_hit_points / 4;
+}
+//---------- End of function Unit::is_retreating_wounded --------//
 
 
 //--------- Begin of function Unit::think_stop_chase --------//
