@@ -36,6 +36,10 @@ The game sources only have two small `#ifdef __ANDROID__` hooks: `src/AM.cpp`
 ## Controls
 
 The 800×600 game is scaled to fit the screen with black bars at the sides.
+It is a real touchscreen: everything happens exactly where you touch, and
+there is no mouse cursor and no edge scrolling. (For now a small red cross
+briefly marks each touch, as a check that touches land in the right spot.
+`TOUCH_DEBUG_CROSS` in `app/jni/src/android_touch.cpp` turns it off.)
 
 | Touch | Does |
 | --- | --- |

@@ -13,6 +13,12 @@
 //   Back button              -> Esc
 //   "Right click" on-screen toggle (SevenKaaActivity): taps are right clicks
 //
+// Every action happens exactly under the finger: the touch point is mapped
+// straight to 800x600 game coordinates, and there is no cursor to steer (it is
+// not drawn on Android, see MouseCursor in src/OMOUSECR.cpp). The window is
+// never grabbed on Android (Vga::is_input_grabbed), so nothing clamps the
+// position and there is no edge scrolling.
+//
 // Touches that start in the black bars beside the game screen are ignored
 // (that is where the on-screen buttons live).
 //
@@ -79,8 +85,10 @@ static void finger_to_window(const SDL_TouchFingerEvent &f, float *wx, float *wy
 	*wy = f.y * h;
 }
 
-// Window pixels -> game screen coordinates, taking the letterboxing done by
-// SDL_RenderSetLogicalSize() into account.
+// Window coordinates -> game screen coordinates (800x600). Uses SDL's own
+// conversion, which also accounts for the window size differing from the
+// drawable's pixel size (dpi_scale) and for the letterboxing done by
+// SDL_RenderSetLogicalSize(): the same math SDL applies to mouse events.
 static void window_to_game(SDL_Window *win, float wx, float wy, float *gx, float *gy)
 {
 	int w = 800, h = 600, lw = 0, lh = 0;
@@ -92,12 +100,7 @@ static void window_to_game(SDL_Window *win, float wx, float wy, float *gx, float
 
 	if( ren && lw > 0 && lh > 0 )
 	{
-		SDL_Rect vp;
-		float sx, sy;
-		SDL_RenderGetViewport(ren, &vp);
-		SDL_RenderGetScale(ren, &sx, &sy);
-		*gx = wx / sx - vp.x;
-		*gy = wy / sy - vp.y;
+		SDL_RenderWindowToLogical(ren, (int) (wx + 0.5f), (int) (wy + 0.5f), gx, gy);
 	}
 	else
 	{
@@ -135,9 +138,39 @@ static float move_threshold(const SDL_TouchFingerEvent &f)
 	return t < 12.0f ? 12.0f : t;
 }
 
+//------------------------------------------------------------------------
+// Temporary debug aid: a red cross where the game thinks the finger is,
+// drawn on the final frame (Vga::flip), so one test on a phone shows whether
+// touches map to the right spot. Set to 0 to turn it off.
+#define TOUCH_DEBUG_CROSS 1
+
+static int dbg_x = -1, dbg_y = -1;
+static Uint32 dbg_time;
+
 static void move_cursor(int x, int y)
 {
 	mouse.process_mouse_motion(x, y);
+	dbg_x = x;
+	dbg_y = y;
+	dbg_time = SDL_GetTicks();
+}
+
+void android_touch_draw_debug(SDL_Surface *surface)
+{
+#if TOUCH_DEBUG_CROSS
+	if( dbg_x < 0 || !surface || SDL_GetTicks() - dbg_time > 1500 )
+		return;
+	Uint32 black = SDL_MapRGB(surface->format, 0, 0, 0);
+	Uint32 red   = SDL_MapRGB(surface->format, 255, 32, 32);
+	const int len = 12;
+	SDL_Rect r;
+	r = { dbg_x - len - 1, dbg_y - 2, 2 * len + 3, 5 };  SDL_FillRect(surface, &r, black);
+	r = { dbg_x - 2, dbg_y - len - 1, 5, 2 * len + 3 };  SDL_FillRect(surface, &r, black);
+	r = { dbg_x - len, dbg_y - 1, 2 * len + 1, 3 };      SDL_FillRect(surface, &r, red);
+	r = { dbg_x - 1, dbg_y - len, 3, 2 * len + 1 };      SDL_FillRect(surface, &r, red);
+#else
+	(void) surface;
+#endif
 }
 
 // Lifting a finger must not leave the cursor on the screen border, where the

@@ -19,4 +19,8 @@ int android_touch_event(SDL_Event *event);
 // handles time based gestures (long press = right click).
 void android_touch_update();
 
+// Called by Vga::flip() on the final 800x600 frame: draws the temporary touch
+// debug cross (see android_touch.cpp).
+void android_touch_draw_debug(SDL_Surface *surface);
+
 #endif

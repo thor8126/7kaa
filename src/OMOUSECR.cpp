@@ -245,6 +245,22 @@ void MouseCursor::set_frame_border(int borderX1, int borderY1, int borderX2, int
 //----------- End of function MouseCursor::set_frame_border -------//
 
 
+//----------- Begin of function cursor_never_drawn --------//
+//
+// Android is played by touch: there is no pointer, so the cursor icon is
+// never drawn (the selection frame still is).
+//
+static int cursor_never_drawn()
+{
+#ifdef __ANDROID__
+	return 1;
+#else
+	return 0;
+#endif
+}
+//----------- End of function cursor_never_drawn --------//
+
+
 //----------- Begin of function MouseCursor::process --------//
 
 void MouseCursor::process(int curX, int curY)
@@ -299,7 +315,7 @@ void MouseCursor::process(int curX, int curY)
 
 	//------- save screen and put cursor -------//
 
-	if( hide_all_flag || ( hide_area_flag &&
+	if( cursor_never_drawn() || hide_all_flag || ( hide_area_flag &&
 		 is_touch( hide_x1, hide_y1, hide_x2, hide_y2 ) ) )
 	{
 		cursor_shown = 0;
@@ -449,7 +465,7 @@ void MouseCursor::disp_back_buf(int bltX1, int bltY1, int bltX2, int bltY2)
 
 	//----- display mouse cursor on the back buffer ----//
 
-	if( is_touch(bltX1, bltY1, bltX2, bltY2) )
+	if( !cursor_never_drawn() && is_touch(bltX1, bltY1, bltX2, bltY2) )
 	{
 		//--- save the front buffer area which will be overwritten ---//
 

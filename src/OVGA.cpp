@@ -108,8 +108,11 @@ int Vga::init()
    if( !window )
       return 0;
 
+#ifndef __ANDROID__
+   // (Android: never grab, see Vga::is_input_grabbed)
    if( config_adv.vga_full_screen )
       set_window_grab(WINGRAB_ON);
+#endif
 
    renderer = SDL_CreateRenderer(window, -1, 0);
    if( !renderer )
@@ -601,6 +604,12 @@ int Vga::is_full_screen()
 //
 int Vga::is_input_grabbed()
 {
+#ifdef __ANDROID__
+   // Touchscreen: touches are absolute positions. A grabbed window would
+   // clamp the cursor to the mouse boundary (Mouse::process_mouse_motion) and
+   // enable edge scrolling from wherever the last touch left it.
+   return 0;
+#endif
    return ((SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_GRABBED) != 0);
 }
 //-------- End of function Vga::is_input_grabbed ----------//
@@ -699,6 +708,9 @@ void Vga::set_full_screen_mode(int mode)
 //-------- Begin of function Vga::set_mouse_mode --------//
 void Vga::set_mouse_mode(MouseInputMode mode)
 {
+#ifdef __ANDROID__
+   mode = MOUSE_INPUT_ABS;   // relative (trackpad-like) input makes no sense on touch
+#endif
    switch( mode )
    {
    case MOUSE_INPUT_REL:
@@ -818,6 +830,9 @@ void Vga::flip()
    if (cur_ticks > ticks + 17 || cur_ticks < ticks) {
       ticks = cur_ticks;
       SDL_BlitSurface(vga_front.surface, NULL, target, NULL);
+#ifdef __ANDROID__
+      android_touch_draw_debug(target);
+#endif
       SDL_UpdateTexture(texture, NULL, target->pixels, target->pitch);
       SDL_RenderClear(renderer);
       SDL_RenderCopy(renderer, texture, NULL, NULL);
