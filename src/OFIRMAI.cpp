@@ -29,6 +29,8 @@
 #include <OUNITRES.h>
 #include <OTALKRES.h>
 #include <ONATION.h>
+#include <OAIWAR.h>
+#include <OINFO.h>
 
 //--------- Begin of function Firm::process_common_ai --------//
 //
@@ -88,6 +90,19 @@ void Firm::think_repair()
 //
 void Firm::ai_del_firm()
 {
+	int enabledLinkCount = 0;
+
+	for( int i=0 ; i<linked_town_count ; i++ )
+	{
+		if( linked_town_enable_array[i] == LINK_EE )
+			enabledLinkCount++;
+	}
+
+	AiWarState::log( "CLOSE       nation %d closes %s %d (built %d days ago, %s, workers %d, town links %d, enabled %d)",
+						  nation_recno, firm_res[firm_id]->name, firm_recno, info.game_date - setup_date,
+						  under_construction ? "under construction" : "complete",
+						  worker_array ? worker_count : -1, linked_town_count, enabledLinkCount );
+
 	if( under_construction )
 	{
 		cancel_construction(COMMAND_AI);

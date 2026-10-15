@@ -25,6 +25,8 @@
 #include <OUNIT.h>
 #include <OFIRMALL.h>
 #include <ONATION.h>
+#include <OINFO.h>
+#include <ConfigAdv.h>
 
 
 //--------- Begin of function Nation::think_reduce_expense --------//
@@ -48,6 +50,14 @@ void Nation::think_reduce_expense()
 
 		if( firmPtr->nation_recno != nation_recno )
 			continue;
+
+		//--- a new firm needs time to hire workers and pay off, closing it right away wastes its setup cost ---//
+
+		if( config_adv.nation_ai_opening_strategy && cash > 0 &&
+			 info.game_date < firmPtr->setup_date + 180 )
+		{
+			continue;
+		}
 
 		if( firmPtr->firm_id == FIRM_WAR_FACTORY ||
 			 firmPtr->firm_id == FIRM_RESEARCH )

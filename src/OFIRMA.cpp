@@ -33,6 +33,7 @@
 #include <OFIRMALL.h>
 #include <OSERES.h>
 #include <OLOG.h>
+#include <OAIWAR.h>
 
 //### begin alex 22/9 ###//
 #ifdef DEBUG
@@ -166,6 +167,8 @@ int FirmArray::build_firm(int xLoc, int yLoc, int nationRecno, int firmId, char*
 		Nation* nationPtr = nation_array[nationRecno];
 
 		nationPtr->add_expense( EXPENSE_FIRM, (float)firm_res[firmId]->setup_cost);		// setup cost of the firm
+
+		AiWarState::log( "BUILD       nation %d starts %s at %d,%d", nationRecno, firm_res[firmId]->name, xLoc, yLoc );
 	}
 
 	return firmRecno;

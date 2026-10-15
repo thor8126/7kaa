@@ -119,6 +119,7 @@ static int loaded_random_seed;
 static int loaded_game_version;
 
 #define FIRST_VERSION_WITH_AI_WAR_STATE	213
+#define FIRST_VERSION_WITH_AI_STRATEGY		214
 
 bool GameFile::read_file_same_version = true;
 
@@ -726,7 +727,7 @@ int GameFile::read_file_3(File* filePtr)
 		if( !read_book_mark( filePtr, BOOK_MARK+216 ) )
 			return 0;
 
-		if( !ai_war_state.read_file(filePtr) )
+		if( !ai_war_state.read_file(filePtr, loaded_game_version >= FIRST_VERSION_WITH_AI_STRATEGY) )
 			return 0;
 	}
 	else

@@ -36,6 +36,7 @@
 #include <OINFO.h>
 #include <OFIRMALL.h>
 #include <OLOG.h>
+#include <OAIWAR.h>
 
 
 //--------- Begin of function Town::process_ai ----------//
@@ -890,8 +891,21 @@ int Town::think_build_research()
 		return 0;
 	}
 
-	if( nationPtr->true_profit_365days() < 0 )
+	//--- a nation going for technology builds its first tower early, when early profits are usually still negative ---//
+
+	int isEarlyTechTower = ai_war_state.get_strategy(nation_recno) == AI_STRATEGY_TECH &&
+								  nationPtr->ai_research_count == 0 && nationPtr->cash > 3000;
+
+	if( nationPtr->true_profit_365days() < 0 && !isEarlyTechTower )
 		return 0;
+
+	//--- the profit must cover the tower's running cost, otherwise cost cutting closes it again soon after ---//
+
+	if( ai_war_state.get_strategy(nation_recno) != -1 && !isEarlyTechTower &&
+		 nationPtr->true_profit_365days() < firm_res[FIRM_RESEARCH]->year_cost )
+	{
+		return 0;
+	}
 
 	if( !nationPtr->ai_should_spend( 25 + nationPtr->pref_use_weapon/2 - nationPtr->ai_research_count*10 ) )
 		return 0;
@@ -909,6 +923,26 @@ int Town::think_build_research()
 
 	if( nationPtr->ai_research_count >= maxResearch )
 		return 0;
+
+	//--- another town of ours may have just ordered one, which is not counted yet ---//
+
+	if( nationPtr->is_action_exist(ACTION_AI_BUILD_FIRM, FIRM_RESEARCH, region_id) )
+		return 0;
+
+	//--- unless the nation is going for technology, the number of towers grows with the population ---//
+
+	int curStrategy = ai_war_state.get_strategy(nation_recno);
+
+	if( curStrategy != -1 && curStrategy != AI_STRATEGY_TECH )
+	{
+		int supportedResearch = 1 + nationPtr->total_population / 150;		// town count is not used as towns split into small ones
+
+		if( curStrategy == AI_STRATEGY_MILITARY )
+			supportedResearch++;		// for weapons
+
+		if( nationPtr->ai_research_count >= supportedResearch )
+			return 0;
+	}
 
 	//---- if any of the existing ones are not full employed ----//
 
@@ -968,6 +1002,11 @@ int Town::think_build_war_factory()
 	if( nationPtr->ai_war_count >= maxWarFactory )
 		return 0;
 
+	//--- another town of ours may have just ordered one, which is not counted yet ---//
+
+	if( nationPtr->is_action_exist(ACTION_AI_BUILD_FIRM, FIRM_WAR_FACTORY, region_id) )
+		return 0;
+
 	//---- if any of the existing ones are not full employed or under capacity ----//
 
 	FirmWar* firmWar;
@@ -1004,6 +1043,11 @@ int Town::think_build_base()
 	//----- see if we have enough money to build & support the weapon ----//
 
 	if( !nationPtr->ai_should_spend(50) )
+		return 0;
+
+	//--- another town of ours may have just ordered one, which is not counted yet ---//
+
+	if( nationPtr->is_action_exist(ACTION_AI_BUILD_FIRM, FIRM_BASE, 0) )
 		return 0;
 
 	if( jobless_population < MAX_BASE_PRAYER/2 ||
@@ -1077,6 +1121,40 @@ int Town::think_build_base()
 int Town::think_build_inn()
 {
 	Nation* ownNation = nation_array[nation_recno];
+
+	//--- another town of ours may have just ordered one, which is not counted yet ---//
+
+	if( ownNation->is_action_exist(ACTION_AI_BUILD_FIRM, FIRM_INN, 0) )
+		return 0;
+
+	//--- an inn comes when the strategy needs it: military and expansion hire soldiers and generals for capturing early, others first get their economy going ---//
+
+	switch( ai_war_state.get_strategy(nation_recno) )
+	{
+		case AI_STRATEGY_ECONOMY:
+			if( ownNation->ai_factory_count == 0 )		// wait for a running production chain
+				return 0;
+			break;
+
+		case AI_STRATEGY_TECH:
+			if( ownNation->ai_research_count == 0 && ownNation->ai_mine_count == 0 )
+				return 0;
+			break;
+
+		case AI_STRATEGY_NAVAL:
+			if( ownNation->ai_harbor_count == 0 && ownNation->ai_mine_count == 0 )
+				return 0;
+			break;
+	}
+
+	//--- don't build an inn that FirmInn::think_del() will close again for lack of cash ---//
+
+	if( ai_war_state.get_strategy(nation_recno) != -1 &&
+		 ownNation->profit_365days() < 0 &&
+		 ownNation->cash < 2000 + 1000 * ownNation->pref_cash_reserve / 100 + firm_res[FIRM_INN]->setup_cost )
+	{
+		return 0;
+	}
 
 	if( ownNation->ai_inn_count < ownNation->ai_supported_inn_count() )
 	{

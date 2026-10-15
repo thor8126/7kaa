@@ -1818,6 +1818,8 @@ void Town::surrender(int toNationRecno)
 	if( nation_recno && nation_recno != toNationRecno )
 		ai_war_state.town_captured(nation_recno, toNationRecno);
 
+	AiWarState::log( "TOWN        town %d (pop %d) surrenders from nation %d to %d", town_recno, population, nation_recno, toNationRecno );
+
 	//----------------------------------------//
 
 	if( nation_recno  == nation_array.player_recno ||

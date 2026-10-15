@@ -28,6 +28,8 @@
 #include <OF_CAMP.h>
 #include <OF_INN.h>
 #include <ONATION.h>
+#include <OAIWAR.h>
+#include <ConfigAdv.h>
 
 
 //------- define struct CaptureTown -------//
@@ -46,13 +48,18 @@ struct CaptureTown
 //
 int Nation::think_capture()
 {
+
 	if( ai_camp_count==0 )		// this can happen when a new nation has just emerged
 		return 0;
 
 	//--- don't capture if the AI is using growth and capture strategy (as opposite to build mine strategy) ---//
+	//--- a nation going for expansion captures from the start ---//
 
-	if( ai_mine_count==0 && total_population < 25 )
+	if( ai_mine_count==0 && total_population < 25 &&
+		 ai_war_state.get_strategy(nation_recno) != AI_STRATEGY_EXPAND )
+	{
 		return 0;
+	}
 
 	//-----------------------------------------//
 
@@ -111,9 +118,22 @@ int Nation::think_capture_independent()
 				continue;
 
 			//------ if we already have a camp linked to this town -----//
+			//
+			// A camp only lowers the resistance of villagers of its commander's
+			// race, so a linked camp commanded by another race is not capturing it.
+			//
+			//-------------------------------------------------------//
 
 			if( firmPtr->nation_recno == nation_recno )
-				break;
+			{
+				if( !config_adv.nation_ai_opening_strategy || !firmPtr->overseer_recno ||
+					 unit_array[firmPtr->overseer_recno]->race_id == townPtr->majority_race() )
+				{
+					break;
+				}
+
+				continue;
+			}
 
 			//--- if there is an overseer with high leadership and right race in the opponent's camp, don't bother to compete with him ---//
 
@@ -139,7 +159,13 @@ int Nation::think_capture_independent()
 		int averageResistance = townPtr->average_resistance(nation_recno);
 		int minResistance 	 = MIN( averageResistance, targetResistance );
 
-		if( minResistance < 50 - pref_peacefulness/5 )		// 30 to 50 depending on
+		int maxResistance = 50 - pref_peacefulness/5;		// 30 to 50 depending on peacefulness
+
+		if( ai_war_state.get_strategy(nation_recno) == AI_STRATEGY_EXPAND )
+			maxResistance += 15;		// a nation going for expansion takes on harder villages
+
+
+		if( minResistance < maxResistance )
 		{
 			captureTownQueue.push({townRecno, minResistance, captureUnitRecno});
 		}

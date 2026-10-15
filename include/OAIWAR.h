@@ -38,6 +38,18 @@ enum { AI_POSTURE_EXPAND=0,		// normal behavior, may start new wars
 		 AI_POSTURE_RECOVER,			// broke, starving or exhausted by war, seeks peace
 		 AI_POSTURE_COUNT };
 
+//------- Define opening strategies of AI nations -------//
+//
+// Chosen from the nation's surroundings and personality, and
+// re-evaluated every year.
+//
+enum { AI_STRATEGY_ECONOMY=0,		// raw materials nearby: mines, factories and trade first
+		 AI_STRATEGY_EXPAND,			// capturable villages nearby: forts and captures first
+		 AI_STRATEGY_MILITARY,		// a rival kingdom close by land: army first
+		 AI_STRATEGY_TECH,			// safe from rivals: research and war machines
+		 AI_STRATEGY_NAVAL,			// small home island: harbors and ships
+		 AI_STRATEGY_COUNT };
+
 #define MAX_WAR_WEARINESS				100
 #define WEARINESS_BLOCK_OFFENSIVE	70		// no new offensives against an enemy at or above this weariness
 #define WEARINESS_FORCE_PEACE			75		// willing to cease fire even during an attack mission
@@ -69,6 +81,8 @@ public:
 	WarRecord	war_record[MAX_NATION][MAX_NATION];
 	char			posture[MAX_NATION];
 	int32_t		posture_date[MAX_NATION];		// the date the current posture was adopted
+	char			strategy[MAX_NATION];
+	int32_t		strategy_date[MAX_NATION];		// the date the strategy was last evaluated, 0 if never
 
 public:
 	void			init();
@@ -78,6 +92,7 @@ public:
 	WarRecord*	get_record(int nationRecno, int withNationRecno);
 	float			weariness(int nationRecno, int withNationRecno);
 	int			get_posture(int nationRecno);
+	int			get_strategy(int nationRecno);
 
 	//------ event notifications ------//
 
@@ -94,7 +109,7 @@ public:
 	int			cease_war_rating(int nationRecno, int withNationRecno);
 
 	int			write_file(File* filePtr);
-	int			read_file(File* filePtr);
+	int			read_file(File* filePtr, int hasStrategy);
 
 	//------ optional event log for tuning, enabled by the SKAI_LOG environment variable ------//
 
@@ -104,6 +119,8 @@ private:
 	void			add_weariness(int nationRecno, int withNationRecno, float amount);
 	void			update_posture(int nationRecno);
 	int			recently_at_war(int nationRecno);
+	void			update_strategy(int nationRecno);
+	void			rate_strategies(int nationRecno, int* ratingArray);
 	static float unit_war_value(Unit* unitPtr);
 };
 

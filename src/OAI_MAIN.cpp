@@ -374,6 +374,38 @@ void Nation::process_ai_main()
 
 	int thinkId = (info.game_date-nation_recno*4) % intervalDays;
 
+	//--- the opening strategy gives its focus more thinking time, unless the posture is an emergency one ---//
+
+	int curPosture = ai_war_state.get_posture(nation_recno);
+
+	if( game.game_mode != GAME_TUTORIAL &&
+		 curPosture != AI_POSTURE_DEFEND && curPosture != AI_POSTURE_RECOVER )
+	{
+		switch( ai_war_state.get_strategy(nation_recno) )
+		{
+			case AI_STRATEGY_ECONOMY:
+			case AI_STRATEGY_TECH:
+				if( thinkId == 5 )			// think_secret_attack
+					thinkId = 0;				// think_build_firm (mines)
+				break;
+
+			case AI_STRATEGY_EXPAND:
+				if( thinkId == 5 )			// think_secret_attack
+					thinkId = 2;				// think_capture
+				break;
+
+			case AI_STRATEGY_MILITARY:
+				if( thinkId == 6 )			// think_attack_monster
+					thinkId = 4;				// think_military
+				break;
+
+			case AI_STRATEGY_NAVAL:
+				if( thinkId == 5 )			// think_secret_attack
+					thinkId = 8;				// think_marine
+				break;
+		}
+	}
+
 	//--- the strategic posture replaces aggressive thinking with more useful thinking ---//
 
 	if( game.game_mode != GAME_TUTORIAL )

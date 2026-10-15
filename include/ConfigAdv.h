@@ -66,6 +66,7 @@ public:
 
 	// nation settings
 	char			nation_ai_coalition;
+	char			nation_ai_opening_strategy;
 	char			nation_ai_posture;
 	char			nation_ai_smart_diplomacy;
 	char			nation_ai_war_weariness;

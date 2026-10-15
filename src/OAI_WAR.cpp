@@ -40,6 +40,9 @@
 #include <OINFO.h>
 #include <OFILE.h>
 #include <OTOWN.h>
+#include <OSITE.h>
+#include <OREGION.h>
+#include <OMISC.h>
 #include <ConfigAdv.h>
 
 //---------- Define constants ------------//
@@ -56,6 +59,9 @@
 #define MIN_TRUCE_DAYS					180
 #define POSTURE_MIN_DAYS				60			// minimum days before leaving a non-emergency posture
 #define CONSOLIDATE_MIN_DAYS			180
+#define STRATEGY_REVIEW_DAYS			365
+#define STRATEGY_SWITCH_MARGIN		10			// a new strategy must rate this much higher to replace the current one
+#define STRATEGY_SCAN_DISTANCE		80			// how far from its towns a nation looks for villages and raw materials
 
 //------- Begin of function AiWarState::log -------//
 //
@@ -99,6 +105,8 @@ void AiWarState::init()
 	memset( war_record, 0, sizeof(war_record) );
 	memset( posture, AI_POSTURE_EXPAND, sizeof(posture) );
 	memset( posture_date, 0, sizeof(posture_date) );
+	memset( strategy, AI_STRATEGY_ECONOMY, sizeof(strategy) );
+	memset( strategy_date, 0, sizeof(strategy_date) );
 }
 //-------- End of function AiWarState::init --------//
 
@@ -133,6 +141,9 @@ void AiWarState::reset_nation(int nationRecno)
 
 	posture[nationRecno-1] = AI_POSTURE_EXPAND;
 	posture_date[nationRecno-1] = info.game_date;
+
+	strategy[nationRecno-1] = AI_STRATEGY_ECONOMY;
+	strategy_date[nationRecno-1] = 0;		// evaluated on the nation's first day
 }
 //-------- End of function AiWarState::reset_nation --------//
 
@@ -177,6 +188,20 @@ int AiWarState::get_posture(int nationRecno)
 	return posture[nationRecno-1];
 }
 //-------- End of function AiWarState::get_posture --------//
+
+
+//------- Begin of function AiWarState::get_strategy -------//
+//
+// return : <int> the nation's opening strategy, -1 if strategies are disabled
+//
+int AiWarState::get_strategy(int nationRecno)
+{
+	if( !config_adv.nation_ai_opening_strategy || nationRecno < 1 || nationRecno > MAX_NATION )
+		return -1;
+
+	return strategy[nationRecno-1];
+}
+//-------- End of function AiWarState::get_strategy --------//
 
 
 //------- Begin of function AiWarState::add_weariness -------//
@@ -419,6 +444,14 @@ void AiWarState::next_day()
 
 		if( nationPtr->is_ai() && info.game_date%30 == i%30 )
 			update_posture(i);
+
+		//------ review the opening strategy once a year ------//
+
+		if( nationPtr->is_ai() && config_adv.nation_ai_opening_strategy &&
+			 ( !strategy_date[i-1] || info.game_date >= strategy_date[i-1] + STRATEGY_REVIEW_DAYS ) )
+		{
+			update_strategy(i);
+		}
 	}
 }
 //-------- End of function AiWarState::next_day --------//
@@ -533,6 +566,162 @@ void AiWarState::update_posture(int nationRecno)
 //-------- End of function AiWarState::update_posture --------//
 
 
+//------- Begin of function AiWarState::rate_strategies -------//
+//
+// Rate each opening strategy from the nation's surroundings and personality.
+//
+// <int*> ratingArray - array of AI_STRATEGY_COUNT ratings to be filled
+//
+void AiWarState::rate_strategies(int nationRecno, int* ratingArray)
+{
+	Nation* nationPtr = nation_array[nationRecno];
+
+	memset( ratingArray, 0, sizeof(int) * AI_STRATEGY_COUNT );
+
+	if( !nationPtr->largest_town_recno || town_array.is_deleted(nationPtr->largest_town_recno) )
+		return;
+
+	Town* baseTown   = town_array[nationPtr->largest_town_recno];
+	int   baseRegion = baseTown->region_id;
+	int   i, j;
+
+	//------- capturable villages near our towns -------//
+
+	int villageRating = 0;
+
+	for( i=town_array.size() ; i>0 ; i-- )
+	{
+		if( town_array.is_deleted(i) )
+			continue;
+
+		Town* townPtr = town_array[i];
+
+		if( townPtr->nation_recno || townPtr->rebel_recno || townPtr->region_id != baseRegion )
+			continue;
+
+		int minDistance = 0x7FFF;
+
+		for( j=0 ; j<nationPtr->ai_town_count ; j++ )
+		{
+			Town* ownTown = town_array[ nationPtr->ai_town_array[j] ];
+			int townDistance = misc.points_distance( townPtr->center_x, townPtr->center_y, ownTown->center_x, ownTown->center_y );
+			minDistance = MIN( minDistance, townDistance );
+		}
+
+		if( minDistance > STRATEGY_SCAN_DISTANCE )
+			continue;
+
+		villageRating += minDistance <= STRATEGY_SCAN_DISTANCE/2 ? 10 : 5;
+
+		if( townPtr->majority_race() == nationPtr->race_id )		// villages of our race are easier to win over
+			villageRating += 5;
+	}
+
+	villageRating = MIN( villageRating, 60 );
+
+	//------- untapped raw material sites near the capital -------//
+
+	int rawRating = 0;
+
+	for( i=site_array.size() ; i>0 ; i-- )
+	{
+		if( site_array.is_deleted(i) )
+			continue;
+
+		Site* sitePtr = site_array[i];
+
+		if( sitePtr->site_type != SITE_RAW || sitePtr->has_mine || sitePtr->region_id != baseRegion )
+			continue;
+
+		if( misc.points_distance( sitePtr->map_x_loc, sitePtr->map_y_loc, baseTown->center_x, baseTown->center_y ) <= STRATEGY_SCAN_DISTANCE )
+			rawRating += 15;
+	}
+
+	rawRating = MIN( rawRating, 45 );
+
+	//------- the nearest rival kingdom reachable by land -------//
+
+	int rivalDistance = 0x7FFF;
+
+	for( i=town_array.size() ; i>0 ; i-- )
+	{
+		if( town_array.is_deleted(i) )
+			continue;
+
+		Town* townPtr = town_array[i];
+
+		if( !townPtr->nation_recno || townPtr->nation_recno == nationRecno || townPtr->region_id != baseRegion )
+			continue;
+
+		int townDistance = misc.points_distance( townPtr->center_x, townPtr->center_y, baseTown->center_x, baseTown->center_y );
+		rivalDistance = MIN( rivalDistance, townDistance );
+	}
+
+	int rivalRating = rivalDistance < 70 ? 70 - rivalDistance : 0;		// the closer the rival, the higher
+
+	//------- a small home island with little to take -------//
+
+	int isSmallIsland = region_array[baseRegion]->region_size < 2500 &&
+							  villageRating < 10 && rawRating == 0;
+
+	//------- rate the strategies -------//
+
+	ratingArray[AI_STRATEGY_ECONOMY] = rawRating + nationPtr->pref_economic_development/3;
+	ratingArray[AI_STRATEGY_EXPAND]  = villageRating + nationPtr->pref_inc_pop_by_capture/3;
+
+	if( rivalRating )
+	{
+		ratingArray[AI_STRATEGY_MILITARY] = rivalRating + nationPtr->pref_military_development/3 +
+														(100-nationPtr->pref_peacefulness)/5;
+	}
+
+	ratingArray[AI_STRATEGY_TECH] = (rivalRating ? 0 : 15) + nationPtr->pref_use_weapon/3;
+
+	if( isSmallIsland )
+		ratingArray[AI_STRATEGY_NAVAL] = 60 + nationPtr->pref_use_marine/3;
+}
+//-------- End of function AiWarState::rate_strategies --------//
+
+
+//------- Begin of function AiWarState::update_strategy -------//
+//
+void AiWarState::update_strategy(int nationRecno)
+{
+	int ratingArray[AI_STRATEGY_COUNT];
+
+	rate_strategies(nationRecno, ratingArray);
+
+	int curStrategy  = strategy[nationRecno-1];
+	int bestStrategy = curStrategy;
+	int isFirstTime  = !strategy_date[nationRecno-1];
+
+	for( int i=0 ; i<AI_STRATEGY_COUNT ; i++ )
+	{
+		int requiredRating = ratingArray[bestStrategy];
+
+		if( !isFirstTime && bestStrategy == curStrategy )
+			requiredRating += STRATEGY_SWITCH_MARGIN;		// keep the current strategy unless another is clearly better
+
+		if( ratingArray[i] > requiredRating )
+			bestStrategy = i;
+	}
+
+	strategy_date[nationRecno-1] = info.game_date;
+
+	if( bestStrategy != curStrategy || isFirstTime )
+	{
+		static const char* strategyName[AI_STRATEGY_COUNT] = { "ECONOMY", "EXPAND", "MILITARY", "TECH", "NAVAL" };
+
+		log( "STRATEGY    nation %d: %s -> %s (economy %d, expand %d, military %d, tech %d, naval %d)",
+			  nationRecno, strategyName[curStrategy], strategyName[bestStrategy],
+			  ratingArray[0], ratingArray[1], ratingArray[2], ratingArray[3], ratingArray[4] );
+
+		strategy[nationRecno-1] = bestStrategy;
+	}
+}
+//-------- End of function AiWarState::update_strategy --------//
+
+
 //------- Begin of function AiWarState::can_start_offensive -------//
 //
 // Whether an AI nation should start a new offensive against a nation
@@ -622,6 +811,12 @@ int AiWarState::write_file(File* filePtr)
 	if( !filePtr->file_write( posture_date, sizeof(posture_date) ) )
 		return 0;
 
+	if( !filePtr->file_write( strategy, sizeof(strategy) ) )
+		return 0;
+
+	if( !filePtr->file_write( strategy_date, sizeof(strategy_date) ) )
+		return 0;
+
 	return 1;
 }
 //-------- End of function AiWarState::write_file --------//
@@ -629,7 +824,9 @@ int AiWarState::write_file(File* filePtr)
 
 //------- Begin of function AiWarState::read_file -------//
 //
-int AiWarState::read_file(File* filePtr)
+// <int> hasStrategy - whether the saved game has the strategy data (save version 214 and later)
+//
+int AiWarState::read_file(File* filePtr, int hasStrategy)
 {
 	if( !filePtr->file_read( war_record, sizeof(war_record) ) )
 		return 0;
@@ -640,12 +837,29 @@ int AiWarState::read_file(File* filePtr)
 	if( !filePtr->file_read( posture_date, sizeof(posture_date) ) )
 		return 0;
 
+	if( hasStrategy )
+	{
+		if( !filePtr->file_read( strategy, sizeof(strategy) ) )
+			return 0;
+
+		if( !filePtr->file_read( strategy_date, sizeof(strategy_date) ) )
+			return 0;
+	}
+	else
+	{
+		memset( strategy, AI_STRATEGY_ECONOMY, sizeof(strategy) );
+		memset( strategy_date, 0, sizeof(strategy_date) );		// evaluated again as the game goes on
+	}
+
 	//------ validate the values read -------//
 
 	for( int i=0 ; i<MAX_NATION ; i++ )
 	{
 		if( posture[i] < 0 || posture[i] >= AI_POSTURE_COUNT )
 			posture[i] = AI_POSTURE_EXPAND;
+
+		if( strategy[i] < 0 || strategy[i] >= AI_STRATEGY_COUNT )
+			strategy[i] = AI_STRATEGY_ECONOMY;
 
 		for( int j=0 ; j<MAX_NATION ; j++ )
 		{

@@ -243,6 +243,7 @@ void ConfigAdv::reset()
 	monster_attack_divisor = 4;
 
 	nation_ai_coalition = 1;
+	nation_ai_opening_strategy = 1;
 	nation_ai_posture = 1;
 	nation_ai_smart_diplomacy = 1;
 	nation_ai_war_weariness = 1;
@@ -367,6 +368,12 @@ int ConfigAdv::set(char *name, char *value)
 	else if( !strcmp(name, "nation_ai_coalition") )
 	{
 		if( !read_bool(value, &nation_ai_coalition) )
+			return 0;
+		update_check_sum(name, value);
+	}
+	else if( !strcmp(name, "nation_ai_opening_strategy") )
+	{
+		if( !read_bool(value, &nation_ai_opening_strategy) )
 			return 0;
 		update_check_sum(name, value);
 	}
