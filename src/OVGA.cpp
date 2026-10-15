@@ -30,6 +30,9 @@
 #include <version.h>
 #include <FilePath.h>
 #include <ConfigAdv.h>
+#ifdef __ANDROID__
+#include <android_glue.h>
+#endif
 
 DBGLOG_DEFAULT_CHANNEL(Vga);
 
@@ -360,6 +363,10 @@ void Vga::handle_messages()
 
    while( SDL_PollEvent(&event) )
    {
+#ifdef __ANDROID__
+      if( android_touch_event(&event) )
+         continue;
+#endif
       switch (event.type)
       {
       case SDL_QUIT:
@@ -561,6 +568,9 @@ void Vga::handle_messages()
          break;
       }
    }
+#ifdef __ANDROID__
+   android_touch_update();
+#endif
 }
 //-------- End of function Vga::handle_messages --------//
 

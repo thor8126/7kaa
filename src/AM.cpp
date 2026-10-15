@@ -87,6 +87,9 @@
 #include <OROCKRES.h>
 #include <OROCK.h>
 #include <OEFFECT.h>
+#ifdef __ANDROID__
+#include <android_glue.h>
+#endif
 #include <OEXPMASK.h>
 #include <OREGION.h>
 #include <OWARPT.h>
@@ -300,6 +303,10 @@ static void extra_error_handler();
 //
 int main(int argc, char **argv)
 {
+#ifdef __ANDROID__
+	if (!android_prepare_game_data())
+		return 1;
+#endif
 	if (!sys.set_game_dir())
 		return 1;
 	locale_res.init();

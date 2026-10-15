@@ -1,0 +1,202 @@
+import java.security.MessageDigest
+
+plugins {
+    id 'com.android.application'
+}
+
+// --------------------------------------------------------------------------
+// Locations
+// --------------------------------------------------------------------------
+
+// The repository root: the game sources (src/, include/) and data (data/)
+// are used from there directly, never copied.
+def repoRoot = rootProject.projectDir.parentFile.canonicalFile
+def gameDataDir = new File(repoRoot, 'data')
+
+def depsDir = rootProject.file(project.findProperty('sevenkaa.depsDir') ?: '../../7kaa-android-deps').canonicalFile
+def abiList = (project.findProperty('sevenkaa.abis') ?: 'arm64-v8a').split(',').collect { it.trim() }.findAll { it }
+
+// --------------------------------------------------------------------------
+// Third-party dependencies: downloaded once from their official GitHub
+// releases into depsDir (outside the repository), verified by SHA-256.
+// --------------------------------------------------------------------------
+
+def deps = [
+    sdl2: [
+        dir   : 'SDL2-2.32.10',
+        url   : 'https://github.com/libsdl-org/SDL/releases/download/release-2.32.10/SDL2-2.32.10.tar.gz',
+        sha256: '5f5993c530f084535c65a6879e9b26ad441169b3e25d789d83287040a9ca5165',
+    ],
+    openal: [
+        dir   : 'openal-soft-1.24.3',
+        url   : 'https://github.com/kcat/openal-soft/releases/download/1.24.3/openal-soft-1.24.3.tar.bz2',
+        sha256: 'cb5e6197a1c0da0edcf2a81024953cc8fa8545c3b9474e48c852af709d587892',
+    ],
+]
+
+def sha256Of = { File f ->
+    def md = MessageDigest.getInstance('SHA-256')
+    f.withInputStream { is ->
+        byte[] buf = new byte[1 << 16]
+        int n
+        while ((n = is.read(buf)) > 0) md.update(buf, 0, n)
+    }
+    md.digest().encodeHex().toString()
+}
+
+def ensureDep = { Map dep ->
+    def target = new File(depsDir, dep.dir)
+    if (target.isDirectory()) return target
+    depsDir.mkdirs()
+    def archive = new File(depsDir, dep.url.tokenize('/').last())
+    if (!archive.isFile() || sha256Of(archive) != dep.sha256) {
+        logger.lifecycle("Downloading ${dep.url}")
+        def tmp = new File(archive.path + '.part')
+        def attempt = 0
+        while (true) {
+            try {
+                def conn = new URL(dep.url).openConnection()
+                conn.connectTimeout = 30000
+                conn.readTimeout = 60000
+                conn.inputStream.withStream { input -> tmp.withOutputStream { it << input } }
+                break
+            } catch (IOException e) {
+                logger.lifecycle("Download failed (${e.message})")
+                // Some networks only work for curl (e.g. broken IPv6 seen
+                // by Java); try it before giving up.
+                def curl = ['curl', '-fsSL', '--retry', '2', '-o', tmp.path, dep.url].execute()
+                curl.waitForProcessOutput(System.out, System.err)
+                if (curl.exitValue() == 0) break
+                if (++attempt >= 3) throw e
+                logger.lifecycle('Retrying')
+            }
+        }
+        def actual = sha256Of(tmp)
+        if (actual != dep.sha256) {
+            tmp.delete()
+            throw new GradleException("Checksum mismatch for ${dep.url}: ${actual}")
+        }
+        archive.delete()
+        tmp.renameTo(archive)
+    }
+    logger.lifecycle("Extracting ${archive.name} to ${depsDir}")
+    def tree = archive.name.endsWith('.bz2') ? tarTree(resources.bzip2(archive)) : tarTree(resources.gzip(archive))
+    copy { from tree; into depsDir }
+    if (!target.isDirectory()) throw new GradleException("${archive.name} did not contain ${dep.dir}")
+    return target
+}
+
+def sdlDir = ensureDep(deps.sdl2)
+def openalDir = ensureDep(deps.openal)
+
+// --------------------------------------------------------------------------
+// Asset manifest: the game data is packaged from ../data as APK assets. The
+// native code copies it to internal storage on first start (and again when
+// the data changes), using this list. First line = hash of all the data.
+// --------------------------------------------------------------------------
+
+def generatedAssetsDir = layout.buildDirectory.dir('generated/sevenkaa-assets').get().asFile
+
+def isPackagedData = { File f -> !f.name.startsWith('Makefile') && !f.name.startsWith('.') && !f.name.endsWith('~') }
+
+def writeAssetManifest = {
+    def files = []
+    gameDataDir.eachFileRecurse(groovy.io.FileType.FILES) { f ->
+        if (isPackagedData(f)) files << f
+    }
+    files.sort { a, b -> a.path <=> b.path }
+    def md = MessageDigest.getInstance('SHA-256')
+    def lines = []
+    byte[] buf = new byte[1 << 16]
+    files.each { f ->
+        def rel = gameDataDir.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+        md.update(rel.getBytes('UTF-8'))
+        f.withInputStream { is -> int n; while ((n = is.read(buf)) > 0) md.update(buf, 0, n) }
+        lines << "${f.length()} ${rel}"
+    }
+    def text = "7KAA-ASSETS ${md.digest().encodeHex()}\n" + lines.join('\n') + '\n'
+    def out = new File(generatedAssetsDir, '7kaa_assets.txt')
+    if (!out.isFile() || out.text != text) {
+        generatedAssetsDir.mkdirs()
+        out.text = text
+    }
+}
+
+def genAssetManifest = tasks.register('genAssetManifest') {
+    inputs.dir(gameDataDir)
+    outputs.dir(generatedAssetsDir)
+    doLast { writeAssetManifest() }
+}
+
+// --------------------------------------------------------------------------
+
+android {
+    namespace 'com.thor8126.sevenkaa'
+    compileSdk 35
+    ndkVersion '27.3.13750724'
+
+    defaultConfig {
+        applicationId 'com.thor8126.sevenkaa'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '2.15.6-android1'
+
+        externalNativeBuild {
+            cmake {
+                arguments "-DSEVENKAA_ROOT=${repoRoot.path.replace('\\', '/')}",
+                          "-DSDL2_SRC=${sdlDir.path.replace('\\', '/')}",
+                          "-DOPENAL_SRC=${openalDir.path.replace('\\', '/')}",
+                          '-DANDROID_STL=c++_shared'
+                abiFilters(*abiList)
+            }
+        }
+        ndk {
+            abiFilters(*abiList)
+        }
+    }
+
+    buildTypes {
+        debug {
+            externalNativeBuild {
+                cmake {
+                    // The game is far too slow unoptimized.
+                    arguments '-DCMAKE_BUILD_TYPE=RelWithDebInfo'
+                }
+            }
+        }
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    externalNativeBuild {
+        cmake {
+            path 'jni/CMakeLists.txt'
+            version '3.31.6'
+        }
+    }
+
+    sourceSets {
+        main {
+            // SDL's Java glue (org.libsdl.app.*) is used from the SDL release.
+            java.srcDirs += [new File(sdlDir, 'android-project/app/src/main/java')]
+            assets.srcDirs = [gameDataDir, generatedAssetsDir]
+        }
+    }
+
+    androidResources {
+        ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!Makefile*'
+    }
+
+    lint {
+        abortOnError false
+    }
+}
+
+tasks.named('preBuild') { dependsOn genAssetManifest }
