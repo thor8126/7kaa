@@ -41,7 +41,7 @@ static short table_start_up_cash[5] = { OPTION_HIGH, OPTION_HIGH, OPTION_MODERAT
 static short table_ai_start_up_cash[5] = { OPTION_LOW, OPTION_MODERATE, OPTION_MODERATE, OPTION_HIGH, OPTION_VERY_HIGH };
 static char  table_ai_aggressiveness[5] = { OPTION_LOW, OPTION_LOW, OPTION_MODERATE, OPTION_HIGH, OPTION_VERY_HIGH };
 static short table_start_up_independent_town[5] = { 30, 30, 15, 15, 7 };
-static short table_start_up_raw_site[5] = { 7, 6, 6, 4, 3, };
+static short table_start_up_raw_site[5] = { 14, 12, 12, 8, 6, };
 static char  table_explore_whole_map[5] = { 1, 1, 1, 1, 0 };
 static char  table_fog_of_war[5] = { 0, 0, 0, 1, 1 };
 static char  table_new_independent_town_emerge[5] = { 1, 1, 1, 1, 1 };
@@ -89,7 +89,7 @@ void Config::default_game_setting()
 //	ai_start_up_food = MEDIUM_STARTUP_RESOURCE;
 	ai_aggressiveness = OPTION_MODERATE;
 	start_up_independent_town = 15;
-	start_up_raw_site = 6;
+	start_up_raw_site = 12;
 	difficulty_level = OPTION_CUSTOM;
 
 	explore_whole_map = 1;
@@ -460,7 +460,7 @@ int Config::single_player_difficulty()
 		score += 7;
 	if( fog_of_war )
 		score += 7;
-	score += (7 - MAX(start_up_raw_site, 7)) * 5;
+	score += (12 - MIN(start_up_raw_site, 12)) * 5;		// fewer raw sites make the game harder
 
 //	if( start_up_cash <= SMALL_STARTUP_RESOURCE )
 //		score += 16;

@@ -1202,7 +1202,7 @@ int Town::think_split_town()
 
 	Nation* nationPtr = nation_array[nation_recno];
 
-	if( population < 45 + nationPtr->pref_territorial_cohesiveness / 10 )
+	if( population < MAX_TOWN_POPULATION - 15 + nationPtr->pref_territorial_cohesiveness / 10 )		// 45 to 55 for 60-person towns
 		return 0;
 
 	//-------- think about which race to move --------//
@@ -1664,7 +1664,7 @@ int Town::think_counter_spy()
 int Town::needed_anti_spy_level()
 {
 	return ( linked_firm_count*10 +
-				100 * population / MAX_TOWN_POPULATION )
+				100 * population / STD_TOWN_POPULATION )
 			 * nation_array[nation_recno]->pref_counter_spy / 100;
 }
 //-------- End of function Town::needed_anti_spy_level --------//

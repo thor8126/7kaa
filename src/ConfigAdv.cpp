@@ -24,6 +24,7 @@
 #include <ConfigAdv.h>
 #include <FilePath.h>
 #include <ONATIONB.h>
+#include <OTOWN.h>
 #include <OFILETXT.h>
 #include <OMISC.h>
 #include <OMOUSE.h>
@@ -260,7 +261,7 @@ void ConfigAdv::reset()
 
 	scenario_config = 1;
 
-	town_ai_emerge_nation_pop_limit = 60 * MAX_NATION;
+	town_ai_emerge_nation_pop_limit = MAX_TOWN_POPULATION * MAX_NATION;
 	town_ai_emerge_town_pop_limit = 1000;
 	town_migration = 1;
 	town_loyalty_qol = 1;

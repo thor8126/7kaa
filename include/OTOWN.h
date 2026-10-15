@@ -46,8 +46,9 @@
 
 //------- define constant --------//
 
-#define MAX_TOWN_GROWTH_POPULATION  60		// grow up to 60 persons in a town
-#define MAX_TOWN_POPULATION  60		// MAX number of units in a town
+#define MAX_TOWN_GROWTH_POPULATION  120		// grow up to 120 persons in a town
+#define MAX_TOWN_POPULATION  120		// MAX number of units in a town
+#define STD_TOWN_POPULATION  60		// the original town size, for per-person rules whose balance should not change with the larger towns
 
 //-------- Define constant -----------//
 

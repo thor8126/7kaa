@@ -1930,7 +1930,7 @@ static int ceilf_int(float f)
 //
 int Town::recruit_dec_loyalty(int raceId, int decNow)
 {
-	float loyaltyDec = MIN( 5, (float) MAX_TOWN_POPULATION / race_pop_array[raceId-1] );
+	float loyaltyDec = MIN( 5, (float) STD_TOWN_POPULATION / race_pop_array[raceId-1] );
 
 	if( config_adv.fix_recruit_dec_loyalty )
 	{

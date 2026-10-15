@@ -440,6 +440,20 @@ void AiWarState::next_day()
 			}
 		}
 
+		//------ yearly summary for the event log ------//
+
+		if( info.game_date%365 == i%365 )
+		{
+			int largestTownPop = 0;
+
+			if( nationPtr->largest_town_recno && !town_array.is_deleted(nationPtr->largest_town_recno) )
+				largestTownPop = town_array[nationPtr->largest_town_recno]->population;
+
+			log( "SUMMARY     nation %d: towns %d, population %d (largest town %d), cash %.0f, yearly profit %.0f, mines %d, military rank %d",
+				  i, nationPtr->ai_town_count, nationPtr->total_population, largestTownPop,
+				  nationPtr->cash, nationPtr->profit_365days(), nationPtr->ai_mine_count, nationPtr->military_rank_rating() );
+		}
+
 		//------ update the posture of AI nations once a month ------//
 
 		if( nationPtr->is_ai() && info.game_date%30 == i%30 )
