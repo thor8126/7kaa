@@ -1,7 +1,10 @@
 name: Android APK
 
-# Builds the Android debug APK (see android/README.md) on GitHub's servers and
-# uploads it as a workflow artifact named "7kaa-android-apk".
+# Builds the Android debug APK (see android/README.md) on GitHub's servers
+# whenever the game or the Android project changes, then replaces the old APK:
+#   - apk/7kaa-android.apk in the repository (commit by github-actions)
+#   - the "android-latest" release, whose download link never changes:
+#     https://github.com/thor8126/7kaa/releases/download/android-latest/7kaa-android.apk
 
 on:
   push:
@@ -13,6 +16,14 @@ on:
       - 'data/**'
       - '.github/workflows/android.yml'
   workflow_dispatch:
+
+# Only the newest push matters: a newer one cancels an older build.
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+permissions:
+  contents: write
 
 jobs:
   apk:
@@ -45,9 +56,36 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --console=plain \
             -Psevenkaa.depsDir="$GITHUB_WORKSPACE/7kaa-android-deps"
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/7kaa-android.apk"
 
       - uses: actions/upload-artifact@v4
         with:
           name: 7kaa-android-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ runner.temp }}/7kaa-android.apk
           if-no-files-found: error
+
+      - name: Replace the APK on the android-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Latest Android build of commit ${GITHUB_SHA::7} ($(date -u '+%Y-%m-%d %H:%M UTC')). Install: download 7kaa-android.apk on the phone and open it (allow installing unknown apps)."
+          gh release delete android-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create android-latest "$RUNNER_TEMP/7kaa-android.apk" \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "Android APK (latest build)" --notes "$notes"
+
+      - name: Replace apk/7kaa-android.apk in the repository
+        run: |
+          mkdir -p apk
+          cp "$RUNNER_TEMP/7kaa-android.apk" apk/7kaa-android.apk
+          printf 'Built from commit %s on %s\n' "$GITHUB_SHA" "$(date -u '+%Y-%m-%d %H:%M UTC')" > apk/BUILD_INFO.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apk/7kaa-android.apk apk/BUILD_INFO.txt
+          git commit -m "Update Android APK (${GITHUB_SHA::7})"
+          # master may have moved on while building; apk/ never conflicts.
+          for i in 1 2 3; do
+            git pull --rebase origin master && git push origin HEAD:master && exit 0
+            sleep 10
+          done
+          exit 1

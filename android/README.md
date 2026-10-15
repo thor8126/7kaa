@@ -60,10 +60,13 @@ A Bluetooth/USB mouse and keyboard also work, exactly as on the desktop.
 
 ## Getting the APK
 
-A ready-built APK is in [`../apk/`](../apk/). Every push that changes the game
-or this folder also builds a fresh one on GitHub Actions
-(`.github/workflows/android.yml`; download the `7kaa-android-apk` artifact from
-the run's page), so nothing heavy has to run on your own PC.
+The latest APK is [`../apk/7kaa-android.apk`](../apk/), also at a fixed link:
+https://github.com/thor8126/7kaa/releases/download/android-latest/7kaa-android.apk
+
+Every push to `master` that changes `android/`, `src/`, `include/` or `data/`
+rebuilds it on GitHub Actions (`.github/workflows/android.yml`, ~15 minutes) and
+replaces both copies. Nothing heavy runs on your own PC. The APK commit is
+made by `github-actions[bot]`, so run `git pull` before your next push.
 
 ## Building locally
 
@@ -105,17 +108,20 @@ Options in `gradle.properties` (or `-P` on the command line):
 
 ## Installing on a phone
 
+Easiest: open the fixed link above in the phone's browser, open the downloaded
+`7kaa-android.apk`, and allow installing unknown apps when asked. Installing a
+newer build over an older one keeps your saves.
+
+Over USB instead:
+
 1. On the phone: Settings → About phone → tap *Build number* 7 times, then
    Settings → Developer options → enable *USB debugging*.
 2. Connect it by USB and accept the debugging prompt on the phone.
-3. Install:
+3. Install (`adb` is in `<sdk>/platform-tools`):
 
 ```bash
-adb install -r ../apk/7kaa-android-arm64.apk
+adb install -r ../apk/7kaa-android.apk
 ```
-
-`adb` is in `<sdk>/platform-tools`. Alternatively copy `app-debug.apk` to the
-phone and open it there (allow installing from unknown sources).
 
 The first start unpacks ~100 MB of game data, which takes a few seconds on a
 black screen; later starts are immediate. Logs: `adb logcat -s 7kaa SDL`.
