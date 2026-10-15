@@ -119,8 +119,12 @@ int Nation::think_capture_independent()
 
 			//------ if we already have a camp linked to this town -----//
 			//
-			// A camp only lowers the resistance of villagers of its commander's
-			// race, so a linked camp commanded by another race is not capturing it.
+			// A camp's commander only lowers the resistance of villagers of his
+			// own race, down to 100 - Town::camp_influence(). A linked camp with a
+			// commander of another race can still lower all races through cash
+			// grants (FirmCamp::think_use_cash_to_capture), but never brings the
+			// majority race down by influence, so a capturer of the majority race
+			// may still be sent to build a camp next to the village.
 			//
 			//-------------------------------------------------------//
 
