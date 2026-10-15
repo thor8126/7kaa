@@ -57,6 +57,7 @@
 #include <OPOWER.h>
 #include <ORACERES.h>
 #include <OREBEL.h>
+#include <OAIWAR.h>
 #include <OREMOTE.h>
 #include <OSPATH.h>
 #include <OSITE.h>
@@ -116,7 +117,7 @@
 //------- define game version constant --------//
 
 	const char *GAME_VERSION_STR = SKVERSION;
-	const int GAME_VERSION = 212;	// Version 2.00, don't change it unless the format of save game files has been changed
+	const int GAME_VERSION = 213;	// Version 2.00, don't change it unless the format of save game files has been changed
 
 //-------- System class ----------//
 
@@ -206,6 +207,7 @@ SiteArray         site_array;
 TownArray         town_array;
 TownNetworkArray  town_network_array;
 NationArray       nation_array;
+AiWarState        ai_war_state;
 FirmArray         firm_array;
 FirmDieArray	  firm_die_array;
 TornadoArray      tornado_array(10);

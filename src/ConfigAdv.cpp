@@ -242,6 +242,9 @@ void ConfigAdv::reset()
 	monster_alternate_attack_curve = 0;
 	monster_attack_divisor = 4;
 
+	nation_ai_coalition = 1;
+	nation_ai_posture = 1;
+	nation_ai_war_weariness = 1;
 	nation_ai_unite_min_relation_level = NATION_NEUTRAL;
 	nation_start_god_level = 0;
 	nation_start_tech_inc_all_level = 0;
@@ -260,6 +263,7 @@ void ConfigAdv::reset()
 	town_migration = 1;
 	town_loyalty_qol = 1;
 
+	unit_ai_retreat_wounded = 1;
 	unit_ai_team_help = 1;
 	unit_allow_path_power_mode = 0;
 	unit_finish_attack_move = 1;
@@ -359,6 +363,24 @@ int ConfigAdv::set(char *name, char *value)
 			return 0;
 		update_check_sum(name, value);
 	}
+	else if( !strcmp(name, "nation_ai_coalition") )
+	{
+		if( !read_bool(value, &nation_ai_coalition) )
+			return 0;
+		update_check_sum(name, value);
+	}
+	else if( !strcmp(name, "nation_ai_posture") )
+	{
+		if( !read_bool(value, &nation_ai_posture) )
+			return 0;
+		update_check_sum(name, value);
+	}
+	else if( !strcmp(name, "nation_ai_war_weariness") )
+	{
+		if( !read_bool(value, &nation_ai_war_weariness) )
+			return 0;
+		update_check_sum(name, value);
+	}
 	else if( !strcmp(name, "nation_ai_unite_min_relation_level") )
 	{
 		if( !strcmpi(value, "hostile") )
@@ -444,6 +466,12 @@ int ConfigAdv::set(char *name, char *value)
 	else if( !strcmp(name, "town_loyalty_qol") )
 	{
 		if( !read_bool(value, &town_loyalty_qol) )
+			return 0;
+		update_check_sum(name, value);
+	}
+	else if( !strcmp(name, "unit_ai_retreat_wounded") )
+	{
+		if( !read_bool(value, &unit_ai_retreat_wounded) )
 			return 0;
 		update_check_sum(name, value);
 	}

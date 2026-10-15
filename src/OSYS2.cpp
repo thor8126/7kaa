@@ -53,6 +53,7 @@
 #include <OROCK.h>
 #include <OEFFECT.h>
 #include <OLOG.h>
+#include <OAIWAR.h>
 #include <OCONFIG.h>
 #include <OPOWER.h>
 #include <OSERES.h>
@@ -238,6 +239,10 @@ void Sys::process()
 		region_array.next_day();
 		LOG_MSG("end region_array.next_day()");
 		LOG_MSG(misc.get_random_seed());
+
+		LOG_MSG("begin ai_war_state.next_day()");
+		ai_war_state.next_day();
+		LOG_MSG("end ai_war_state.next_day()");
 
 		day_frame_count = 0;
 	}

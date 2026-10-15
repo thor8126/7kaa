@@ -38,6 +38,7 @@
 #include <OSERES.h>
 #include <OSYS.h>
 #include <OWARPT.h>
+#include <OAIWAR.h>
 
 #ifdef NO_DEBUG_UNIT
 #undef err_when
@@ -146,6 +147,8 @@ void Unit::hit_target(Unit* parentUnit, Unit* targetUnit, float attackDamage, sh
 	#define ONE_OVER_ATTACK_SLOW_DOWN				(float) 1/ATTACK_SLOW_DOWN
 	#define COMPARE_POINT								DEFAULT_ARMOR_OVER_ATTACK_SLOW_DOWN + ONE_OVER_ATTACK_SLOW_DOWN
 
+	float hitPointsBefore = targetUnit->hit_points;		// a dying unit can be hit again before it is removed
+
 	//-*********** simulate aat ************-//
 #ifdef DEBUG
 		if(!debug_sim_game_type)
@@ -167,6 +170,12 @@ void Unit::hit_target(Unit* parentUnit, Unit* targetUnit, float attackDamage, sh
 	if( targetUnit->hit_points <= 0 )
 	{
 		targetUnit->hit_points = (float) 0;
+
+		if( hitPointsBefore > 0 && parentNationRecno && targetNationRecno &&
+			 parentNationRecno != targetNationRecno )
+		{
+			ai_war_state.unit_killed(parentNationRecno, targetUnit);
+		}
 
 		//---- if the unit killed is a human unit -----//
 
@@ -638,6 +647,9 @@ void Unit::hit_firm(Unit* attackUnit, int targetXLoc, int targetYLoc, float atta
 				attackNationPtr->enemy_firm_destroyed++;
 
 			nation_array[targetFirm->nation_recno]->own_firm_destroyed++;
+
+			if( attackNationRecno && attackNationRecno != targetFirm->nation_recno )
+				ai_war_state.firm_destroyed(attackNationRecno, targetFirm->nation_recno);
 		}
 
 		else if( targetFirm->firm_id == FIRM_MONSTER )

@@ -47,6 +47,7 @@
 #include <OREBEL.h>
 #include <OREMOTE.h>
 #include <ConfigAdv.h>
+#include <OAIWAR.h>
 #include "gettext.h"
 
 //-------- Define static variables --------//
@@ -141,6 +142,8 @@ void NationBase::init(int nationType, int raceId, int colorSchemeId, uint32_t pl
 
 	// #### Richard 6-12-2013: Moved this from init_relation to here, so it works with new independent nations spawning #### //
 	is_allied_with_player = 0;
+
+	ai_war_state.reset_nation(nation_recno);
 
 	for( int i=nation_array.size() ; i>0 ; i-- )
 	{
@@ -306,6 +309,8 @@ void NationBase::init_relation(int relationNationRecno)
 	NationRelation* nationRelation = relation_array+relationNationRecno-1;
 
 	memset( nationRelation, 0, sizeof(NationRelation) );
+
+	ai_war_state.reset_pair(nation_recno, relationNationRecno);		// the recno may be a reused one
 
 	set_relation_should_attack(relationNationRecno, relationNationRecno!=nation_recno, COMMAND_AUTO);
 
@@ -1137,8 +1142,12 @@ void NationBase::set_relation_status(short nationRecno, char newStatus, char rec
 
 	//------------------------------------------------//
 
+	int oldStatus = nationRelation->status;
+
 	relation_status_array[nationRecno-1] = newStatus;
 	nationRelation->status = newStatus;
+
+	ai_war_state.status_changed(nation_recno, nationRecno, oldStatus, newStatus);
 	nationRelation->last_change_status_date = info.game_date;
 
 	int newRelationLevel = newStatus * RELATION_LEVEL_PER_STATUS;

@@ -65,6 +65,9 @@ public:
 	int			monster_attack_divisor;
 
 	// nation settings
+	char			nation_ai_coalition;
+	char			nation_ai_posture;
+	char			nation_ai_war_weariness;
 	char			nation_ai_unite_min_relation_level;
 	int			nation_start_god_level;
 	int			nation_start_tech_inc_all_level;
@@ -87,6 +90,7 @@ public:
 	char			town_loyalty_qol;
 
 	// unit settings
+	char			unit_ai_retreat_wounded;
 	char			unit_ai_team_help;
 	char			unit_finish_attack_move;
 	char			unit_loyalty_require_local_leader;

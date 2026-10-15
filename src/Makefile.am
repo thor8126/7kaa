@@ -33,6 +33,7 @@ bin_PROGRAMS = 7kaa
 	OAI_TOWN.cpp \
 	OAI_TRAD.cpp \
 	OAI_UNIT.cpp \
+	OAI_WAR.cpp \
 	OANLINE.cpp \
 	OBATTLE.cpp \
 	OBLOB.cpp \

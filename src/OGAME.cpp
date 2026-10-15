@@ -71,6 +71,7 @@
 #include <OWARPT.h>
 // ##### begin Gilbert 2/10 #######//
 #include <OFIRMDIE.h>
+#include <OAIWAR.h>
 // ##### end Gilbert 2/10 #######//
 
 //---------------- DETECT_SPREAD ----------------//
@@ -156,6 +157,7 @@ int Game::init(int loadGameCall)
 	//------- init game data class ---------//
 
 	nation_array.init();
+	ai_war_state.init();
 	firm_array.init();
 	// ##### begin Gilbert 2/10 #######//
 	firm_die_array.init();

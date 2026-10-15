@@ -58,6 +58,7 @@
 #include <OSaveGameArray.h>
 #include <dbglog.h>
 #include <file_io_visitor.h>
+#include <OAIWAR.h>
 
 using namespace FileIOVisitor;
 
@@ -115,6 +116,9 @@ DBGLOG_DEFAULT_CHANNEL(GameFile);
 //--------- Define static vars ---------//
 
 static int loaded_random_seed;
+static int loaded_game_version;
+
+#define FIRST_VERSION_WITH_AI_WAR_STATE	213
 
 bool GameFile::read_file_same_version = true;
 
@@ -204,6 +208,7 @@ int GameFile::read_file(File* filePtr)
 		return -1;		// the executing program can't handle saved game in future version
 
 	read_file_same_version = ( load_file_game_version/100==GAME_VERSION/100 );
+	loaded_game_version = load_file_game_version;
 
 	//------------------------------------------------//
 	//
@@ -446,6 +451,13 @@ int GameFile::write_file_3(File* filePtr)
 	write_book_mark( filePtr, BOOK_MARK+214 );
 
 	if( !dirt_array.write_file(filePtr) )
+		return 0;
+
+	//--- the AI war state must be before firm_die_array, as read_file_3() does not read firm_die_array ---//
+
+	write_book_mark( filePtr, BOOK_MARK+216 );
+
+	if( !ai_war_state.write_file(filePtr) )
 		return 0;
 
 	// ##### begin Gilbert 2/10 ######//
@@ -708,6 +720,19 @@ int GameFile::read_file_3(File* filePtr)
 
 	if( !dirt_array.read_file(filePtr) )
 		return 0;
+
+	if( loaded_game_version >= FIRST_VERSION_WITH_AI_WAR_STATE )
+	{
+		if( !read_book_mark( filePtr, BOOK_MARK+216 ) )
+			return 0;
+
+		if( !ai_war_state.read_file(filePtr) )
+			return 0;
+	}
+	else
+	{
+		ai_war_state.init();		// older saved games have no war records, they will be rebuilt as the game goes on
+	}
 
 	// ##### begin Gilbert 2/10 ######//
 	if( !read_book_mark( filePtr, BOOK_MARK+215 ) )

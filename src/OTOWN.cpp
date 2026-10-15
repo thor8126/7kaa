@@ -54,6 +54,7 @@
 #include <OSERES.h>
 #include <OLOG.h>
 #include <ConfigAdv.h>
+#include <OAIWAR.h>
 
 static char random_race();
 
@@ -1811,6 +1812,11 @@ void Town::surrender(int toNationRecno)
 		if( rebelPtr->mobile_rebel_count > 0 )
 			return;
 	}
+
+	//------ record towns taken in wars ------//
+
+	if( nation_recno && nation_recno != toNationRecno )
+		ai_war_state.town_captured(nation_recno, toNationRecno);
 
 	//----------------------------------------//
 
