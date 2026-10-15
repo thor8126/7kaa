@@ -34,8 +34,9 @@
 
 //------------- define constant --------------//
 
-#define MAX_RAW			 		    3
-#define MAX_PRODUCT					 3
+#define MAX_RAW			 		    5
+#define MAX_PRODUCT					 5		// one product per raw material, must equal MAX_RAW
+#define STD_PRODUCT_COUNT			 3		// the original number of products, for rules whose balance should not change with more products
 #define MAX_RAW_RESERVE_QTY	50000
 
 //------------ define icon size -------------//
@@ -50,7 +51,12 @@ enum { RAW_SMALL_ICON_WIDTH=10,
 
 enum { RAW_CLAY=1,
 		 RAW_COPPER,
-		 RAW_IRON,		 };
+		 RAW_IRON,
+		 RAW_GOLD,
+		 RAW_MARBLE,		 };
+
+static_assert( MAX_RAW == MAX_PRODUCT, "every raw material has one product" );
+static_assert( RAW_MARBLE == MAX_RAW, "a raw id for each raw material" );
 
 //------------ Define struct RawRec ---------------//
 
@@ -109,6 +115,7 @@ public:
 
 	void  	put_small_product_icon(int x, int y, int rawId);
 	void		put_small_raw_icon(int x, int y, int rawId);
+	void		disp_goods_qty(int y, short* rawQtyArray, short* productQtyArray);
 	const char*	product_name(int rawId);
 
 	char* 	large_product_icon(int rawId)	{ return res_icon.read(rawId); }

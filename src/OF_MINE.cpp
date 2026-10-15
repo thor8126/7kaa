@@ -38,6 +38,7 @@
 #include <OBUTT3D.h>
 #include "gettext.h"
 #include <ConfigAdv.h>
+#include <OAIWAR.h>
 
 //------- define static vars -------//
 
@@ -111,6 +112,8 @@ void FirmMine::init_derived()
 
 		site_array[site_recno]->has_mine = 1;
 		site_array.untapped_raw_count--;
+
+		AiWarState::log( "MINE        nation %d mines %s", nation_recno, raw_res[raw_id]->name );
 
 		err_when( site_array.untapped_raw_count < 0 );
 	}
@@ -259,12 +262,15 @@ int FirmMine::detect_info()
 //----------- End of function FirmMine::detect_info -----------//
 
 
-const char *mining_raw_msg[MAX_RAW] =
+const char *mining_raw_msg[] =
 {
 	N_("Mining Clay"),
 	N_("Mining Copper"),
 	N_("Mining Iron"),
+	N_("Mining Gold"),
+	N_("Mining Marble"),
 };
+static_assert( sizeof(mining_raw_msg)/sizeof(mining_raw_msg[0]) == MAX_RAW, "one entry for each raw material" );
 //--------- Begin of function FirmMine::disp_mine_info ---------//
 //
 void FirmMine::disp_mine_info(int dispY1, int refreshFlag)

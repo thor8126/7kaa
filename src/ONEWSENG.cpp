@@ -1196,13 +1196,16 @@ void News::assassinator_caught()
 //------- End of function News::assassinator_caught -----//
 
 
-const char *raw_exhaust_msg[MAX_RAW] =
+const char *raw_exhaust_msg[] =
 {
 	// TRANSLATORS: Your <Clay/Copper/Iron> Mine has exhausted its <Clay/Copper/Iron> deposit.
 	N_("Your Clay Mine has exhausted its Clay deposit."),
 	N_("Your Copper Mine has exhausted its Copper deposit."),
 	N_("Your Iron Mine has exhausted its Iron deposit."),
+	N_("Your Gold Mine has exhausted its Gold deposit."),
+	N_("Your Marble Mine has exhausted its Marble deposit."),
 };
+static_assert( sizeof(raw_exhaust_msg)/sizeof(raw_exhaust_msg[0]) == MAX_RAW, "one entry for each raw material" );
 //------ Begin of function News::raw_exhaust -----//
 //
 // short_para1 - raw id.

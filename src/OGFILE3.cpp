@@ -526,7 +526,7 @@ static void visit_unit_marine_derived(Visitor *v, UnitMarine *u)
 	visit<int32_t>(v, &u->last_load_goods_date);
 }
 
-enum { UNIT_MARINE_DERIVED_RECORD_SIZE = 145 };
+enum { UNIT_MARINE_DERIVED_RECORD_SIZE = 137 + 4*MAX_RAW };		// 145 with 3 raw materials
 
 //--------- Begin of function UnitMarine::read_derived_file ---------//
 int UnitMarine::read_derived_file(File* filePtr)
@@ -1585,7 +1585,7 @@ static void visit_version_1_nation(Visitor *v, Version_1_Nation *v1n)
 	visit<int32_t>(v, &v1n->total_ship_combat_level);
 	visit<int16_t>(v, &v1n->largest_town_recno);
 	visit<int16_t>(v, &v1n->largest_town_pop);
-	visit_array<int16_t>(v, v1n->raw_count_array, MAX_RAW);
+	visit_array<int16_t>(v, v1n->raw_count_array, VERSION_1_MAX_RAW);
 	visit_array<uint16_t>(v, v1n->last_unit_name_id_array,
 								VERSION_1_MAX_UNIT_TYPE);
 	visit<int32_t>(v, &v1n->population_rating);
@@ -1900,7 +1900,7 @@ static void visit_nation(Visitor *v, Nation *nat)
 	visit<int16_t>(v, &nat->lead_attack_camp_recno);
 }
 
-enum { NATION_RECORD_SIZE = 2202 };
+enum { NATION_RECORD_SIZE = 2196 + 2*MAX_RAW };		// 2202 with 3 raw materials
 
 //--------- Begin of function Nation::write_file ---------//
 //

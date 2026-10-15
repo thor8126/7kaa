@@ -175,7 +175,8 @@ void UnitCaravan::disp_stop(int dispY1, int refreshFlag)
 				firmPtr = firm_array[ stop_array[i].firm_recno ];
 				nation_array[firmPtr->nation_recno]->disp_nation_color(x+4, y+4);
 				font_san.put(x+20, y+4, firmPtr->firm_name());
-				font_san.put(x+4, y+19, _("Pick up:"));
+				if( GOODS_SELECT_SHOW_LABEL )		// the goods buttons take the whole row when there are many goods types
+					font_san.put(x+4, y+19, _("Pick up:"));
 
 #if(defined(FRENCH))
 				button_set_stop[i].paint_text( x+4, y+37, x+86, y+56, "Set Stop" );
@@ -263,14 +264,13 @@ void UnitCaravan::disp_goods_select_button(int stopNum, int dispY1, int refreshF
 	if(refreshFlag!=INFO_REPAINT && refreshFlag!=INFO_UPDATE)
 		return;
 
-	#define SHIFT_X_OFFSET	73
 	#define SELECT_BUTTON_WIDTH	16
 	#define SELECT_BUTTON_HEIGHT	16
 
 	CaravanStop	*stopPtr = &stop_array[stopNum];
 	Firm *firmPtr = firm_array[stopPtr->firm_recno];
 
-	int  x=INFO_X1+SHIFT_X_OFFSET, y=dispY1+17, x1, pick_up_goods = 0;
+	int  x=GOODS_SELECT_X, y=dispY1+17, x1, pick_up_goods = 0;
 	char *pickUpArray = stopPtr->pick_up_array;
 	char isPush;
 
@@ -487,30 +487,7 @@ void UnitCaravan::disp_goods(int dispY1, int refreshFlag)
 	if( refreshFlag == INFO_REPAINT )
 		vga_util.d3_panel_up( INFO_X1, dispY1, INFO_X2, dispY1+42 );
 
-	int	x=INFO_X1+20, y=dispY1+5;
-	String str;
-
-	int i;
-	for(i=0; i<MAX_RAW; i++, x+=60)
-	{
-		vga_front.d3_panel_up( x, y, x+RAW_SMALL_ICON_WIDTH+5, y+RAW_SMALL_ICON_HEIGHT+5 );
-
-		raw_res.put_small_raw_icon( x+3, y+3, i+1 );
-
-		font_san.disp( x+25, y+2, raw_qty_array[i], 1, x+59 );
-	}
-
-	x =INFO_X1+20;
-	y+=19;
-
-	for( i=0; i<MAX_PRODUCT; i++, x+=60)
-	{
-		vga_front.d3_panel_up( x, y, x+RAW_SMALL_ICON_WIDTH+5, y+RAW_SMALL_ICON_HEIGHT+5 );
-
-		raw_res.put_small_product_icon( x+3, y+3, i+1 );
-
-		font_san.disp( x+25, y+2, product_raw_qty_array[i], 1, x+59 );
-	}
+	raw_res.disp_goods_qty( dispY1+5, raw_qty_array, product_raw_qty_array );
 }
 //---------- End of function UnitCaravan::disp_goods ----------//
 

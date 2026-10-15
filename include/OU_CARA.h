@@ -67,6 +67,17 @@ enum	{	AUTO_PICK_UP = 0,
 
 enum { PICK_UP_TYPE_COUNT = NO_PICK_UP };
 
+//---- layout of the goods pick up buttons of a caravan or ship stop in the info panel ----//
+//
+// The buttons follow the "Pick up:" label when they all fit, otherwise
+// (with more goods types) they start at the panel's left edge without the label.
+// Used where INFO_X1 and INFO_X2 are defined (OINFO.h).
+
+#define GOODS_SELECT_LABEL_OFFSET	73
+#define GOODS_SELECT_BUTTON_WIDTH	16
+#define GOODS_SELECT_SHOW_LABEL		( INFO_X2-4-(INFO_X1+GOODS_SELECT_LABEL_OFFSET) >= GOODS_SELECT_BUTTON_WIDTH*(NO_PICK_UP+1) )
+#define GOODS_SELECT_X					( INFO_X1 + (GOODS_SELECT_SHOW_LABEL ? GOODS_SELECT_LABEL_OFFSET : 4) )
+
 enum { NO_STOP_DEFINED = 0,	// used for journey_status
 		 ON_WAY_TO_FIRM = 1,
 		 SURROUND_FIRM,

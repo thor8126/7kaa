@@ -99,6 +99,12 @@ void RawRes::load_all_info()
 	Database *dbRaw = game_set.open_db(RAW_DB);
 
 	raw_count = (short) dbRaw->rec_count();
+
+	//--- the code has arrays and icons for exactly MAX_RAW raw materials ---//
+
+	if( raw_count != MAX_RAW )
+		err.run( "RAW.DBF in STD.SET has %d raw materials, but the game needs %d.", raw_count, MAX_RAW );
+
 	raw_info_array = new RawInfo[raw_count];
 
 	//------ read in raw information array -------//
@@ -280,12 +286,51 @@ void RawRes::put_small_product_icon(int x, int y, int rawId)
 //---------- End of function RawRes::put_small_product_icon -----------//
 
 
-const char *product_name_str[MAX_RAW] =
+const char *product_name_str[] =
 {
 	N_("Clay Products"),
 	N_("Copper Products"),
-	N_("Iron Products")
+	N_("Iron Products"),
+	N_("Gold Products"),
+	N_("Marble Products")
 };
+static_assert( sizeof(product_name_str)/sizeof(product_name_str[0]) == MAX_RAW, "one entry for each raw material" );
+//---------- Begin of function RawRes::disp_goods_qty -----------//
+//
+// Display the quantities of goods carried by a caravan or a ship in the
+// info panel: raw materials on the first row, products on the second.
+//
+// <int>    y                - y position of the first row
+// <short*> rawQtyArray      - MAX_RAW quantities of raw materials
+// <short*> productQtyArray  - MAX_PRODUCT quantities of products
+//
+void RawRes::disp_goods_qty(int y, short* rawQtyArray, short* productQtyArray)
+{
+	#define GOODS_DISP_X_MARGIN	4
+	#define GOODS_DISP_X_STEP		( (INFO_X2-INFO_X1-GOODS_DISP_X_MARGIN*2) / MAX_RAW )
+	#define GOODS_DISP_QTY_OFFSET	(RAW_SMALL_ICON_WIDTH+8)
+
+	for( int row=0 ; row<2 ; row++, y+=19 )
+	{
+		int x = INFO_X1 + GOODS_DISP_X_MARGIN;
+
+		for( int i=0 ; i<MAX_RAW ; i++, x+=GOODS_DISP_X_STEP )
+		{
+			vga_front.d3_panel_up( x, y, x+RAW_SMALL_ICON_WIDTH+5, y+RAW_SMALL_ICON_HEIGHT+5 );
+
+			if( row==0 )
+				put_small_raw_icon( x+3, y+3, i+1 );
+			else
+				put_small_product_icon( x+3, y+3, i+1 );
+
+			font_san.disp( x+GOODS_DISP_QTY_OFFSET, y+2, row==0 ? rawQtyArray[i] : productQtyArray[i], 1,
+								x+GOODS_DISP_X_STEP-2 );
+		}
+	}
+}
+//---------- End of function RawRes::disp_goods_qty -----------//
+
+
 //---------- Begin of function RawRes::product_name -----------//
 
 const char *RawRes::product_name(int rawId)

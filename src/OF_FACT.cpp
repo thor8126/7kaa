@@ -40,6 +40,7 @@
 #include <OF_FACT.h>
 #include <OREMOTE.h>
 #include <OSE.h>
+#include <OAIWAR.h>
 #include "gettext.h"
 
 
@@ -196,6 +197,8 @@ void FirmFactory::auto_set_product()
 			}
 		}
 	}
+
+	AiWarState::log( "FACTORY     nation %d makes %s", nation_recno, raw_res.product_name(product_raw_id) );
 }
 //------- End of function FirmFactory::auto_set_product -------//
 
@@ -356,12 +359,15 @@ void FirmFactory::draw(int displayLayer)
 //--------- End of function FirmFactory::draw -----------//
 
 
-const char *producing_product_msg[MAX_RAW] =
+const char *producing_product_msg[] =
 {
 	N_("Producing Clay Products"),
 	N_("Producing Copper Products"),
 	N_("Producing Iron Products"),
+	N_("Producing Gold Products"),
+	N_("Producing Marble Products"),
 };
+static_assert( sizeof(producing_product_msg)/sizeof(producing_product_msg[0]) == MAX_RAW, "one entry for each raw material" );
 //--------- Begin of function FirmFactory::disp_factory_info ---------//
 //
 void FirmFactory::disp_factory_info(int dispY1, int refreshFlag)

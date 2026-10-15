@@ -4414,7 +4414,12 @@ void Town::update_quality_of_life()
 
 	//------ return the quality of life ------//
 
-	quality_of_life = int( (float)100 * totalPurchase / (townDemand * MAX_PRODUCT) );
+	//--- buying any STD_PRODUCT_COUNT products in full gives the best quality of life, as in the original game with 3 products ---//
+	//--- it is capped at 100 as the loyalty and growth rules are based on 0 to 100 ---//
+
+	quality_of_life = int( (float)100 * totalPurchase / (townDemand * STD_PRODUCT_COUNT) );
+
+	quality_of_life = MIN( quality_of_life, 100 );
 }
 //----------- End of function Town::update_quality_of_life ---------//
 

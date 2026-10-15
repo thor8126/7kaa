@@ -104,6 +104,7 @@ void Version_1_Town::convert_to_version_2(Town *townPtr)
 	townPtr->auto_grant_loyalty = auto_grant_loyalty;
 	townPtr->town_combat_level = town_combat_level;
 	
+	memset(townPtr->has_product_supply, 0, sizeof(townPtr->has_product_supply));
 	memcpy(townPtr->has_product_supply, has_product_supply, sizeof(has_product_supply));
 
 	townPtr->no_neighbor_space = no_neighbor_space;
@@ -264,6 +265,7 @@ void Version_1_NationBase::convert_to_version_2(Nation *nationPtr)
 	nationPtr->largest_town_recno = largest_town_recno;
 	nationPtr->largest_town_pop = largest_town_pop;
 
+	memset(nationPtr->raw_count_array, 0, sizeof(nationPtr->raw_count_array));
 	memcpy(nationPtr->raw_count_array, raw_count_array, sizeof(raw_count_array));
 	memset(nationPtr->last_unit_name_id_array, 0, sizeof(nationPtr->last_unit_name_id_array));
 	memcpy(nationPtr->last_unit_name_id_array, last_unit_name_id_array, sizeof(last_unit_name_id_array));

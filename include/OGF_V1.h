@@ -35,6 +35,7 @@
 
 //------------ Define constant for game version == 1xx -----------------//
 #define	VERSION_1_MAX_RACE						7
+#define	VERSION_1_MAX_RAW						3		// raw materials and products in version 1 saved games
 #define	VERSION_1_MAX_UNIT_TYPE					37
 #define	VERSION_1_RACERES_NAME_COUNT			1582
 #define	VERSION_1_UNITRES_UNIT_INFO_COUNT	37
@@ -115,7 +116,7 @@ public:
 	//----------- AI vars ------------//
 
 	char	town_combat_level;						// combat level of the people in this town
-	char	has_product_supply[MAX_PRODUCT];		// whether this town has the supply of these products
+	char	has_product_supply[VERSION_1_MAX_RAW];		// whether this town has the supply of these products
 	char	no_neighbor_space;						// 1 if there is no space to build firms/towns next to this town
 
 	//------ inter-relationship -------//
@@ -284,7 +285,7 @@ class Version_1_NationBase
 		short		 largest_town_recno;		// the recno of the biggest town of this nation
 		short		 largest_town_pop;
 
-		short		 raw_count_array[MAX_RAW];		// no. of natural resources site this nation possesses
+		short		 raw_count_array[VERSION_1_MAX_RAW];		// no. of natural resources site this nation possesses
 		uint16_t	 last_unit_name_id_array[VERSION_1_MAX_UNIT_TYPE];
 
 		//--------- rank ratings ---------//

@@ -515,30 +515,7 @@ int FirmHarbor::detect_det()
 //
 void FirmHarbor::disp_ship_goods(UnitMarine* shipUnit, int dispY1, int refreshFlag)
 {
-	int	x=INFO_X1+20, y=dispY1+5;
-	String str;
-
-	int i;
-	for(i=0; i<MAX_RAW; i++, x+=60)
-	{
-		vga_front.d3_panel_up( x, y, x+RAW_SMALL_ICON_WIDTH+5, y+RAW_SMALL_ICON_HEIGHT+5 );
-
-		raw_res.put_small_raw_icon( x+3, y+3, i+1 );
-
-		font_san.disp( x+25, y+2, shipUnit->raw_qty_array[i], 1, x+59 );
-	}
-
-	x =INFO_X1+20;
-	y+=19;
-
-	for( i=0; i<MAX_PRODUCT; i++, x+=60)
-	{
-		vga_front.d3_panel_up( x, y, x+RAW_SMALL_ICON_WIDTH+5, y+RAW_SMALL_ICON_HEIGHT+5 );
-
-		raw_res.put_small_product_icon( x+3, y+3, i+1 );
-
-		font_san.disp( x+25, y+2, shipUnit->product_raw_qty_array[i], 1, x+59 );
-	}
+	raw_res.disp_goods_qty( dispY1+5, shipUnit->raw_qty_array, shipUnit->product_raw_qty_array );
 }
 //---------- End of function FirmHarbor::disp_ship_goods ----------//
 
