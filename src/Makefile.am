@@ -242,6 +242,7 @@ bin_PROGRAMS = 7kaa
 	OUNITM.cpp \
 	OUNITRES.cpp \
 	OUNITS.cpp \
+	OUNITSUP.cpp \
 	OU_CARA.cpp \
 	OU_CARA2.cpp \
 	OU_CARAS.cpp \

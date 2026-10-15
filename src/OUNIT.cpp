@@ -938,6 +938,10 @@ void Unit::next_day()
 	   err_when( unit_array.is_deleted(unitRecno) );
 	}
 
+	//------- attrition when out of supply -------//
+
+	process_supply();
+
    //------- restore cur_power --------//
 
    cur_power += 5;
@@ -1035,6 +1039,11 @@ void Unit::next_day()
 void Unit::process_recover()
 {
 	if( hit_points==0 || hit_points == max_hit_points )      // this unit is dead already
+		return;
+
+	//---- units out of supply don't recover, see OUNITSUP.CPP ----//
+
+	if( is_supply_unit() && !is_supplied() )
 		return;
 
 	err_when( hit_points > max_hit_points );

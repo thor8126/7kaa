@@ -1191,7 +1191,18 @@ void Unit::disp_unit_info(int dispY1, int refreshFlag)
 	//--------- display debug info ---------//
 
 	if( !is_civilian() && rank_id != RANK_KING )
+	{
 		font_san.field( x, y, _("Contribution"), x+92, nation_contribution, 1, INFO_X2-2, refreshFlag);
+		y+=16;
+	}
+
+	//------- display whether the player's unit is supplied, see OUNITSUP.CPP -------//
+
+	if( nation_recno && nation_recno == nation_array.player_recno && is_supply_unit() )
+	{
+		font_san.field( x, y, _("Supply"), x+92, is_supplied() ? _("Supplied") : _("Out of supply"),
+							 INFO_X2-2, refreshFlag);
+	}
 }
 //----------- End of function Unit::disp_unit_info -----------//
 

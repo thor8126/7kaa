@@ -740,6 +740,10 @@ protected:
 	void  general_die();
 	void  pay_expense();
 	void  process_recover();
+	void  process_supply();
+	int   is_supply_unit();
+	int   is_supplied();
+	int   is_supplying_nation(int supplierNationRecno);
 };
 #pragma pack()
 
