@@ -135,7 +135,7 @@ jwasm_fmt="-elf -zt0"
 # enable_debug=no
 # enable_dynamic_support_libs=no
 # enable_enet=yes
-# enable_multiplayer=yes
+# enable_multiplayer=no
 
 # Configuration options
 
@@ -155,8 +155,8 @@ AC_ARG_ENABLE([debug],
 )
 
 AC_ARG_ENABLE([multiplayer],
-  AS_HELP_STRING([--disable-multiplayer], [disable multiplayer support in menu]),
-  [], [enable_multiplayer=yes]
+  AS_HELP_STRING([--enable-multiplayer], [enable multiplayer support in menu (off by default, this version is single-player)]),
+  [], [enable_multiplayer=no]
 )
 
 AC_ARG_ENABLE([dynamic-mingw-gnulibs],

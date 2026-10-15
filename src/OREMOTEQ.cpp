@@ -60,7 +60,20 @@ int RemoteQueue::validate_queue(int start)
 	RemoteQueueTraverse rqt(*this, start);
 	for( rqt.traverse_set_start(start); !rqt.traverse_finish(); rqt.traverse_next() )
 	{
-		RemoteMsg *remoteMsgPtr = rqt.get_remote_msg();
+		//--- every message must lie entirely within the queue, as received data cannot be trusted ---//
+
+		if( rqt.offset + (int)sizeof(uint16_t) > queued_size )
+			return 0;
+
+		uint16_t msgLen;
+		RemoteMsg *remoteMsgPtr = rqt.get_remote_msg(&msgLen);
+
+		if( msgLen >= 0x8000 || rqt.offset + (int)sizeof(uint16_t) + msgLen > queued_size )
+			return 0;
+
+		if( msgLen < sizeof(remoteMsgPtr->id) )		// too short to hold a message id, every queued message has one
+			return 0;
+
 		if( remoteMsgPtr->id )
 		{
 			if( remoteMsgPtr->id<FIRST_REMOTE_MSG_ID || remoteMsgPtr->id>LAST_REMOTE_MSG_ID )

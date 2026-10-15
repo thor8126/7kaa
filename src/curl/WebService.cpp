@@ -55,8 +55,12 @@ void WebService::init()
 	cookie_file += "cookies.txt";
 	if( !cookie_file.error_flag )
 		curl_easy_setopt(curl, CURLOPT_COOKIEJAR, (char*)cookie_file);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+	//--- verify the server's certificate, as the login sends the user's password ---//
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+#if defined(_WIN32) && defined(CURLSSLOPT_NATIVE_CA)
+	curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, (long)CURLSSLOPT_NATIVE_CA);	// use the Windows certificate store, MinGW builds have no CA bundle
+#endif
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&buffer);
 	// Use a hard timeout at 10 seconds. This is not foolproof, but it is

@@ -307,8 +307,22 @@ int Remote::poll_msg()
 		}
 		else
 */
-		err_when( msgListSize < sizeof(short) + sizeof(uint32_t) );
+		//--- discard a packet too short to hold a message, received data cannot be trusted ---//
+
+		if( msgListSize < sizeof(short) + sizeof(uint32_t) )
+		{
+			ec_remote.de_recv_queue();
+			continue;
+		}
+
 		RemoteMsg *rMsg = (RemoteMsg *)(recvBuf + sizeof(short) );
+
+		if( rMsg->id == MSG_QUEUE_HEADER &&
+			 msgListSize < sizeof(short) + sizeof(uint32_t) + sizeof(uint32_t) )		// the header carries the sender's frame count
+		{
+			ec_remote.de_recv_queue();
+			continue;
+		}
 		int	queueToCopy = -1;
 
 		//--- if message id !=MSG_QUEUE_HEADER, this packet is sent by send_free_msg(), not by send_queue_now() ---//
