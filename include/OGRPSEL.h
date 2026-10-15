@@ -23,6 +23,8 @@
 
 #define MAX_SELECT_GROUP_NUM	9
 
+class Unit;
+
 //------------ class GroupSelect ----------//
 class GroupSelect
 {
@@ -37,6 +39,10 @@ class GroupSelect
 
 		void	group_units(int groupNum);
 		void	select_grouped_units(int groupNum);
+		void	select_army();
+
+	private:
+		static int is_army_unit(Unit* unitPtr);
 };
 
 extern GroupSelect group_select;

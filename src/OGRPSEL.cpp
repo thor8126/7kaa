@@ -23,6 +23,10 @@
 #include <OPOWER.h>
 #include <OUNIT.h>
 #include <ONATION.h>
+#include <OUNITRES.h>
+#include <OWORLD.h>
+#include <OINFO.h>
+#include <OSERES.h>
 
 //--------------- begin of function GroupSelect::GroupSelect ----------------//
 GroupSelect::GroupSelect()
@@ -168,3 +172,118 @@ void GroupSelect::select_grouped_units(int groupNum)
 }
 //--------------- end of function GroupSelect::select_grouped_units ----------------//
 
+
+
+//--------------- begin of function GroupSelect::is_army_unit ----------------//
+//
+// Whether the unit is part of the player's mobile army: soldiers, generals
+// and war machines out on the map. The king, civilians, spies, caravans,
+// ships, monsters, gods and units inside buildings or ships are excluded.
+//
+int GroupSelect::is_army_unit(Unit* unitPtr)
+{
+	if( !unitPtr->is_own() || unitPtr->spy_recno )
+		return 0;
+
+	if( !unitPtr->is_visible() || unitPtr->hit_points <= 0 || unitPtr->is_shealth() )
+		return 0;
+
+	switch( unit_res[unitPtr->unit_id]->unit_class )
+	{
+		case UNIT_CLASS_HUMAN:
+			return unitPtr->rank_id != RANK_KING && !unitPtr->is_civilian();
+
+		case UNIT_CLASS_WEAPON:
+			return 1;
+	}
+
+	return 0;
+}
+//--------------- end of function GroupSelect::is_army_unit ----------------//
+
+
+//--------------- begin of function GroupSelect::select_army ----------------//
+//
+// Select the player's whole army anywhere on the map. When the whole army
+// is already selected, move the view to the leading unit instead.
+//
+void GroupSelect::select_army()
+{
+	if( !nation_array.player_recno )
+		return;
+
+	int arraySize = unit_array.size();
+	int armyCount = 0, alreadySelectedCount = 0;
+	int i;
+	Unit* unitPtr;
+
+	for( i=arraySize ; i>0 ; i-- )
+	{
+		if( unit_array.is_deleted(i) )
+			continue;
+
+		unitPtr = unit_array[i];
+
+		if( !is_army_unit(unitPtr) )
+			continue;
+
+		armyCount++;
+
+		if( unitPtr->selected_flag )
+			alreadySelectedCount++;
+	}
+
+	if( !armyCount )
+		return;
+
+	//--- pressed again with the whole army selected: look at the army ---//
+
+	if( alreadySelectedCount == armyCount && unit_array.selected_count == armyCount &&
+		 unit_array.selected_recno && !unit_array.is_deleted(unit_array.selected_recno) )
+	{
+		unitPtr = unit_array[unit_array.selected_recno];
+		world.go_loc( unitPtr->next_x_loc(), unitPtr->next_y_loc() );
+		return;
+	}
+
+	//---------- select the army ----------//
+
+	power.reset_selection();
+
+	Unit* leadUnitPtr = NULL;
+
+	for( i=arraySize ; i>0 ; i-- )
+	{
+		if( unit_array.is_deleted(i) )
+			continue;
+
+		unitPtr = unit_array[i];
+
+		if( !is_army_unit(unitPtr) )
+			continue;
+
+		unitPtr->selected_flag = 1;
+		unit_array.selected_count++;
+
+		//--- the leading unit shown in the info panel: generals first, then soldiers, then war machines ---//
+
+		if( !leadUnitPtr || unitPtr->rank_id > leadUnitPtr->rank_id ||
+			 ( unitPtr->rank_id == leadUnitPtr->rank_id &&
+				unit_res[unitPtr->unit_id]->unit_class == UNIT_CLASS_HUMAN &&
+				unit_res[leadUnitPtr->unit_id]->unit_class != UNIT_CLASS_HUMAN ) )
+		{
+			leadUnitPtr = unitPtr;
+		}
+	}
+
+	unit_array.selected_recno = leadUnitPtr->sprite_recno;
+
+	if( se_res.mark_select_object_time() )
+	{
+		se_res.sound( leadUnitPtr->cur_x_loc(), leadUnitPtr->cur_y_loc(), 1, 'S',
+						  leadUnitPtr->sprite_id, "SEL" );
+	}
+
+	info.disp();
+}
+//--------------- end of function GroupSelect::select_army ----------------//

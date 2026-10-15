@@ -211,7 +211,7 @@ private:
 	void		process();
 
 	void		disp_button();
-	void 		detect_button();
+	int 		detect_button();
 
 	void		disp_view();
 	void		update_view();

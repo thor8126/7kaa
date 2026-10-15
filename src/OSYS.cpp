@@ -1572,6 +1572,10 @@ void Sys::detect_letter_key(unsigned scanCode, unsigned skeyState)
             groupId = keyCode-'0';
             group_select.group_units(groupId);
             break;
+
+         case 'a':                  // select the whole army
+            group_select.select_army();
+            break;
       }
    }
 

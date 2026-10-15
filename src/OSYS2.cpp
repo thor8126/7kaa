@@ -26,6 +26,8 @@
 #include <OMOUSE.h>
 #include <OFONT.h>
 #include <OBUTT3D.h>
+#include <OBUTTON.h>
+#include <OGRPSEL.h>
 #include <OVBROWSE.h>
 #include <ONATION.h>
 #include <OFIRM.h>
@@ -71,6 +73,14 @@
 
 static int		  report_disp_frame_no;
 static Button3D  button_menu;
+static Button    button_army;		// select the whole army (also Ctrl+A), drawn over the zoom view
+
+#define ARMY_BUTTON_X1	(ZOOM_X2-62)
+#define ARMY_BUTTON_Y1	(ZOOM_Y1+4)
+#define ARMY_BUTTON_X2	(ZOOM_X2-4)
+#define ARMY_BUTTON_Y2	(ZOOM_Y1+22)
+
+static int is_army_button_shown();
 
 //-------- Begin of function Sys::detect --------//
 //
@@ -107,7 +117,8 @@ void Sys::detect()
 		process_key(mouse.scan_code, mouse.event_skey_state);
 	}
 
-	detect_button();		// detect main buttons on the screen
+	if( detect_button() )		// detect main buttons on the screen
+		return;						// the click has been used by a button over the zoom view
 
 	detect_view();
 }
@@ -393,7 +404,7 @@ void Sys::disp_button()
 
 //-------- Begin of function Sys::detect_button --------//
 //
-void Sys::detect_button()
+int Sys::detect_button()
 {
 	//--------- detect menu button -------//
 
@@ -403,7 +414,15 @@ void Sys::detect_button()
 		// game.in_game_menu();
 		in_game_menu.enter(!remote.is_enable());
 		// ##### end Gilbert 5/11 #######//
-		return;
+		return 0;
+	}
+
+	//--------- detect army button -------//
+
+	if( is_army_button_shown() && button_army.detect() )
+	{
+		group_select.select_army();
+		return 1;
 	}
 
 	//------- detect view mode buttons -----//
@@ -445,8 +464,21 @@ void Sys::detect_button()
 			break;
 		}
 	}
+
+	return 0;
 }
 //--------- End of function Sys::detect_button ---------//
+
+//--------- Begin of static function is_army_button_shown ---------//
+//
+// The army button is drawn over the zoom view in the normal view mode.
+//
+static int is_army_button_shown()
+{
+	return nation_array.player_recno && sys.view_mode == MODE_NORMAL &&
+			 !in_game_menu.is_active() && !option_menu.is_active();
+}
+//---------- End of static function is_army_button_shown ----------//
 
 
 //-------- Begin of function Sys::set_view_mode --------//
@@ -705,6 +737,15 @@ void Sys::update_view()
 			town_array.draw_profile();
 			unit_array.draw_profile();
 
+			vga.use_front();
+		}
+
+		//------- draw the army button over the zoom view -------//
+
+		if( is_army_button_shown() )
+		{
+			vga.use_back();
+			button_army.paint_text( ARMY_BUTTON_X1, ARMY_BUTTON_Y1, ARMY_BUTTON_X2, ARMY_BUTTON_Y2, _("Army") );
 			vga.use_front();
 		}
 
