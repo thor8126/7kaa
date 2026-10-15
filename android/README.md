@@ -40,9 +40,9 @@ The 800×600 game is scaled to fit the screen with black bars at the sides.
 | Touch | Does |
 | --- | --- |
 | Tap | Left click (select, press buttons) |
-| Long press (hold ~0.5 s, the phone vibrates) | Right click: move / attack / order the selected units |
+| Long press, then lift (hold ~0.5 s until the phone vibrates) | Right click: move / attack / order the selected units |
 | Two-finger tap | Right click at the first finger |
-| Drag with one finger | Left drag: box-select units, drag sliders |
+| Drag with one finger (also after holding still) | Left drag: box-select units, drag sliders |
 | Drag with two fingers | Scroll the map |
 | Tap the mini-map | Jump there (as on the desktop) |
 | Back button | Esc |

@@ -123,6 +123,13 @@ int Vga::init()
    SDL_WarpMouseGlobal(mouse_x, mouse_y); // warp to initialize mouse by event queue
 
    Uint32 window_pixel_format = SDL_GetWindowPixelFormat(window);
+#ifdef __ANDROID__
+   // Android windows report an RGBA-type format, while the 32-bit "target"
+   // surface below gets SDL's default XRGB layout. Uploading one into a
+   // texture of the other swaps the channels (everything turns cyan), so use
+   // the surface's own layout for the texture too.
+   window_pixel_format = SDL_PIXELFORMAT_RGB888;
+#endif
    if (window_pixel_format == SDL_PIXELFORMAT_UNKNOWN)
    {
       ERR("Unknown pixel format: %s\n", SDL_GetError());

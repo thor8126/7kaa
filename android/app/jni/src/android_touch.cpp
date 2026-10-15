@@ -4,9 +4,11 @@
 // from SDL, so all game code stays unchanged:
 //
 //   tap                      -> left click
-//   long press (hold still)  -> right click (move / attack orders)
+//   long press, then lift    -> right click (move / attack orders); the phone
+//                               vibrates when the press is long enough
 //   two-finger tap           -> right click at the first finger
-//   one-finger drag          -> left button drag (box select, sliders)
+//   one-finger drag          -> left button drag (box select, sliders), also
+//                               after holding still first
 //   two-finger drag          -> pan the map
 //   Back button              -> Esc
 //   "Right click" on-screen toggle (SevenKaaActivity): taps are right clicks
@@ -47,6 +49,7 @@ static float pan_last_x, pan_last_y;  // centroid, game pixels
 static float pan_acc_x, pan_acc_y;
 static float pan_total;
 static int panned;
+static int long_press_armed;          // held still long enough: lift = right click
 static volatile int right_click_mode;   // set from the Java UI thread
 
 extern "C" JNIEXPORT void JNICALL
@@ -150,11 +153,24 @@ static void park_cursor()
 		move_cursor(x, y);
 }
 
+// Left button up. Like the desktop's SDL_MOUSEBUTTONUP handler
+// (Vga::handle_messages), this frees the cursor: pressing in the map view
+// confines the cursor to it (Power::detect_frame), and without the reset every
+// later tap would be pulled back into the map view.
+static void release_left()
+{
+	mouse.add_event(LEFT_BUTTON_RELEASE);
+	mouse.reset_boundary();
+}
+
 static void click(MouseEventType down, MouseEventType up, int x, int y)
 {
 	move_cursor(x, y);
 	mouse.add_event(down);
-	mouse.add_event(up);
+	if( up == LEFT_BUTTON_RELEASE )
+		release_left();
+	else
+		mouse.add_event(up);
 }
 
 // Short vibration so the player feels when a long press became a right click.
@@ -191,12 +207,16 @@ static void finger_down(const SDL_TouchFingerEvent &f)
 		if( !on_game_screen(f) )
 			return;
 		state = TOUCH_PENDING;
+		long_press_armed = 0;
 		finger1 = f.fingerId;
 		down_time = SDL_GetTicks();
 		finger_to_window(f, &start_wx, &start_wy);
 		f1_wx = start_wx;
 		f1_wy = start_wy;
 		game_pos(f, &start_lx, &start_ly);
+		// a new touch can land anywhere: no button is held, so nothing may
+		// confine the cursor
+		mouse.reset_boundary();
 		move_cursor(start_lx, start_ly);
 	}
 	else if( state == TOUCH_PENDING && f.fingerId != finger1 )
@@ -282,7 +302,7 @@ static void finger_up(const SDL_TouchFingerEvent &f)
 	case TOUCH_PENDING:
 		if( f.fingerId == finger1 )
 		{
-			if( right_click_mode )
+			if( right_click_mode || long_press_armed )
 				click(RIGHT_BUTTON, RIGHT_BUTTON_RELEASE, start_lx, start_ly);
 			else
 				click(LEFT_BUTTON, LEFT_BUTTON_RELEASE, start_lx, start_ly);
@@ -297,7 +317,7 @@ static void finger_up(const SDL_TouchFingerEvent &f)
 			int x, y;
 			game_pos(f, &x, &y);
 			move_cursor(x, y);
-			mouse.add_event(LEFT_BUTTON_RELEASE);
+			release_left();
 			park_cursor();
 			state = TOUCH_IGNORE;
 		}
@@ -359,10 +379,12 @@ int android_touch_event(SDL_Event *event)
 
 void android_touch_update()
 {
-	if( state == TOUCH_PENDING && SDL_GetTicks() - down_time >= LONG_PRESS_MS )
+	// Holding still only arms the right click (the phone vibrates); it fires
+	// when the finger is lifted, so holding and then dragging still drags.
+	if( state == TOUCH_PENDING && !long_press_armed &&
+		 SDL_GetTicks() - down_time >= LONG_PRESS_MS )
 	{
-		click(RIGHT_BUTTON, RIGHT_BUTTON_RELEASE, start_lx, start_ly);
+		long_press_armed = 1;
 		haptic_tick();
-		state = TOUCH_IGNORE;
 	}
 }
