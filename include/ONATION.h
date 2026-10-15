@@ -566,6 +566,7 @@ public:
 	int 	 		think_ally_against_big_enemy();
 	int 	 		think_unite_against_big_enemy();
 	int			think_form_coalition(int enemyNationRecno);
+	int			think_build_road();
 	int			is_coalition_target(int leaderNationRecno);
 	int			common_threat_rating(int withNationRecno);
 

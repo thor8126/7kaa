@@ -28,6 +28,7 @@
 #include <OBUTT3D.h>
 #include <OBUTTON.h>
 #include <OGRPSEL.h>
+#include <OROAD.h>
 #include <OVBROWSE.h>
 #include <ONATION.h>
 #include <OFIRM.h>
@@ -79,6 +80,11 @@ static Button    button_army;		// select the whole army (also Ctrl+A), drawn ove
 #define ARMY_BUTTON_Y1	(ZOOM_Y1+4)
 #define ARMY_BUTTON_X2	(ZOOM_X2-4)
 #define ARMY_BUTTON_Y2	(ZOOM_Y1+22)
+
+static Button    button_road;		// build roads, below the army button
+
+#define ROAD_BUTTON_Y1	(ZOOM_Y1+26)
+#define ROAD_BUTTON_Y2	(ZOOM_Y1+44)
 
 static int is_army_button_shown();
 
@@ -425,6 +431,22 @@ int Sys::detect_button()
 		return 1;
 	}
 
+	//--------- detect road button -------//
+
+	if( is_army_button_shown() && button_road.detect() )
+	{
+		if( power.command_id == COMMAND_BUILD_ROAD )		// pressing it again leaves the road building mode
+		{
+			power.reset_command();
+		}
+		else
+		{
+			power.issue_command(COMMAND_BUILD_ROAD);
+			road_res.start_x_loc = road_res.start_y_loc = -1;
+		}
+		return 1;
+	}
+
 	//------- detect view mode buttons -----//
 
 	#define VIEW_MODE_BUTTON_WIDTH   58
@@ -746,6 +768,8 @@ void Sys::update_view()
 		{
 			vga.use_back();
 			button_army.paint_text( ARMY_BUTTON_X1, ARMY_BUTTON_Y1, ARMY_BUTTON_X2, ARMY_BUTTON_Y2, _("Army") );
+			button_road.paint_text( ARMY_BUTTON_X1, ROAD_BUTTON_Y1, ARMY_BUTTON_X2, ROAD_BUTTON_Y2, _("Road"), 1,
+				power.command_id == COMMAND_BUILD_ROAD );
 			vga.use_front();
 		}
 

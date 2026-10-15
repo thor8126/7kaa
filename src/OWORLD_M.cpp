@@ -34,6 +34,7 @@
 #include <OGAME.h>
 #include <OWORLD.h>
 #include <OTERRAIN.h>
+#include <OROAD.h>
 
 //-------- Begin of function MapMatrix::MapMatrix ----------//
 
@@ -194,6 +195,9 @@ void MapMatrix::draw_map()
 
 					else if( locPtr->is_plant() )
 						*writePtr = plant_res.plant_map_color;
+
+					else if( locPtr->has_road() )
+						*writePtr = road_res.map_color;
 
 					else
 					{

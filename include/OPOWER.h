@@ -39,6 +39,7 @@ enum { COMMAND_BUILD_FIRM=1,
 		 COMMAND_BUILD_WALL,
 		 COMMAND_DESTRUCT_WALL,
 		 COMMAND_GOD_CAST_POWER,
+		 COMMAND_BUILD_ROAD,		// see RoadRes, two clicks: the start and the end of the road
 	  };
 
 // --------- define ScreenObjectType --------//

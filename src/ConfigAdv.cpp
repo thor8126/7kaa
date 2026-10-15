@@ -243,6 +243,7 @@ void ConfigAdv::reset()
 	monster_alternate_attack_curve = 0;
 	monster_attack_divisor = 4;
 
+	nation_ai_build_roads = 1;
 	nation_ai_coalition = 1;
 	nation_ai_opening_strategy = 1;
 	nation_ai_posture = 1;
@@ -364,6 +365,12 @@ int ConfigAdv::set(char *name, char *value)
 		if( !read_int(value, &monster_attack_divisor) )
 			return 0;
 		if( CHECK_BOUND(monster_attack_divisor, 1, 6) )
+			return 0;
+		update_check_sum(name, value);
+	}
+	else if( !strcmp(name, "nation_ai_build_roads") )
+	{
+		if( !read_bool(value, &nation_ai_build_roads) )
 			return 0;
 		update_check_sum(name, value);
 	}

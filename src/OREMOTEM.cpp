@@ -40,6 +40,7 @@
 #include <OCRC_STO.h>
 // ##### patch begin Gilbert 20/1 #######//
 #include <OBOX.h>
+#include <OROAD.h>
 // ##### patch end Gilbert 20/1 #######//
 #include <gettext.h>
 
@@ -181,7 +182,11 @@ static MsgProcessFP msg_process_function_array[] =
 	&RemoteMsg::ship_copy_route,
 	&RemoteMsg::firm_request_builder,
 	&RemoteMsg::market_switch_restock,
+	&RemoteMsg::road_build,
 };
+
+static_assert( sizeof(msg_process_function_array)/sizeof(msg_process_function_array[0]) == REMOTE_MSG_TYPE_COUNT,
+	"one process function for each remote message type, in the same order" );
 
 //---------- Declare static functions ----------//
 
@@ -3025,3 +3030,16 @@ void RemoteMsg::market_switch_restock()
 	}
 }
 // ------- End of function RemoteMsg::switch_restock ---------//
+
+
+// ------- Begin of function RemoteMsg::road_build ---------//
+void RemoteMsg::road_build()
+{
+	err_when( id != MSG_ROAD_BUILD );
+	// packet structure : <nation recno> <xLoc1> <yLoc1> <xLoc2> <yLoc2>
+	short *shortPtr = (short *)data_buf;
+
+	if( !nation_array.is_deleted(*shortPtr) )
+		road_res.build_road( shortPtr[1], shortPtr[2], shortPtr[3], shortPtr[4], shortPtr[0], COMMAND_REMOTE );
+}
+// ------- End of function RemoteMsg::road_build ---------//

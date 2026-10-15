@@ -76,7 +76,7 @@ int RemoteQueue::validate_queue(int start)
 
 		if( remoteMsgPtr->id )
 		{
-			if( remoteMsgPtr->id<FIRST_REMOTE_MSG_ID || remoteMsgPtr->id>LAST_REMOTE_MSG_ID )
+			if( remoteMsgPtr->id<FIRST_REMOTE_MSG_ID || remoteMsgPtr->id>=LAST_REMOTE_MSG_ID )		// LAST_REMOTE_MSG_ID has no process function
 				return 0;
 		}
 		err_when( ++loopCount > 200 );

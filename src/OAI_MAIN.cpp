@@ -319,6 +319,11 @@ void Nation::process_ai()
 	if( info.game_date%360 == nation_recno%360 )
 		ai_improve_relation();
 
+	//----- think about building roads twice a year -----//
+
+	if( info.game_date%180 == (nation_recno*37)%180 )
+		think_build_road();
+
 	//------ think about surrendering -------//
 
 	if( info.game_date%60 == nation_recno%60 )

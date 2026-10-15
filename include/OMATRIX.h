@@ -54,6 +54,7 @@
 
 #define	LOCATE_POWER_OFF			0x1000 // true if no power_nation_recno can be set in this location
 #define	LOCATE_HARBOR_BIT       0x2000 // true if the terrain is suitable to build harbor (x,y) to (x+2,y+2)
+#define	LOCATE_ROAD					0x4000 // true if there is a road on this location, see OROAD.h
 
 // ------- constant on visibility ----------//
 // const unsigned char FULL_VISIBILITY = MAX_BRIGHTNESS_ADJUST_DEGREE * 8 + 7;
@@ -236,7 +237,7 @@ public:
 	// ---------- plant -----------//
 	int 	is_plant()						{ return (loc_flag & LOCATE_BLOCK_MASK) == LOCATE_IS_PLANT; }
 	int 	can_add_plant(int teraMask = LOCATE_WALK_LAND)
-			{ return !cargo_recno && (loc_flag & teraMask) && !(loc_flag & (LOCATE_BLOCK_MASK | LOCATE_SITE_MASK)) && !has_site(); }
+			{ return !cargo_recno && (loc_flag & teraMask) && !(loc_flag & (LOCATE_BLOCK_MASK | LOCATE_SITE_MASK)) && !has_site() && !has_road(); }
 	void	set_plant(int plantId, int offsetX, int offsetY);
 	int	plant_id()						{ if( is_plant() ) return extra_para; else return 0; }
 	int	plant_inner_x() 				{ return cargo_recno & 0xFF; }
@@ -289,6 +290,11 @@ public:
 	//----------- harbor bit -----------//
 	void	set_harbor_bit()         { loc_flag |= LOCATE_HARBOR_BIT; }
 	void	clear_harbor_bit()       { loc_flag &= ~LOCATE_HARBOR_BIT; }
+
+	// ---------- road -------------//
+	int	has_road()					{ return loc_flag & LOCATE_ROAD; }
+	void	set_road()					{ loc_flag |= LOCATE_ROAD; }
+	void	clear_road()				{ loc_flag &= ~LOCATE_ROAD; }
 	int	can_build_whole_harbor() { return loc_flag & LOCATE_HARBOR_BIT; }
 };
 #pragma pack()

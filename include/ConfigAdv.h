@@ -65,6 +65,7 @@ public:
 	int			monster_attack_divisor;
 
 	// nation settings
+	char			nation_ai_build_roads;
 	char			nation_ai_coalition;
 	char			nation_ai_opening_strategy;
 	char			nation_ai_posture;

@@ -32,6 +32,7 @@ bin_PROGRAMS = 7kaa
 	OAI_TALK.cpp \
 	OAI_TOWN.cpp \
 	OAI_TRAD.cpp \
+	OAI_ROAD.cpp \
 	OAI_UNIT.cpp \
 	OAI_WAR.cpp \
 	OANLINE.cpp \
@@ -144,6 +145,7 @@ bin_PROGRAMS = 7kaa
 	ORAIN2.cpp \
 	ORAIN3.cpp \
 	ORAWRES.cpp \
+	OROAD.cpp \
 	OREBEL.cpp \
 	OREGION.cpp \
 	OREGIONS.cpp \

@@ -105,6 +105,7 @@ public:
 	char   is_inited()  { return window != NULL; }
 
 	int    load_pal(const char* fileName);
+	const SDL_Color* get_game_pal()	{ return game_pal; }		// the colours of the game palette, read only
 	void   activate_pal(VgaBuf*);
 
 	int    set_custom_palette(char*);

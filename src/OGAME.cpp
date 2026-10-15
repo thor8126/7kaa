@@ -72,6 +72,7 @@
 // ##### begin Gilbert 2/10 #######//
 #include <OFIRMDIE.h>
 #include <OAIWAR.h>
+#include <OROAD.h>
 // ##### end Gilbert 2/10 #######//
 
 //---------------- DETECT_SPREAD ----------------//
@@ -158,6 +159,7 @@ int Game::init(int loadGameCall)
 
 	nation_array.init();
 	ai_war_state.init();
+	road_res.init();
 	firm_array.init();
 	// ##### begin Gilbert 2/10 #######//
 	firm_die_array.init();
@@ -259,6 +261,7 @@ void Game::deinit(int loadGameCall)
 	//------- deinit game data class ---------//
 
 	nation_array.deinit();
+	road_res.deinit();
 	firm_array.deinit();
 	// ##### begin Gilbert 2/10 #######//
 	firm_die_array.deinit();

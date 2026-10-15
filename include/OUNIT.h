@@ -432,6 +432,7 @@ public:
 	virtual void pre_process();
 	virtual void process_idle();     // derived function of Sprite
 	virtual void process_move();     // derived function of Sprite
+	void			process_move_step();
 	virtual void process_wait();     // derived function of Sprite
 	virtual void process_extra_move() {;}// derived function of Sprite, for ship only
 	virtual int  process_die();

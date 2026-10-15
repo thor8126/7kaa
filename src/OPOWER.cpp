@@ -40,6 +40,7 @@
 #include <OWALLRES.h>
 #include <OSERES.h>
 #include <OREMOTE.h>
+#include <OROAD.h>
 
 //-------------- Define constant -----------------//
 
@@ -383,6 +384,23 @@ int Power::detect_frame()
 
 						case COMMAND_BUILD_WALL:
 							world.build_wall_tile(curXLoc, curYLoc, nation_array.player_recno, COMMAND_PLAYER);
+							rc = 1;
+							break;
+
+						case COMMAND_BUILD_ROAD:
+							//--- the first click sets the start, the second builds the road and starts the next segment from its end ---//
+
+							if( road_res.start_x_loc < 0 )
+							{
+								road_res.start_x_loc = curXLoc;
+								road_res.start_y_loc = curYLoc;
+							}
+							else if( road_res.build_road(road_res.start_x_loc, road_res.start_y_loc,
+										curXLoc, curYLoc, nation_array.player_recno, COMMAND_PLAYER) )
+							{
+								road_res.start_x_loc = curXLoc;
+								road_res.start_y_loc = curYLoc;
+							}
 							rc = 1;
 							break;
 
@@ -1565,6 +1583,7 @@ int Power::choose_cursor(int scrnX, int scrnY,
 					return CURSOR_SHIP_STOP;
 				return CURSOR_CANT_SHIP_STOP;
 			case COMMAND_BUILD_WALL:
+			case COMMAND_BUILD_ROAD:
 				return CURSOR_BUILD;
 			case COMMAND_DESTRUCT_WALL:
 				return CURSOR_DESTRUCT;

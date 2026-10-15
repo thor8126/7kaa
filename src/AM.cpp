@@ -58,6 +58,7 @@
 #include <ORACERES.h>
 #include <OREBEL.h>
 #include <OAIWAR.h>
+#include <OROAD.h>
 #include <OREMOTE.h>
 #include <OSPATH.h>
 #include <OSITE.h>
@@ -211,6 +212,7 @@ TownArray         town_array;
 TownNetworkArray  town_network_array;
 NationArray       nation_array;
 AiWarState        ai_war_state;
+RoadRes           road_res;
 FirmArray         firm_array;
 FirmDieArray	  firm_die_array;
 TornadoArray      tornado_array(10);

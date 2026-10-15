@@ -61,6 +61,7 @@
 #include <OANLINE.h>
 #include <OFIRMDIE.h>
 #include <OIMGRES.h>
+#include <OROAD.h>
 #include "gettext.h"
 
 //--------- Define static vars -----------//
@@ -364,6 +365,10 @@ void ZoomMatrix::draw()
 				{
 					dirt_array[locPtr->dirt_recno()]->draw_block(xLoc,yLoc);
 				}
+
+				// --------- draw road --------//
+				if( locPtr->has_road() )
+					road_res.draw(x, y, xLoc, yLoc);
 
 				if(terrain_res[locPtr->terrain_id]->can_snow() )
 				{
@@ -793,6 +798,15 @@ void ZoomMatrix::draw_build_marker()
 	else if( power.command_id == COMMAND_GOD_CAST_POWER )
 	{
 		draw_god_cast_range();
+		return;
+	}
+
+	//------- COMMAND_BUILD_ROAD --------//
+
+	else if( power.command_id == COMMAND_BUILD_ROAD )
+	{
+		road_res.draw_build_preview( top_x_loc + (mouse.cur_x-ZOOM_X1)/ZOOM_LOC_WIDTH,
+											top_y_loc + (mouse.cur_y-ZOOM_Y1)/ZOOM_LOC_HEIGHT );
 		return;
 	}
 

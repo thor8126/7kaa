@@ -24,6 +24,7 @@
 
 #include <ALL.h>
 #include <OWORLD.h>
+#include <OSYS.h>
 #include <OF_HARB.h>
 #include <OGAME.h>
 #include <ONATION.h>
@@ -1665,6 +1666,26 @@ int Unit::avail_node_enough_for_search(short x1, short y1, short x2, short y2)
 //
 void Unit::process_move()
 {
+	process_move_step();
+
+	//--- a land unit on a road moves faster: it makes another normal step every other frame ---//
+
+	if( cur_action == SPRITE_MOVE && mobile_type == UNIT_LAND &&
+		 (sys.frame_count + sprite_recno) % 2 == 0 &&
+		 world.get_loc(cur_x_loc(), cur_y_loc())->has_road() )
+	{
+		process_move_step();
+	}
+}
+//---------- End of function Unit::process_move ----------//
+
+
+//--------- Begin of function Unit::process_move_step ---------//
+//
+// Move the unit one step, see Sprite::process_move().
+//
+void Unit::process_move_step()
+{
 	//----- if the sprite has reach the destintion ----//
 
 	//--------------------------------------------------------//
@@ -1742,7 +1763,7 @@ void Unit::process_move()
 	//--------------------------------------------------------//
 	err_when(cur_action==SPRITE_MOVE && (cur_x!=go_x || cur_y!=go_y) && (cur_x==next_x && cur_y==next_y));
 }
-//---------- End of function Unit::process_move ----------//
+//---------- End of function Unit::process_move_step ----------//
 
 
 //--------- Begin of function Unit::process_wait ---------//
