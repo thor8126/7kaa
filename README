@@ -1,0 +1,109 @@
+PLEASE UPDATE YOUR LINKS
+https://sourceforge.net/projects/skfans
+
+Seven Kingdoms: Ancient Adversaries
+-----------------------------------
+
+Release version 2.15.6
+Project website: www.7kfans.com
+Downloads and source repo: sourceforge.net/projects/skfans
+
+This is a GPL release of the Seven Kingdoms: Ancient Adversaries thanks to
+Enlight Software which granted the ability to license the game under a
+free and open source license in 2009. See the file "COPYING" for the
+details of the license. We are indebted to Enlight for making the 7kfans
+project possible and giving a new chance to build a community for fans
+of the game.
+
+Summary of changes from 2.15.5 to 2.15.6
+---------
+* Fixed bugs related to rebelling
+* Improved AI on handling rebellions
+* Fixed several crash bugs
+* Fixed small graphic update bugs
+* Fixed bug when assigning to ship
+* Fixed AI declare war bug
+* Fixed AI give tribute bug
+* Greatly improved AI sea based missions
+* Improved AI on training and recruiting
+* Cleaned up some deinit code
+* Improved handling of town migration with workers
+* Improved AI to be move aggressive in attack missions
+* Improved validation of attack actions
+* Added display of the land mass size in the F10 menu
+* Enabled town peasant migration
+* Created button for markets to control stocking type -- thanks MicroVirus and
+   sraboy
+* Added Phoenix vision on fryhtan lairs
+* Improved AI at building harbors
+* Fixed bugs related to AI surrenders
+* Improved locale code
+* Made English the default language on Windows
+* Increased the max number of raw resource sites to 10
+* Fixed bug on trade ship docking and exiting
+* Reduced penalty on trade unit destruction
+* Improved distance calculating so placing buildings and towns on any side is
+   treated the same
+* Fixed some path finding issues
+* Enabled the ability for AI to scout the map
+* Fixed screen edge mouse handling bug
+* Fixed exploit when spying on an enemy nation report
+* Improved AI handling on granting money to towns and recruiting
+* Increased the speed of speed level 9
+
+
+System Requirements
+---------
+
+Supported operating systems
+* Windows
+* Linux
+* MacOS
+
+Supported architectures for multiplayer
+* x86 compatible processor
+
+
+Building the game
+---------
+
+The build process is based on autotools, as this easily runs on all typical
+Windows, Linux and Unix-like systems with minimal requirements. Below are the
+additional things that you are expected to provide in your build environment.
+
+For building for Windows, the environment we use is mingw-w64 with a cross-
+compiler under Linux. The same mingw-w64 is available from MSYS native to
+Windows. There are other similar environments, but we cannot help people
+configure their system -- you are expected to know how to use your tools.
+
+Required dependencies
+* GCC 4.6+ C++11 compliant compiler
+* SDL 2.24.0+
+* enet 1.3.xx Reliable UDP networking library
+* OpenAL-soft or equivalent driver
+
+Optional dependencies
+* libcurl for full 7kfans multiplayer integration (website requires TLS1.2)
+* gettext 0.19
+* Game music: 7kaa-music-2.15
+  -> Packagers: Copy music into program data folder or PACKAGE_DATA_DIR
+  -> Make sure the file names are in upper-case
+* NSIS for building a Windows installer
+* TeX Live with latexmk, fontaxes, accanthis, universalis, and yfonts for
+  generating the game manual in pdf
+
+Autoconf 2.65+ and autoconf-archive is required when generating a configure
+script. You do not need to generate a configure script when you are building
+an officially released version of the game as it is already provided in the
+source archive. Compiling and using git snapshots for general use is dis-
+couraged and instead use the latest officially released version of the game.
+
+
+Running locally from source build
+--------
+
+To run the game from the build directory, you need to point to the game data
+folder. The game data folder is set by the environment variable SKDATA. In
+a bash shell, this can be accomplished by
+$ SKDATA=data src/7kaa
+
