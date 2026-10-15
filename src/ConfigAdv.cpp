@@ -263,6 +263,7 @@ void ConfigAdv::reset()
 
 	town_ai_emerge_nation_pop_limit = MAX_TOWN_POPULATION * MAX_NATION;
 	town_ai_emerge_town_pop_limit = 1000;
+	town_king_influence_all_races = 1;
 	town_migration = 1;
 	town_loyalty_qol = 1;
 
@@ -469,6 +470,12 @@ int ConfigAdv::set(char *name, char *value)
 	else if( !strcmp(name, "town_ai_emerge_town_pop_limit") )
 	{
 		if( !read_int(value, &town_ai_emerge_town_pop_limit) )
+			return 0;
+		update_check_sum(name, value);
+	}
+	else if( !strcmp(name, "town_king_influence_all_races") )
+	{
+		if( !read_bool(value, &town_king_influence_all_races) )
 			return 0;
 		update_check_sum(name, value);
 	}

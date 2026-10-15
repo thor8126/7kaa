@@ -22,6 +22,7 @@
 //Description : Firm Military Camp - AI functions
 
 #include <ONATION.h>
+#include <ConfigAdv.h>
 #include <OINFO.h>
 #include <OCONFIG.h>
 #include <OTOWN.h>
@@ -736,6 +737,8 @@ int FirmCamp::think_capture_target_town()
 	int   prefPeacefulness = nation_array[nation_recno]->pref_peacefulness;
 	Nation* ownNation = nation_array[nation_recno];
 	int   overseerRaceId = unit_array[overseer_recno]->race_id;
+	int   overseerInfluencesAllRaces = config_adv.town_king_influence_all_races &&
+										 unit_array[overseer_recno]->rank_id == RANK_KING;
 
 	for( i=0 ; i<linked_town_count ; i++ )
 	{
@@ -757,7 +760,8 @@ int FirmCamp::think_capture_target_town()
 
 			if( resistanceDec > 0 &&
 				 curResistance > 25-25*ownNation->pref_peacefulness/100 &&		// for nation that has a high peacefulness preference they will wait for the loyalty to fall and try not to attack the town unless necessary
-				 townPtr->race_pop_array[overseerRaceId-1] >= 5 )		// if it's less than 5, don't count it, as that it will be easy to attack
+				 ( townPtr->race_pop_array[overseerRaceId-1] >= 5 ||		// if it's less than 5, don't count it, as that it will be easy to attack
+				   overseerInfluencesAllRaces ) )							// a king influences all races, see Town::update_target_resistance()
 			{
 				continue;		// let it decrease until it can no longer decrease
 			}

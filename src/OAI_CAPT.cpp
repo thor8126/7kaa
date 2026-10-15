@@ -30,6 +30,9 @@
 #include <ONATION.h>
 #include <OAIWAR.h>
 #include <ConfigAdv.h>
+#include <ORACERES.h>
+#include <OUNITRES.h>
+#include <OWORLD.h>
 
 
 //------- define struct CaptureTown -------//
@@ -120,8 +123,9 @@ int Nation::think_capture_independent()
 			//------ if we already have a camp linked to this town -----//
 			//
 			// A camp's commander only lowers the resistance of villagers of his
-			// own race, down to 100 - Town::camp_influence(). A linked camp with a
-			// commander of another race can still lower all races through cash
+			// own race, down to 100 - Town::camp_influence(), except a king, who
+			// lowers all races (Town::update_target_resistance). A linked camp with
+			// a commander of another race can still lower all races through cash
 			// grants (FirmCamp::think_use_cash_to_capture), but never brings the
 			// majority race down by influence, so a capturer of the majority race
 			// may still be sent to build a camp next to the village.
@@ -131,7 +135,9 @@ int Nation::think_capture_independent()
 			if( firmPtr->nation_recno == nation_recno )
 			{
 				if( !config_adv.nation_ai_opening_strategy || !firmPtr->overseer_recno ||
-					 unit_array[firmPtr->overseer_recno]->race_id == townPtr->majority_race() )
+					 unit_array[firmPtr->overseer_recno]->race_id == townPtr->majority_race() ||
+					 ( config_adv.town_king_influence_all_races &&
+						unit_array[firmPtr->overseer_recno]->rank_id == RANK_KING ) )
 				{
 					break;
 				}
@@ -270,8 +276,27 @@ int Nation::capture_expected_resistance(int townRecno, int *captureUnitRecno)
 	int targetResistance;
 
 	*captureUnitRecno = find_best_capturer(townRecno, majorityRace, /*out*/ targetResistance);
+
 	if( !(*captureUnitRecno) )
-		return 100;
+	{
+		//--- no general of the majority race, capture_build_camp() can still hire one from our inns ---//
+
+		if( !config_adv.nation_ai_opening_strategy )
+			return 100;
+
+		targetResistance = inn_capturer_resistance(townRecno, majorityRace);
+
+		if( targetResistance >= 100 )
+			return 100;
+	}
+
+	//--- a king brings villagers of every race in an independent town down to his target ---//
+
+	else if( config_adv.town_king_influence_all_races && !townPtr->nation_recno &&
+				unit_array[*captureUnitRecno]->rank_id == RANK_KING )
+	{
+		return targetResistance;
+	}
 
 	int resultResistance =
 		( targetResistance * townPtr->race_pop_array[majorityRace-1] +
@@ -281,6 +306,78 @@ int Nation::capture_expected_resistance(int townRecno, int *captureUnitRecno)
 	return resultResistance;
 }
 //---------- End of function Nation::capture_expected_resistance ---------//
+
+
+//--------- Begin of function Nation::capturer_hire_importance --------//
+//
+// return : <int> the importance rating of hiring a commander for capturing a village
+//
+int Nation::capturer_hire_importance()
+{
+	if( ai_war_state.get_strategy(nation_recno) == AI_STRATEGY_EXPAND )
+		return 50;		// a nation going for expansion spends more on capturing villages
+
+	return 30;
+}
+//---------- End of function Nation::capturer_hire_importance ---------//
+
+
+//--------- Begin of function Nation::inn_capturer_resistance --------//
+//
+// Return the lowest resistance of the given race of the village that a
+// commander hired from one of our inns could bring it down to, using the
+// same formula as Town::camp_influence(). This is the same choice
+// hire_best_capturer() makes: the leader with the highest leadership.
+//
+// return : <int> the expected resistance, 100 if no suitable commander can be hired
+//
+int Nation::inn_capturer_resistance(int townRecno, int raceId)
+{
+	if( !ai_should_hire_unit(capturer_hire_importance()) )
+		return 100;
+
+	Town* townPtr      = town_array[townRecno];
+	int   destRegionId = world.get_region_id(townPtr->loc_x1, townPtr->loc_y1);
+	int   bestLeadership = -1;
+
+	for( int i=0 ; i<ai_inn_count ; i++ )
+	{
+		FirmInn* firmInn = firm_array[ai_inn_array[i]]->cast_to_FirmInn();
+
+		if( !firmInn || firmInn->region_id != destRegionId )
+			continue;
+
+		InnUnit* innUnit = firmInn->inn_unit_array;
+
+		for( int j=0 ; j<firmInn->inn_unit_count ; j++, innUnit++ )
+		{
+			if( innUnit->skill.skill_id == SKILL_LEADING &&
+				 unit_res[innUnit->unit_id]->race_id == raceId &&
+				 cash >= innUnit->hire_cost &&
+				 innUnit->skill.skill_level > bestLeadership )
+			{
+				bestLeadership = innUnit->skill.skill_level;
+			}
+		}
+	}
+
+	if( bestLeadership < 0 )
+		return 100;
+
+	//------- the influence of the commander, see Town::camp_influence() -------//
+
+	int influence = bestLeadership*2/3;
+
+	if( race_res.is_same_race(race_id, raceId) )
+		influence += influence/3;
+
+	influence += (int) reputation/2;
+
+	influence = MIN(100, influence);
+
+	return MAX(0, 100-influence);
+}
+//---------- End of function Nation::inn_capturer_resistance ---------//
 
 
 //--------- Begin of function Nation::start_capture --------//
@@ -361,7 +458,8 @@ int Nation::capture_build_camp(int townRecno, int raceId, int captureUnitRecno)
 	//---------- add the action to the queue now ----------//
 
 	err_when( captureTown->nation_recno==0 &&
-				 unit_array[unitRecno]->race_id != captureTown->majority_race() );
+				 unit_array[unitRecno]->race_id != captureTown->majority_race() &&
+				 !( config_adv.town_king_influence_all_races && unit_array[unitRecno]->rank_id == RANK_KING ) );
 
 	int actionRecno = add_action( buildXLoc, buildYLoc, captureTown->loc_x1, captureTown->loc_y1,
 							ACTION_AI_BUILD_FIRM, FIRM_CAMP, 1, unitRecno );
@@ -400,7 +498,12 @@ int Nation::find_best_capturer(int townRecno, int raceId, int& bestTargetResista
 	{
 		unitPtr = unit_array[ ai_general_array[i] ];
 
-		if( raceId && unitPtr->race_id != raceId )
+		//--- a king influences villagers of every race in independent towns, see Town::update_target_resistance() ---//
+
+		int isAllRaceCapturer = config_adv.town_king_influence_all_races &&
+										unitPtr->rank_id == RANK_KING && !targetTown->nation_recno;
+
+		if( raceId && unitPtr->race_id != raceId && !isAllRaceCapturer )
 			continue;
 
 		err_when( unitPtr->nation_recno != nation_recno );
@@ -545,7 +648,7 @@ int Nation::mobilize_capturer(int unitRecno)
 //
 int Nation::hire_best_capturer(int townRecno, int raceId)
 {
-	if( !ai_should_hire_unit(30) )		// 30 - importance rating
+	if( !ai_should_hire_unit(capturer_hire_importance()) )		// 30, or 50 for a nation going for expansion
 		return 0;
 
 	FirmInn	*firmInn;

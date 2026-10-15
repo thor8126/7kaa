@@ -1501,6 +1501,22 @@ void Town::update_target_resistance()
 
 		if( curValue == -1 || newValue < curValue )		// need to do this comparsion as there may be more than one command bases of the same nation linked to this town, we use the one with the most influence.
 			race_target_resistance_array[unitPtr->race_id-1][unitPtr->nation_recno-1] = newValue;
+
+		//--- a king commanding the camp influences the villagers of every race in an independent town ---//
+
+		if( config_adv.town_king_influence_all_races && unitPtr->rank_id == RANK_KING && !nation_recno )
+		{
+			for( j=0 ; j<MAX_RACE ; j++ )
+			{
+				if( race_pop_array[j] == 0 )
+					continue;
+
+				curValue = race_target_resistance_array[j][unitPtr->nation_recno-1];
+
+				if( curValue == -1 || newValue < curValue )
+					race_target_resistance_array[j][unitPtr->nation_recno-1] = newValue;
+			}
+		}
 	}
 }
 //------- End of function Town::update_target_resistance ------//

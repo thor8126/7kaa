@@ -489,6 +489,8 @@ public:
 	int 			capture_build_camp(int townRecno, int raceId, int captureUnitRecno);
 	int 			find_best_capturer(int townRecno, int raceId, int& bestResistanceReduce);
 	int 			hire_best_capturer(int townRecno, int raceId);
+	int 			inn_capturer_resistance(int townRecno, int raceId);
+	int 			capturer_hire_importance();
 	int			mobilize_capturer(int unitRecno);
 
 	int 			think_capture_new_enemy_town(Town* capturerTown, int useAllCamp=0);

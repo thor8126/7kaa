@@ -1774,6 +1774,11 @@ void Town::update_base_town_status()
 		ownNation->ai_base_town_count++;
 
 	is_base_town = newBaseTownStatus;
+
+	//--- the per-region base town counts are only recounted when towns are added or removed, recount them now,  ---//
+	//--- otherwise a nation's first town is never counted as a base town and the AI won't capture any village ---//
+
+	ownNation->update_ai_region();
 }
 //-------- End of function Town::update_base_town_status --------//
 
