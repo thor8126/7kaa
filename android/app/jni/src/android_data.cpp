@@ -129,6 +129,8 @@ int android_prepare_game_data()
 	// Touch input is translated by android_touch.cpp; do not let SDL turn
 	// fingers into mouse clicks as well.
 	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+	// ...and do not turn a real mouse into fake touches either.
+	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
 	// Deliver the Back button to the game (mapped to Esc) instead of quitting.
 	SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
 	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");

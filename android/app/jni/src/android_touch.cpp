@@ -365,6 +365,17 @@ int android_touch_event(SDL_Event *event)
 	case SDL_MULTIGESTURE:
 		return 1;          // two-finger panning is done above
 
+	// Touches act only through the absolute mapping above. Drop any mouse
+	// events SDL or the device synthesizes from touches, so nothing can move
+	// the cursor relative to its old position like a trackpad.
+	case SDL_MOUSEMOTION:
+		return event->motion.which == SDL_TOUCH_MOUSEID;
+	case SDL_MOUSEBUTTONDOWN:
+	case SDL_MOUSEBUTTONUP:
+		return event->button.which == SDL_TOUCH_MOUSEID;
+	case SDL_MOUSEWHEEL:
+		return event->wheel.which == SDL_TOUCH_MOUSEID;
+
 	case SDL_KEYDOWN:
 	case SDL_KEYUP:
 		if( event->key.keysym.sym == SDLK_AC_BACK )
