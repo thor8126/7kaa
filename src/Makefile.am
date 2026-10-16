@@ -70,6 +70,7 @@ bin_PROGRAMS = 7kaa
 	OFIRMIF.cpp \
 	OFIRMIF2.cpp \
 	OFIRMIF3.cpp \
+	OFIRMRAL.cpp \
 	OFIRMRES.cpp \
 	OFLAME.cpp \
 	OFONT.cpp \

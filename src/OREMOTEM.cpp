@@ -184,6 +184,7 @@ static MsgProcessFP msg_process_function_array[] =
 	&RemoteMsg::market_switch_restock,
 	&RemoteMsg::road_build,
 	&RemoteMsg::units_wait_ferry,
+	&RemoteMsg::firm_set_rally_point,
 };
 
 static_assert( sizeof(msg_process_function_array)/sizeof(msg_process_function_array[0]) == REMOTE_MSG_TYPE_COUNT,
@@ -3058,3 +3059,16 @@ void RemoteMsg::units_wait_ferry()
 		unit_array.wait_for_ferry( shortPtr[0], shortPtr+2, shortPtr[1], COMMAND_REMOTE );
 }
 // ------- End of function RemoteMsg::units_wait_ferry ---------//
+
+
+// ------- Begin of function RemoteMsg::firm_set_rally_point ---------//
+void RemoteMsg::firm_set_rally_point()
+{
+	err_when( id != MSG_FIRM_SET_RALLY_POINT );
+	// packet structure : <firm recno> <x loc> <y loc>
+	short *shortPtr = (short *)data_buf;
+
+	if( !firm_array.is_deleted(shortPtr[0]) )
+		firm_array[shortPtr[0]]->set_rally_point( shortPtr[1], shortPtr[2], COMMAND_REMOTE );
+}
+// ------- End of function RemoteMsg::firm_set_rally_point ---------//

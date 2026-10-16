@@ -124,6 +124,8 @@ Firm::Firm()
     should_close_flag = 0;
     no_neighbor_space = 0;
     ai_should_build_factory_count = 0;
+    rally_x_loc = -1;
+    rally_y_loc = -1;
 }
 //----------- End of function Firm::Firm ---------//
 
@@ -162,6 +164,9 @@ void Firm::init(int xLoc, int yLoc, int nationRecno, int firmId, const char* bui
 	FirmInfo* firmInfo = firm_res[firmId];
 
 	firm_id = firmId;
+
+	rally_x_loc = -1;		// no rally point, see OFIRMRAL.CPP
+	rally_y_loc = -1;
 
 	if( buildCode )
 		firm_build_id = firmInfo->get_build_id(buildCode);
@@ -3360,6 +3365,9 @@ void Firm::change_nation(int newNationRecno)
 {
 	if( nation_recno == newNationRecno )
       return;
+
+	rally_x_loc = -1;		// the rally point was the old owner's, see OFIRMRAL.CPP
+	rally_y_loc = -1;
 
 	//---------- stop all attack actions to this firm ----------//
 	unit_array.stop_attack_firm(firm_recno);

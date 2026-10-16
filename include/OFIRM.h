@@ -237,6 +237,11 @@ public:
 	char	 no_neighbor_space;			// no space to build firms/towns next to this town
 	char	 ai_should_build_factory_count;
 
+	//------- rally point, see OFIRMRAL.CPP -------//
+
+	short	 rally_x_loc;					// -1 if no rally point is set
+	short	 rally_y_loc;
+
 	//--------- static vars ----------//
 
 	static char  firm_menu_mode;
@@ -277,6 +282,15 @@ public:
 
 	void		capture_firm(int newNationRecno);
 	virtual void change_nation(int newNationRecno);
+
+	//------- rally point functions, see OFIRMRAL.CPP -------//
+
+	int		can_set_rally_point();
+	int		has_rally_point()		{ return rally_x_loc >= 0; }
+	void		set_rally_point(int xLoc, int yLoc, char remoteAction);
+	void		send_to_rally_point(short* unitArray, int unitCount);
+	void		disp_rally_point(int dispY1, int refreshFlag);
+	int		detect_rally_point();
 
 	void		setup_link();
 	void		release_link();

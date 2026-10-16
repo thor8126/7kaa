@@ -391,6 +391,8 @@ void FirmCamp::put_info(int refreshFlag)
 		}
 
 		x=INFO_X1+BUTTON_ACTION_WIDTH*2;
+
+		disp_rally_point( INFO_Y1+288, refreshFlag );		// see OFIRMRAL.CPP
 	}
 	else
 		x=INFO_X1;
@@ -446,6 +448,9 @@ int FirmCamp::detect_info()
 
 	if( !own_firm() )
 		return 0;
+
+	if( detect_rally_point() )		// see OFIRMRAL.CPP
+		return 1;
 
 	//------ detect the overseer button -----//
 
@@ -896,6 +901,10 @@ void FirmCamp::patrol()
 
 		overseerUnit->team_info->member_count = patrol_unit_count;
 	}
+
+	//------ the patrol goes to the rally point, see OFIRMRAL.CPP ------//
+
+	send_to_rally_point( patrol_unit_array, patrol_unit_count );
 
 	//-------- display info --------//
 

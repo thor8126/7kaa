@@ -272,6 +272,35 @@ static void draw_unit_way_point_on_zoom_map()
 //------------ end of static function draw_unit_way_point_on_zoom_map -----------//
 
 
+//------------ begin of static function draw_firm_rally_point_on_zoom_map -----------//
+//
+// Draw a line from the selected fort or war factory to its rally point, see OFIRMRAL.CPP
+//
+static void draw_firm_rally_point_on_zoom_map()
+{
+	if( !firm_array.selected_recno || firm_array.is_deleted(firm_array.selected_recno) )
+		return;
+
+	Firm* firmPtr = firm_array[firm_array.selected_recno];
+
+	if( !firmPtr->has_rally_point() || (!firmPtr->own_firm() && !config.show_ai_info) )
+		return;
+
+	char *chPtr = image_icon.get_ptr("WAYPOINT");
+	short chOffsetX = - (*(short *)chPtr / 2);
+	short chOffsetY = - (*(1+(short *)chPtr) / 2);
+
+	short lineFromX = (firmPtr->center_x - world.zoom_matrix->top_x_loc)*ZOOM_LOC_WIDTH + ZOOM_X1 + ZOOM_LOC_WIDTH/2;
+	short lineFromY = (firmPtr->center_y - world.zoom_matrix->top_y_loc)*ZOOM_LOC_HEIGHT + ZOOM_Y1 + ZOOM_LOC_HEIGHT/2;
+	short lineToX = (firmPtr->rally_x_loc - world.zoom_matrix->top_x_loc)*ZOOM_LOC_WIDTH + ZOOM_X1 + ZOOM_LOC_WIDTH/2;
+	short lineToY = (firmPtr->rally_y_loc - world.zoom_matrix->top_y_loc)*ZOOM_LOC_HEIGHT + ZOOM_Y1 + ZOOM_LOC_HEIGHT/2;
+
+	anim_line.draw_line(&vga_back, lineFromX, lineFromY, lineToX, lineToY, 0, 1);
+	world.zoom_matrix->put_bitmap_clip(lineToX+chOffsetX, lineToY+chOffsetY, chPtr);
+}
+//------------ end of static function draw_firm_rally_point_on_zoom_map -----------//
+
+
 //-------- Begin of function ZoomMatrix::ZoomMatrix ----------//
 
 ZoomMatrix::ZoomMatrix() : land_disp_sort_array(sizeof(DisplaySort),100),
@@ -1681,6 +1710,7 @@ void ZoomMatrix::draw_objects()
 
 	draw_unit_path_on_zoom_map(AIR_DISP_LAYER_MASK);
 	draw_unit_way_point_on_zoom_map();
+	draw_firm_rally_point_on_zoom_map();
 	draw_objects_now(&air_disp_sort_array);
 	// ##### end Gilbert 9/10 ######//
 

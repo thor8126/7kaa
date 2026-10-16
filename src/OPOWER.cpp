@@ -25,6 +25,7 @@
 #include <OMOUSECR.h>
 #include <OUNIT.h>
 #include <OFIRM.h>
+#include <OSE.h>
 #include <OTOWN.h>
 #include <OSITE.h>
 #include <OSYS.h>
@@ -572,6 +573,23 @@ int Power::detect_action()
 	if( selectedCount==0 )		// no unit selected
 	{
 		mem_del(selectedArray);
+
+		//--- with the player's fort or war factory selected, right-clicking the map sets its rally point, see OFIRMRAL.CPP ---//
+
+		if( firm_array.selected_recno && !firm_array.is_deleted(firm_array.selected_recno) )
+		{
+			Firm* firmPtr = firm_array[firm_array.selected_recno];
+
+			if( firmPtr->own_firm() && firmPtr->can_set_rally_point() && !firmPtr->under_construction &&
+				 ( curXLoc < firmPtr->loc_x1 || curXLoc > firmPtr->loc_x2 ||		// right-clicking the building itself does nothing
+					curYLoc < firmPtr->loc_y1 || curYLoc > firmPtr->loc_y2 ) )
+			{
+				se_ctrl.immediate_sound("TURN_ON");
+				firmPtr->set_rally_point( curXLoc, curYLoc, COMMAND_PLAYER );
+				return 1;
+			}
+		}
+
 		return 0;
 	}
 

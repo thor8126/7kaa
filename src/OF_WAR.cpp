@@ -178,6 +178,8 @@ void FirmWar::disp_main_menu(int refreshFlag)
 			button_vacate_firm.disable();
 
 		x += (BUTTON_ACTION_WIDTH * 2);
+
+		disp_rally_point( INFO_Y1+281, refreshFlag );
 	}
 
 	disp_spy_button( x, INFO_Y1+235, refreshFlag );
@@ -210,6 +212,9 @@ int FirmWar::detect_main_menu()
 
 	if( !own_firm() )
 		return 0;
+
+	if( detect_rally_point() )		// see OFIRMRAL.CPP
+		return 1;
 
 	//---------- detect cancel build ------------//
 	if( build_unit_id && button_cancel_build.detect() )
@@ -946,7 +951,9 @@ void FirmWar::process_build()
 			return;
 		}
 
-		unit_array.add_unit( build_unit_id, nation_recno, 0, 0, xLoc, yLoc );
+		short unitRecno = unit_array.add_unit( build_unit_id, nation_recno, 0, 0, xLoc, yLoc );
+
+		send_to_rally_point( &unitRecno, 1 );		// see OFIRMRAL.CPP
 
 		if( firm_array.selected_recno == firm_recno )
 		{
