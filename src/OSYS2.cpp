@@ -67,6 +67,7 @@
 #include <OOPTMENU.h>
 #include <OINGMENU.h>
 #include <CmdLine.h>
+#include <OCALLARM.h>
 #include <gettext.h>
 
 
@@ -85,6 +86,11 @@ static Button    button_road;		// build roads, below the army button
 
 #define ROAD_BUTTON_Y1	(ZOOM_Y1+26)
 #define ROAD_BUTTON_Y2	(ZOOM_Y1+44)
+
+static Button    button_defend;		// call to arms, below the road button while the player is under attack, see OCALLARM.CPP
+
+#define DEFEND_BUTTON_Y1	(ZOOM_Y1+48)
+#define DEFEND_BUTTON_Y2	(ZOOM_Y1+66)
 
 static int is_army_button_shown();
 
@@ -447,6 +453,14 @@ int Sys::detect_button()
 		return 1;
 	}
 
+	//--------- detect defend button -------//
+
+	if( is_army_button_shown() && call_to_arms.is_active() && button_defend.detect() )
+	{
+		call_to_arms.execute(COMMAND_PLAYER);
+		return 1;
+	}
+
 	//------- detect view mode buttons -----//
 
 	#define VIEW_MODE_BUTTON_WIDTH   58
@@ -770,6 +784,9 @@ void Sys::update_view()
 			button_army.paint_text( ARMY_BUTTON_X1, ARMY_BUTTON_Y1, ARMY_BUTTON_X2, ARMY_BUTTON_Y2, _("Army") );
 			button_road.paint_text( ARMY_BUTTON_X1, ROAD_BUTTON_Y1, ARMY_BUTTON_X2, ROAD_BUTTON_Y2, _("Road"), 1,
 				power.command_id == COMMAND_BUILD_ROAD );
+
+			if( call_to_arms.is_active() )
+				button_defend.paint_text( ARMY_BUTTON_X1, DEFEND_BUTTON_Y1, ARMY_BUTTON_X2, DEFEND_BUTTON_Y2, _("Defend") );
 			vga.use_front();
 		}
 

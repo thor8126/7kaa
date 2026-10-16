@@ -98,6 +98,7 @@ public:
 	// unit settings
 	char			unit_ai_retreat_wounded;
 	char			unit_supply_attrition;
+	char			unit_auto_return_idle;
 	char			unit_ai_team_help;
 	char			unit_finish_attack_move;
 	char			unit_loyalty_require_local_leader;

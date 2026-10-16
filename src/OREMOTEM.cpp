@@ -29,6 +29,7 @@
 #include <OUNIT.h>
 #include <OGAME.h>
 #include <OREMOTE.h>
+#include <OCALLARM.h>
 #include <OFIRM.h>
 #include <OFIRMALL.h>
 #include <OTOWN.h>
@@ -185,6 +186,7 @@ static MsgProcessFP msg_process_function_array[] =
 	&RemoteMsg::road_build,
 	&RemoteMsg::units_wait_ferry,
 	&RemoteMsg::firm_set_rally_point,
+	&RemoteMsg::call_to_arms_send,
 };
 
 static_assert( sizeof(msg_process_function_array)/sizeof(msg_process_function_array[0]) == REMOTE_MSG_TYPE_COUNT,
@@ -3072,3 +3074,15 @@ void RemoteMsg::firm_set_rally_point()
 		firm_array[shortPtr[0]]->set_rally_point( shortPtr[1], shortPtr[2], COMMAND_REMOTE );
 }
 // ------- End of function RemoteMsg::firm_set_rally_point ---------//
+
+
+// ------- Begin of function RemoteMsg::call_to_arms_send ---------//
+void RemoteMsg::call_to_arms_send()
+{
+	err_when( id != MSG_CALL_TO_ARMS );
+	// packet structure : <x loc> <y loc>
+	short *shortPtr = (short *)data_buf;
+
+	call_to_arms.send_troops( shortPtr[0], shortPtr[1] );
+}
+// ------- End of function RemoteMsg::call_to_arms_send ---------//

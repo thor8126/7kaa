@@ -31,6 +31,7 @@
 #include <OCONFIG.h>
 #include <OFONT.h>
 #include <OINFO.h>
+#include <OCALLARM.h>
 #include <OPLANT.h>
 #include <ODATE.h>
 #include <OSPY.h>
@@ -2718,6 +2719,11 @@ void Town::being_attacked(int attackerUnitRecno, float attackDamage)
 	int attackerNationRecno = attackerUnit->nation_recno;
 
 	last_being_attacked_date = info.game_date;
+
+	//--- tell the player and let them send their troops, see OCALLARM.CPP ---//
+
+	if( nation_recno && nation_recno == nation_array.player_recno )
+		call_to_arms.alert( center_x, center_y, 0, town_name_id );
 
 	//--------- store attacker nation recno -----------//
 

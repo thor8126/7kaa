@@ -338,6 +338,7 @@ public:
 
 	short			home_camp_firm_recno;
 	short			ferry_harbor_recno;			// the harbor where this unit waits for a ferry, see OU_FERRY.CPP
+	char			idle_far_days;					// days the player's unit has stood idle far from home, see OUNITSUP.CPP
 
 	char			aggressive_mode;
 
@@ -747,6 +748,9 @@ protected:
 	int   is_supply_unit();
 	int   is_supplied();
 	int   is_supplying_nation(int supplierNationRecno);
+	void  process_auto_return();
+	int   is_near_own_building();
+	int   auto_return_home();
 
 public:
 	int   supply_wagon_follow(int targetXLoc, int targetYLoc);

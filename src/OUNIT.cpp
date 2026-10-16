@@ -941,6 +941,7 @@ void Unit::next_day()
 	//------- attrition when out of supply -------//
 
 	process_supply();
+	process_auto_return();
 
    //------- restore cur_power --------//
 

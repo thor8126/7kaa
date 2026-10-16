@@ -272,6 +272,7 @@ void ConfigAdv::reset()
 
 	unit_ai_retreat_wounded = 1;
 	unit_supply_attrition = 1;
+	unit_auto_return_idle = 1;
 	unit_ai_team_help = 1;
 	unit_allow_path_power_mode = 0;
 	unit_finish_attack_move = 1;
@@ -516,6 +517,12 @@ int ConfigAdv::set(char *name, char *value)
 	else if( !strcmp(name, "unit_ai_retreat_wounded") )
 	{
 		if( !read_bool(value, &unit_ai_retreat_wounded) )
+			return 0;
+		update_check_sum(name, value);
+	}
+	else if( !strcmp(name, "unit_auto_return_idle") )
+	{
+		if( !read_bool(value, &unit_auto_return_idle) )
 			return 0;
 		update_check_sum(name, value);
 	}

@@ -31,6 +31,7 @@
 #include <ONATION.h>
 #include <OAIWAR.h>
 #include <OINFO.h>
+#include <OCALLARM.h>
 
 //--------- Begin of function Firm::process_common_ai --------//
 //
@@ -236,6 +237,15 @@ int Firm::think_hire_inn_unit()
 void Firm::being_attacked(int attackerUnitRecno)
 {
 	last_attacked_date = info.game_date;
+
+	//--- tell the player and let them send their troops, see OCALLARM.CPP ---//
+
+	if( nation_recno && nation_recno == nation_array.player_recno &&
+		 unit_array[attackerUnitRecno]->nation_recno != nation_recno )
+	{
+		call_to_arms.alert( center_x, center_y, firm_id,
+			closest_town_name_id ? closest_town_name_id : get_closest_town_name_id() );
+	}
 
 	if( nation_recno && firm_ai )
 	{

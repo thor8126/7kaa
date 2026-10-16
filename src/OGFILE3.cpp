@@ -294,10 +294,11 @@ static void visit_unit(Visitor *v, Unit *u)
 	visit<int8_t>(v, &u->seek_path_fail_count);
 	visit<int8_t>(v, &u->ignore_power_nation);
 	visit<int16_t>(v, &u->ferry_harbor_recno);
+	visit<int8_t>(v, &u->idle_far_days);
 	visit_pointer(v, &u->team_info);
 }
 
-enum { UNIT_RECORD_SIZE = 171 };		// 169 before ferry_harbor_recno was added
+enum { UNIT_RECORD_SIZE = 172 };		// 169 before ferry_harbor_recno and idle_far_days were added
 
 //--------- Begin of function Unit::write_file ---------//
 //

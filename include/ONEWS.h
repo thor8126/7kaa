@@ -90,6 +90,7 @@ enum { NEWS_DIPLOMACY=1,
 		 NEWS_MULTI_QUIT_GAME,
 		 NEWS_MULTI_SAVE_GAME,
 		 NEWS_MULTI_CONNECTION_LOST,
+		 NEWS_UNDER_ATTACK,			// your town or firm is under attack, see OCALLARM.CPP
 	  };
 
 //------- Define struct News ---------//
@@ -177,6 +178,7 @@ public:
 	void  multi_quit_game();
 	void  multi_save_game();
 	void  multi_connection_lost();
+	void  under_attack();
 };
 #pragma pack()
 
@@ -255,6 +257,7 @@ public:
 	void  multi_quit_game(int nationRecno);
 	void  multi_save_game();
 	void  multi_connection_lost(int nationRecno);
+	void  under_attack(int xLoc, int yLoc, int firmId, int townNameId);
 
 	//--------------------------------------------//
 

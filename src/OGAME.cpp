@@ -73,6 +73,7 @@
 #include <OFIRMDIE.h>
 #include <OAIWAR.h>
 #include <OROAD.h>
+#include <OCALLARM.h>
 // ##### end Gilbert 2/10 #######//
 
 //---------------- DETECT_SPREAD ----------------//
@@ -160,6 +161,7 @@ int Game::init(int loadGameCall)
 	nation_array.init();
 	ai_war_state.init();
 	road_res.init();
+	call_to_arms.reset();
 	firm_array.init();
 	// ##### begin Gilbert 2/10 #######//
 	firm_die_array.init();

@@ -33,6 +33,12 @@
 // Supply wagons are built in war factories without research. They can't
 // attack: ordered to attack along with an army, they follow it instead,
 // staying SUPPLY_WAGON_FOLLOW_DISTANCE short of the target.
+//
+// The player's units that stand idle far from home (no own town or firm
+// within SUPPLY_BUILDING_RANGE) for AUTO_RETURN_IDLE_DAYS go back on their
+// own: soldiers and war machines to their fort or the nearest fort with
+// room, generals to a fort without a commander, civilians to the nearest
+// town with room, otherwise next to the nearest own building.
 
 #include <ALL.h>
 #include <OUNIT.h>
@@ -53,6 +59,7 @@
 #define SUPPLY_BUILDING_RANGE				15		// an own or allied town or building within this distance supplies a unit
 #define SUPPLY_WAGON_FOLLOW_DISTANCE	4		// a supply wagon following an army attack stops this far from the target
 #define SUPPLY_CHECK_INTERVAL_DAYS		10
+#define AUTO_RETURN_IDLE_DAYS				60		// the player's idle units far from home return after this many days
 #define SUPPLY_ATTRITION_PERCENT			3		// hit points lost each SUPPLY_CHECK_INTERVAL_DAYS out of supply
 #define SUPPLY_MIN_HIT_POINTS_PERCENT	30		// attrition stops at this level
 
@@ -258,6 +265,230 @@ int Unit::supply_wagon_follow(int targetXLoc, int targetYLoc)
 	return 1;
 }
 //----------- End of function Unit::supply_wagon_follow -----------//
+
+
+//--------- Begin of function Unit::is_near_own_building ---------//
+//
+// return : <int> 1 if one of the nation's towns or firms is within
+//			  SUPPLY_BUILDING_RANGE of the unit
+//
+int Unit::is_near_own_building()
+{
+	int xLoc = next_x_loc();
+	int yLoc = next_y_loc();
+	int i;
+
+	for( i=town_array.size() ; i>0 ; i-- )
+	{
+		if( town_array.is_deleted(i) )
+			continue;
+
+		Town* townPtr = town_array[i];
+
+		if( townPtr->nation_recno == nation_recno &&
+			 loc_rect_distance(xLoc, yLoc, townPtr->loc_x1, townPtr->loc_y1, townPtr->loc_x2, townPtr->loc_y2) <= SUPPLY_BUILDING_RANGE )
+		{
+			return 1;
+		}
+	}
+
+	for( i=firm_array.size() ; i>0 ; i-- )
+	{
+		if( firm_array.is_deleted(i) )
+			continue;
+
+		Firm* firmPtr = firm_array[i];
+
+		if( firmPtr->nation_recno == nation_recno &&
+			 loc_rect_distance(xLoc, yLoc, firmPtr->loc_x1, firmPtr->loc_y1, firmPtr->loc_x2, firmPtr->loc_y2) <= SUPPLY_BUILDING_RANGE )
+		{
+			return 1;
+		}
+	}
+
+	return 0;
+}
+//----------- End of function Unit::is_near_own_building -----------//
+
+
+//--------- Begin of function Unit::process_auto_return ---------//
+//
+// Called once a day by Unit::next_day(). The player's units which have
+// stood idle far from home for AUTO_RETURN_IDLE_DAYS go back.
+//
+void Unit::process_auto_return()
+{
+	if( info.game_date % SUPPLY_CHECK_INTERVAL_DAYS != sprite_recno % SUPPLY_CHECK_INTERVAL_DAYS )
+		return;
+
+	//------ only the player's units out on the map ------//
+
+	int isEligible = config_adv.unit_auto_return_idle &&
+						  nation_recno && nation_recno == nation_array.player_recno &&
+						  !spy_recno && unit_mode == 0 && mobile_type == UNIT_LAND && is_visible() &&
+						  rank_id != RANK_KING &&
+						  ( (unit_res[unit_id]->unit_class == UNIT_CLASS_HUMAN && race_id) ||
+							 unit_res[unit_id]->unit_class == UNIT_CLASS_WEAPON );
+
+	int isIdle = cur_action == SPRITE_IDLE && action_mode == ACTION_STOP && action_mode2 == ACTION_STOP;
+
+	if( !isEligible || !isIdle || is_near_own_building() )
+	{
+		idle_far_days = 0;
+		return;
+	}
+
+	idle_far_days = (char) MIN( idle_far_days + SUPPLY_CHECK_INTERVAL_DAYS, 120 );
+
+	if( idle_far_days < AUTO_RETURN_IDLE_DAYS )
+		return;
+
+	idle_far_days = 0;		// try again after another AUTO_RETURN_IDLE_DAYS if there is nowhere to go
+
+	auto_return_home();
+}
+//----------- End of function Unit::process_auto_return -----------//
+
+
+//--------- Begin of function Unit::auto_return_home ---------//
+//
+// return : <int> 1 if the unit has been sent home
+//
+int Unit::auto_return_home()
+{
+	int curXLoc = next_x_loc();
+	int curYLoc = next_y_loc();
+	int regionId = region_id();
+	int i;
+
+	UnitInfo* unitInfo = unit_res[unit_id];
+	int isCivilian = unitInfo->unit_class == UNIT_CLASS_HUMAN && is_civilian();
+
+	//------ soldiers and war machines: their own fort first ------//
+
+	if( !isCivilian && rank_id == RANK_SOLDIER && home_camp_firm_recno &&
+		 !firm_array.is_deleted(home_camp_firm_recno) &&
+		 firm_array[home_camp_firm_recno]->nation_recno == nation_recno &&
+		 firm_array[home_camp_firm_recno]->region_id == regionId &&
+		 firm_array[home_camp_firm_recno]->worker_count < MAX_WORKER )
+	{
+		if( return_camp() )
+			return 1;
+	}
+
+	//------ the nearest fort with room, or a town with room for civilians ------//
+
+	int bestDistance = 0x7FFF, bestXLoc = -1, bestYLoc = -1;
+
+	if( isCivilian )
+	{
+		for( i=town_array.size() ; i>0 ; i-- )
+		{
+			if( town_array.is_deleted(i) )
+				continue;
+
+			Town* townPtr = town_array[i];
+
+			if( townPtr->nation_recno != nation_recno || townPtr->region_id != regionId ||
+				 townPtr->population >= MAX_TOWN_POPULATION )
+			{
+				continue;
+			}
+
+			int curDistance = misc.points_distance(curXLoc, curYLoc, townPtr->center_x, townPtr->center_y);
+
+			if( curDistance < bestDistance )
+			{
+				bestDistance = curDistance;
+				bestXLoc = townPtr->loc_x1;
+				bestYLoc = townPtr->loc_y1;
+			}
+		}
+	}
+	else
+	{
+		for( i=firm_array.size() ; i>0 ; i-- )
+		{
+			if( firm_array.is_deleted(i) )
+				continue;
+
+			Firm* firmPtr = firm_array[i];
+
+			if( firmPtr->nation_recno != nation_recno || firmPtr->firm_id != FIRM_CAMP ||
+				 firmPtr->under_construction || firmPtr->region_id != regionId )
+			{
+				continue;
+			}
+
+			if( rank_id == RANK_GENERAL ? firmPtr->overseer_recno != 0 : firmPtr->worker_count >= MAX_WORKER )
+				continue;
+
+			int curDistance = misc.points_distance(curXLoc, curYLoc, firmPtr->center_x, firmPtr->center_y);
+
+			if( curDistance < bestDistance )
+			{
+				bestDistance = curDistance;
+				bestXLoc = firmPtr->loc_x1;
+				bestYLoc = firmPtr->loc_y1;
+			}
+		}
+	}
+
+	if( bestXLoc >= 0 )
+	{
+		assign(bestXLoc, bestYLoc);
+		return 1;
+	}
+
+	//------ otherwise next to the nearest own building ------//
+
+	for( i=firm_array.size() ; i>0 ; i-- )
+	{
+		if( firm_array.is_deleted(i) )
+			continue;
+
+		Firm* firmPtr = firm_array[i];
+
+		if( firmPtr->nation_recno != nation_recno || firmPtr->region_id != regionId )
+			continue;
+
+		int curDistance = misc.points_distance(curXLoc, curYLoc, firmPtr->center_x, firmPtr->center_y);
+
+		if( curDistance < bestDistance )
+		{
+			bestDistance = curDistance;
+			bestXLoc = firmPtr->center_x;
+			bestYLoc = firmPtr->center_y;
+		}
+	}
+
+	for( i=town_array.size() ; i>0 ; i-- )
+	{
+		if( town_array.is_deleted(i) )
+			continue;
+
+		Town* townPtr = town_array[i];
+
+		if( townPtr->nation_recno != nation_recno || townPtr->region_id != regionId )
+			continue;
+
+		int curDistance = misc.points_distance(curXLoc, curYLoc, townPtr->center_x, townPtr->center_y);
+
+		if( curDistance < bestDistance )
+		{
+			bestDistance = curDistance;
+			bestXLoc = townPtr->center_x;
+			bestYLoc = townPtr->center_y;
+		}
+	}
+
+	if( bestXLoc < 0 )		// nothing of ours on this land, stay
+		return 0;
+
+	move_to(bestXLoc, bestYLoc);
+	return 1;
+}
+//----------- End of function Unit::auto_return_home -----------//
 
 
 //--------- Begin of function Unit::process_supply ---------//

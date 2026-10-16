@@ -995,6 +995,28 @@ void NewsArray::multi_connection_lost(int nationRecno)
 //------- End of function NewsArray::multi_connection_lost -----//
 
 
+//------ Begin of function NewsArray::under_attack -----//
+//
+// One of the player's towns or firms is under attack, see OCALLARM.CPP.
+//
+// short_para1 - id. of the firm, 0 for a town
+// short_para2 - name id. of the town, or of the town closest to the firm
+//
+void NewsArray::under_attack(int xLoc, int yLoc, int firmId, int townNameId)
+{
+	News* newsPtr = add_news( NEWS_UNDER_ATTACK, NEWS_NORMAL, nation_array.player_recno, 0, 1 );
+
+	if( !newsPtr )
+		return;
+
+	newsPtr->short_para1 = firmId;
+	newsPtr->short_para2 = townNameId;
+
+	newsPtr->set_loc( xLoc, yLoc, NEWS_LOC_ANY );
+}
+//------- End of function NewsArray::under_attack -----//
+
+
 //------ Begin of function NewsArray::add_news -----//
 //
 // Called by news processing function to set news parameters

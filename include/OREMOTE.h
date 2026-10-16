@@ -170,6 +170,7 @@ enum { MSG_QUEUE_HEADER=FIRST_REMOTE_MSG_ID,
 		 MSG_ROAD_BUILD,
 		 MSG_UNITS_WAIT_FERRY,
 		 MSG_FIRM_SET_RALLY_POINT,
+		 MSG_CALL_TO_ARMS,
 
 		 LAST_REMOTE_MSG_ID			// keep this item last
 	  };
@@ -322,6 +323,7 @@ public:
 	void	road_build();
 	void	units_wait_ferry();
 	void	firm_set_rally_point();
+	void	call_to_arms_send();
 };
 
 //----------- Define class Remote -----------//

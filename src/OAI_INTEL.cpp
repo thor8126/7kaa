@@ -510,7 +510,7 @@ void Nation::think_explore()
 		}
 
 		if( unitPtr->nation_recno != nation_recno || unitPtr->spy_recno ||
-			 !unitPtr->is_visible() || !unitPtr->race_id || unitPtr->rank_id != RANK_SOLDIER ||
+			 !unitPtr->is_visible() || !unitPtr->race_id || unitPtr->rank_id != RANK_SOLDIER || unitPtr->is_civilian() ||
 			 unitPtr->ai_action_id || unitPtr->leader_unit_recno ||
 			 unitPtr->action_mode != ACTION_STOP || unitPtr->action_mode2 != ACTION_STOP ||
 			 unitPtr->region_id() != homeTown->region_id )

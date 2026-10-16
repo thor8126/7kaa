@@ -88,6 +88,7 @@ static NewsInfo news_info_array[] =
 	{ &News::multi_quit_game, 1 },
 	{ &News::multi_save_game, 1 },
 	{ &News::multi_connection_lost, 1 },
+	{ &News::under_attack, 1 },
 };
 
 //------- Define static variables --------//
@@ -1731,6 +1732,36 @@ void News::multi_connection_lost()
 	snprintf(str, MAX_STR_LEN+1, _("The connection with %s's Kingdom%s has been lost."), king_name1(), nation_color_str1());
 }
 //------- End of function News::multi_connection_lost -----//
+
+
+//------ Begin of function News::under_attack -----//
+//
+// short_para1 - id. of the firm, 0 for a town
+// short_para2 - name id. of the town, or of the town closest to the firm
+//
+void News::under_attack()
+{
+	//---------------- Text Format -----------------//
+	//
+	// Your village <town name> is under attack! Press Defend to send your troops.
+	// Your <firm type> near <town name> is under attack! Press Defend to send your troops.
+	//
+	//----------------------------------------------//
+
+	if( short_para1 )
+	{
+		// TRANSLATORS: Your <Firm> near <Town> is under attack! ...
+		snprintf(str, MAX_STR_LEN+1, _("Your %s near %s is under attack! Press Defend to send your troops."),
+			_(firm_res[short_para1]->name), town_res.get_name(short_para2));
+	}
+	else
+	{
+		// TRANSLATORS: Your village <Town> is under attack! ...
+		snprintf(str, MAX_STR_LEN+1, _("Your village %s is under attack! Press Defend to send your troops."),
+			town_res.get_name(short_para2));
+	}
+}
+//------- End of function News::under_attack -----//
 
 
 //------ Begin of function News::nation_name1 -----//
