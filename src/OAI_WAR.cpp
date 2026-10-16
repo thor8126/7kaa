@@ -58,6 +58,8 @@
 #define TOWN_LOST_WEARINESS			12.0f
 #define TOWN_GAINED_WEARINESS			6.0f
 #define MIN_TRUCE_DAYS					180
+#define OPENING_PEACE_DAYS				(365*3)		// AI nations start no wars in the first years of a game
+#define OPENING_PEACE_DAYS_MILITARY	(365*2)		// for a nation with a rival close by, see AI_STRATEGY_MILITARY
 #define POSTURE_MIN_DAYS				60			// minimum days before leaving a non-emergency posture
 #define CONSOLIDATE_MIN_DAYS			180
 #define STRATEGY_REVIEW_DAYS			365
@@ -829,6 +831,13 @@ int AiWarState::can_declare_war(int nationRecno, int targetNationRecno)
 
 	if( !warRecord )
 		return 1;
+
+	//--- no new wars in the opening years: kingdoms build up first, sooner when a rival is close by ---//
+
+	int openingDays = get_strategy(nationRecno) == AI_STRATEGY_MILITARY ? OPENING_PEACE_DAYS_MILITARY : OPENING_PEACE_DAYS;
+
+	if( info.game_date < info.game_start_date + openingDays )
+		return 0;
 
 	if( config_adv.nation_ai_war_weariness )
 	{

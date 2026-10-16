@@ -268,7 +268,7 @@ int Nation::war_target_rating(int nationRecno)
 
 	//------ an old grudge: a former enemy has a relation level near 0, a neutral kingdom 40 ------//
 
-	int grudgeRating = MAX( -30, MIN( 40, 40 - nationRelation->ai_relation_level ) );
+	int grudgeRating = MAX( -30, MIN( 30, 30 - nationRelation->ai_relation_level ) );
 
 	grudgeRating += MIN( 30, nationRelation->started_war_on_us_count*10 );
 

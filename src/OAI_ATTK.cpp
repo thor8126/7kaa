@@ -690,7 +690,10 @@ void Nation::ai_attack_target_execute(int directAttack)
 			{
 				//------- declare war with the target nation -------//
 
-				if( ai_attack_target_nation_recno )
+				//--- not on itself: the target may be a building of its own being captured by an enemy ---//
+
+				if( ai_attack_target_nation_recno && ai_attack_target_nation_recno != nation_recno &&
+					 !nation_array.is_deleted(ai_attack_target_nation_recno) )
 				{
 					if( get_relation_status(ai_attack_target_nation_recno) != NATION_HOSTILE )
 					{

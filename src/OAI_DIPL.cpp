@@ -667,7 +667,7 @@ int Nation::think_declare_war()
 	//------------------------------------------------//
 
 	int bestRating=0, bestTargetNation=0;
-	int neededRating = 35 + pref_peacefulness/5;		// 35 to 55
+	int neededRating = 40 + pref_peacefulness/5;		// 40 to 60
 
 	for( i=1 ; i<=nation_array.size() ; i++ )
 	{

@@ -641,6 +641,9 @@ int TalkRes::ai_send_talk_msg(int toNationRecno, int fromNationRecno, int talkId
 	if( !fromNation->is_ai() )
 		return 0;
 
+	if( toNationRecno == fromNationRecno || nation_array.is_deleted(toNationRecno) )		// e.g. a war declaration from an attack on its own building being captured, see Nation::ai_attack_target_execute()
+		return 0;
+
 	//--- first check again if the nation should send the message now ---//
 
 	if( !forceSend )
