@@ -91,6 +91,7 @@ private:
 
 	void	think_new_production();
 	int 	should_build_new_weapon();
+	int	think_build_supply_wagon();
 	int	think_del();
 };
 #pragma pack()

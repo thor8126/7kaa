@@ -140,6 +140,9 @@ void UnitRes::load_info()
 	int		 i;
 
 	unit_info_count = dbUnit->rec_count();
+
+	if( unit_info_count != MAX_UNIT_TYPE )		// UNIT.DBF in STD.SET must have one record for each unit type
+		err.run( "UnitRes::load_info: %d unit records, %d expected", unit_info_count, MAX_UNIT_TYPE );
 	unit_info_array = (UnitInfo*) mem_add(sizeof(UnitInfo) * unit_info_count);
 
 	memset( unit_info_array, 0, sizeof(UnitInfo)*unit_info_count );

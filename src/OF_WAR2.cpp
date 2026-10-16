@@ -27,6 +27,9 @@
 #include <OUNIT.h>
 #include <OTECHRES.h>
 #include <OF_WAR.h>
+#include <OUNITRES.h>
+#include <OAIWAR.h>
+#include <ConfigAdv.h>
 
 //--------- Begin of function FirmWar::process_ai ---------//
 
@@ -93,6 +96,15 @@ void FirmWar::think_new_production()
 	if( !should_build_new_weapon() )
 		return;
 
+	//---- supply wagons for armies attacking far from home, see OUNITSUP.CPP ----//
+
+	if( think_build_supply_wagon() )
+	{
+		add_queue( UNIT_SUPPLY_WAGON );
+		AiWarState::log( "WAGON       nation %d builds a supply wagon at war factory %d", nation_recno, firm_recno );
+		return;
+	}
+
 	//---- calculate the average instance count of all available weapons ---//
 
 	int 		 weaponTypeCount=0, totalWeaponCount=0;
@@ -109,7 +121,7 @@ void FirmWar::think_new_production()
 			continue;
 		}
 
-		if( unitId == UNIT_EXPLOSIVE_CART )		// AI doesn't use Porcupine
+		if( unitId == UNIT_EXPLOSIVE_CART || unitId == UNIT_SUPPLY_WAGON )		// AI doesn't use Porcupine, supply wagons are not weapons
 			continue;
 
 		weaponTypeCount++;
@@ -140,6 +152,9 @@ void FirmWar::think_new_production()
 		if( unitId == UNIT_EXPLOSIVE_CART )		//**BUGHERE, don't produce it yet, it needs a different usage than the others.
 			continue;
 
+		if( unitId == UNIT_SUPPLY_WAGON )		// built by think_build_supply_wagon()
+			continue;
+
 		int unitCount = unitInfo->nation_unit_count_array[nation_recno-1];
 
 		curRating = averageWeaponCount-unitCount + techLevel*3;
@@ -157,6 +172,45 @@ void FirmWar::think_new_production()
 		add_queue( bestUnitId );
 }
 //------ End of function FirmWar::think_new_production -------//
+
+
+//----- Begin of function FirmWar::think_build_supply_wagon ------//
+//
+// One supply wagon for every three camps, at most MAX_AI_SUPPLY_WAGON,
+// when the nation is not on the defensive. Wagons are stationed in the
+// camps, one in each, and follow their soldiers when they attack.
+//
+// return : <int> 1 if a supply wagon should be built now
+//
+int FirmWar::think_build_supply_wagon()
+{
+	#define MAX_AI_SUPPLY_WAGON	3
+
+	if( !config_adv.unit_supply_attrition )
+		return 0;
+
+	int curPosture = ai_war_state.get_posture(nation_recno);
+
+	if( curPosture == AI_POSTURE_DEFEND || curPosture == AI_POSTURE_RECOVER )
+		return 0;
+
+	Nation* nationPtr = nation_array[nation_recno];
+
+	int wantedCount = MIN( nationPtr->ai_camp_count/3, MAX_AI_SUPPLY_WAGON );
+	int wagonCount  = unit_res[UNIT_SUPPLY_WAGON]->nation_unit_count_array[nation_recno-1];
+
+	if( build_unit_id == UNIT_SUPPLY_WAGON )
+		wagonCount++;
+
+	for( int i=0 ; i<build_queue_count ; i++ )
+	{
+		if( build_queue_array[i] == UNIT_SUPPLY_WAGON )
+			wagonCount++;
+	}
+
+	return wagonCount < wantedCount;
+}
+//------ End of function FirmWar::think_build_supply_wagon -------//
 
 
 //----- Begin of function FirmWar::should_build_new_weapon ------//

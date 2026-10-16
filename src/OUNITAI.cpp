@@ -874,6 +874,9 @@ int Unit::think_weapon_action()
 	if( think_assign_weapon_to_camp() )
 		return 1;
 
+	if( unit_id == UNIT_SUPPLY_WAGON )		// supply wagons wait for a camp with room, they don't ask for new camps
+		return 0;
+
 	//----- if no camp to assign, build a new one ------//
 
 	if( think_build_camp() )
@@ -900,6 +903,21 @@ int Unit::think_assign_weapon_to_camp()
 
 		if( firmCamp->region_id	!= regionId || firmCamp->is_worker_full() )
 			continue;
+
+		//--- one supply wagon in each camp, it follows the camp's soldiers when they attack ---//
+
+		if( unit_id == UNIT_SUPPLY_WAGON )
+		{
+			int j;
+			for( j=0 ; j<firmCamp->worker_count ; j++ )
+			{
+				if( firmCamp->worker_array[j].unit_id == UNIT_SUPPLY_WAGON )
+					break;
+			}
+
+			if( j < firmCamp->worker_count )
+				continue;
+		}
 
 		//-------- calculate the rating ---------//
 

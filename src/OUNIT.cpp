@@ -2542,6 +2542,7 @@ void Unit::fix_attack_info()
          attack_count = 2;
          break;
       case UNIT_EXPLOSIVE_CART:
+      case UNIT_SUPPLY_WAGON:
          attack_count = 0;
          break;
       default:

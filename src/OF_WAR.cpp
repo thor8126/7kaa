@@ -48,6 +48,7 @@
 
 	#define BUILD_BUTTON_WIDTH 	201
 	#define BUILD_BUTTON_HEIGHT 	46
+	#define COMPACT_BUILD_BUTTON_HEIGHT 42		// when all weapons and the supply wagon can be built, lower buttons fit in the interface
 	#define COUNT_BUTTON_OFFSET_X	156
 	#define COUNT_BUTTON_OFFSET_Y 7
 	#define COUNT_BUTTON_WIDTH		32
@@ -266,6 +267,24 @@ void FirmWar::disp_build_menu(int refreshFlag)
 		int unitId, x=INFO_X1+2, y=INFO_Y1;
 		UnitInfo* unitInfo;
 
+		//------ count the weapons which can be built to fit their buttons ------//
+
+		int buildCount=0;
+
+		for( unitId=1; unitId<=MAX_UNIT_TYPE ; unitId++ )
+		{
+			unitInfo = unit_res[unitId];
+
+			if( unitInfo->unit_class == UNIT_CLASS_WEAPON &&
+				 unitInfo->get_nation_tech_level(nation_recno) > 0 )
+			{
+				buildCount++;
+			}
+		}
+
+		int buttonHeight = buildCount >= MAX_WEAPON_TYPE ? COMPACT_BUILD_BUTTON_HEIGHT : BUILD_BUTTON_HEIGHT;
+		int countButtonOffsetY = COUNT_BUTTON_OFFSET_Y - (BUILD_BUTTON_HEIGHT-buttonHeight)/2;
+
 		for( unitId=1; unitId<=MAX_UNIT_TYPE ; unitId++ )
 		{
 			unitInfo = unit_res[unitId];
@@ -274,22 +293,22 @@ void FirmWar::disp_build_menu(int refreshFlag)
 				 unitInfo->get_nation_tech_level(nation_recno) > 0 )
 			{
 				// disp_build_button( y, unitId, 1);
-				button_queue_weapon[added_count].create(x+COUNT_BUTTON_OFFSET_X, y+COUNT_BUTTON_OFFSET_Y,
-					x+COUNT_BUTTON_OFFSET_X+COUNT_BUTTON_WIDTH-1, y+COUNT_BUTTON_OFFSET_Y+COUNT_BUTTON_HEIGHT-1,
+				button_queue_weapon[added_count].create(x+COUNT_BUTTON_OFFSET_X, y+countButtonOffsetY,
+					x+COUNT_BUTTON_OFFSET_X+COUNT_BUTTON_WIDTH-1, y+countButtonOffsetY+COUNT_BUTTON_HEIGHT-1,
 					i_disp_queue_button, ButtonCustomPara(this, unitId) );
-				button_weapon[added_count].paint(x, y, x+BUILD_BUTTON_WIDTH-1, y+BUILD_BUTTON_HEIGHT-1,
+				button_weapon[added_count].paint(x, y, x+BUILD_BUTTON_WIDTH-1, y+buttonHeight-1,
 					i_disp_build_button, ButtonCustomPara(&button_queue_weapon[added_count], unitId) );
 
-				err_when(added_count >= MAX_UNIT_TYPE);
+				err_when(added_count >= MAX_WEAPON_TYPE);
 				button_unit_id[added_count++] = unitId;
-				y += BUILD_BUTTON_HEIGHT;
+				y += buttonHeight;
 			}
 		}
 
 		if( !added_count || queue_weapon_selected >= added_count)
 			queue_weapon_selected = -1;
 
-		button_cancel.paint(x, y, x+BUILD_BUTTON_WIDTH-1, y+BUILD_BUTTON_HEIGHT*3/4,
+		button_cancel.paint(x, y, x+BUILD_BUTTON_WIDTH-1, y+buttonHeight*3/4,
 		ButtonCustom::disp_text_button_func, ButtonCustomPara((void*)_("Done"),0) );
 	}
 	// ###### end Gilbert 10/9 ########//
@@ -555,6 +574,7 @@ static void i_disp_build_button(ButtonCustom *button, int repaintBody)
 	int y1 = button->y1;
 	int x2 = button->x2;
 	int y2 = button->y2;
+	int shiftY = (BUILD_BUTTON_HEIGHT - (y2-y1+1)) / 2;		// move the contents up on compact buttons
 	if( !button->pushed_flag )
 	{
 		if( repaintBody )
@@ -582,7 +602,7 @@ static void i_disp_build_button(ButtonCustom *button, int repaintBody)
 		// display unit large icon
 		short unitId = button->custom_para.value;
 		UnitInfo* unitInfo = unit_res[unitId];
-		vga_front.put_bitmap(x1+BUILD_UNIT_ICON_OFFSET_X, y1+BUILD_UNIT_ICON_OFFSET_Y, 
+		vga_front.put_bitmap(x1+BUILD_UNIT_ICON_OFFSET_X, y1+BUILD_UNIT_ICON_OFFSET_Y-shiftY,
 			unitInfo->get_large_icon_ptr(0));
 
 		err_when( button->custom_para.value != queueButton->custom_para.value);
@@ -613,7 +633,7 @@ static void i_disp_build_button(ButtonCustom *button, int repaintBody)
 		if( queue_weapon_selected>=0 && button_unit_id[queue_weapon_selected] == unitId )
 			str += "<";
 
-		font_bible.put( x1+BUILD_UNIT_NAME_OFFSET_X, y1+BUILD_UNIT_NAME_OFFSET_Y, str );
+		font_bible.put( x1+BUILD_UNIT_NAME_OFFSET_X, y1+BUILD_UNIT_NAME_OFFSET_Y-shiftY, str );
 	}
 
 	// display small button

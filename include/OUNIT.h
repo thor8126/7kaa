@@ -54,6 +54,8 @@
 
 #define GAME_FRAMES_PER_DAY 10
 
+#define SUPPLY_WAGON_RANGE	8		// an own or allied supply wagon within this distance supplies a unit, see OUNITSUP.CPP
+
 //-------- action code for action_mode ---------//
 
 enum { ACTION_STOP,
@@ -745,6 +747,12 @@ protected:
 	int   is_supply_unit();
 	int   is_supplied();
 	int   is_supplying_nation(int supplierNationRecno);
+
+public:
+	int   supply_wagon_follow(int targetXLoc, int targetYLoc);
+	void  disp_supply_wagon_info(int dispY1, int refreshFlag);
+
+protected:
 };
 #pragma pack()
 

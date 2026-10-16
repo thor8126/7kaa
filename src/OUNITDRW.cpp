@@ -33,6 +33,60 @@
 #include <ONATION.h>
 #include <OUNIT.h>
 #include <OCONFIG.h>
+#include <OUNITRES.h>
+
+//------- Begin of static function wagon_remap_table -------//
+//
+// Supply wagons use the caravan sprite drawn in grey, see OUNITSUP.CPP.
+// The nation colours, outline and shadow (codes 0xE0 and above) are kept.
+//
+// <char*> colorRemapTable - the nation's color remap table
+//
+// return : <char*> the color remap table for drawing a supply wagon
+//
+static char* wagon_remap_table(char* colorRemapTable)
+{
+	#define FIRST_RESERVED_COLOR	0xE0
+
+	static unsigned char greyColor[FIRST_RESERVED_COLOR];
+	static int           greyColorInit=0;
+	static char          wagonRemapTable[256];
+
+	if( !greyColorInit )
+	{
+		const SDL_Color* gamePal = vga.get_game_pal();
+
+		for( int i=0 ; i<FIRST_RESERVED_COLOR ; i++ )
+		{
+			int lum = (gamePal[i].r*30 + gamePal[i].g*59 + gamePal[i].b*11) / 100 * 115 / 100;		// slightly lighter
+			int bestColor = i, bestDiff = 0x7FFF;
+
+			for( int j=0 ; j<FIRST_RESERVED_COLOR ; j++ )
+			{
+				if( gamePal[j].r != gamePal[j].g || gamePal[j].g != gamePal[j].b )		// greys only
+					continue;
+
+				int diff = abs(gamePal[j].r - MIN(lum, 255));
+
+				if( diff < bestDiff )
+				{
+					bestDiff  = diff;
+					bestColor = j;
+				}
+			}
+
+			greyColor[i] = (unsigned char) bestColor;
+		}
+
+		greyColorInit = 1;
+	}
+
+	for( int i=0 ; i<256 ; i++ )
+		wagonRemapTable[i] = i < FIRST_RESERVED_COLOR ? colorRemapTable[greyColor[i]] : colorRemapTable[i];
+
+	return wagonRemapTable;
+}
+//-------- End of static function wagon_remap_table --------//
 
 #ifdef NO_DEBUG_UNIT
 #undef err_when
@@ -84,6 +138,9 @@ void Unit::draw()
 	//------- get the color remap table for this sprite ------//
 
 	char* colorRemapTable = game.get_color_remap_table(nation_recno, 0); 		// selected_flag);
+
+	if( unit_id == UNIT_SUPPLY_WAGON )
+		colorRemapTable = wagon_remap_table(colorRemapTable);
 
 	//---- only portion of the sprite is inside the view area ------//
 
@@ -404,6 +461,9 @@ void Unit::draw_outlined()
 	//------- get the color remap table for this sprite ------//
 
 	char* colorRemapTable = game.get_color_remap_table(nation_recno, 1);
+
+	if( unit_id == UNIT_SUPPLY_WAGON )
+		colorRemapTable = wagon_remap_table(colorRemapTable);
 
 	//---- only portion of the sprite is inside the view area ------//
 

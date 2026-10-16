@@ -101,7 +101,8 @@ void Unit::attack_unit(int targetXLoc, int targetYLoc, int xOffset, int yOffset,
 	//------------------------------------------------------------//
 	if(!can_attack())
 	{
-		stop2(KEEP_DEFENSE_MODE);
+		if( !supply_wagon_follow(targetXLoc, targetYLoc) )		// supply wagons follow the army, see OUNITSUP.CPP
+			stop2(KEEP_DEFENSE_MODE);
 		return;
 	}
 	else if(is_unit_dead())
@@ -146,7 +147,11 @@ void Unit::attack_unit(short targetRecno, int xOffset, int yOffset, int resetBlo
 	//------------------------------------------------------------//
 	if(!can_attack())
 	{
-		stop2(KEEP_DEFENSE_MODE);
+		if( unit_array.is_deleted(targetRecno) || !unit_array[targetRecno]->is_visible() ||		// supply wagons follow the army, see OUNITSUP.CPP
+			 !supply_wagon_follow(unit_array[targetRecno]->next_x_loc(), unit_array[targetRecno]->next_y_loc()) )
+		{
+			stop2(KEEP_DEFENSE_MODE);
+		}
 		return;
 	}
 	else if(is_unit_dead())
@@ -977,7 +982,8 @@ void Unit::attack_firm(int firmXLoc, int firmYLoc, int xOffset, int yOffset, int
 	//------------------------------------------------------------//
 	if(!can_attack())
 	{
-		stop2(KEEP_DEFENSE_MODE);
+		if( !supply_wagon_follow(firmXLoc, firmYLoc) )		// supply wagons follow the army, see OUNITSUP.CPP
+			stop2(KEEP_DEFENSE_MODE);
 		return;
 	}
 	else if(is_unit_dead())
@@ -1485,7 +1491,8 @@ void Unit::attack_town(int townXLoc, int townYLoc, int xOffset, int yOffset, int
 	//------------------------------------------------------------//
 	if(!can_attack())
 	{
-		stop2(KEEP_DEFENSE_MODE);
+		if( !supply_wagon_follow(townXLoc, townYLoc) )		// supply wagons follow the army, see OUNITSUP.CPP
+			stop2(KEEP_DEFENSE_MODE);
 		return;
 	}
 	else if(is_unit_dead())
@@ -1936,7 +1943,8 @@ void Unit::attack_wall(int wallXLoc, int wallYLoc, int xOffset, int yOffset, int
 	//------------------------------------------------------------//
 	if(!can_attack())
 	{
-		stop2(KEEP_DEFENSE_MODE);
+		if( !supply_wagon_follow(wallXLoc, wallYLoc) )		// supply wagons follow the army, see OUNITSUP.CPP
+			stop2(KEEP_DEFENSE_MODE);
 		return;
 	}
 	else if(is_unit_dead())

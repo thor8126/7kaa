@@ -24,10 +24,15 @@
 // A soldier, general, king or war machine out on the map is supplied when
 // it is within SUPPLY_BUILDING_RANGE of one of its own or an allied
 // kingdom's towns or buildings (territory itself only reaches 2 locations
-// beyond buildings, see World::set_power), or near a road that is not in
-// enemy territory. Out of supply it does not recover hit
+// beyond buildings, see World::set_power), near a road that is not in
+// enemy territory, or within SUPPLY_WAGON_RANGE of one of its own or an
+// allied kingdom's supply wagons. Out of supply it does not recover hit
 // points, and it slowly loses them (attrition), but never below
 // SUPPLY_MIN_HIT_POINTS_PERCENT, so attrition alone never kills a unit.
+//
+// Supply wagons are built in war factories without research. They can't
+// attack: ordered to attack along with an army, they follow it instead,
+// staying SUPPLY_WAGON_FOLLOW_DISTANCE short of the target.
 
 #include <ALL.h>
 #include <OUNIT.h>
@@ -40,11 +45,13 @@
 #include <OINFO.h>
 #include <ConfigAdv.h>
 #include <OAIWAR.h>
+#include <OMISC.h>
 
 //------- Define constants -------//
 
 #define SUPPLY_ROAD_RANGE					3		// a road within this distance supplies a unit
 #define SUPPLY_BUILDING_RANGE				15		// an own or allied town or building within this distance supplies a unit
+#define SUPPLY_WAGON_FOLLOW_DISTANCE	4		// a supply wagon following an army attack stops this far from the target
 #define SUPPLY_CHECK_INTERVAL_DAYS		10
 #define SUPPLY_ATTRITION_PERCENT			3		// hit points lost each SUPPLY_CHECK_INTERVAL_DAYS out of supply
 #define SUPPLY_MIN_HIT_POINTS_PERCENT	30		// attrition stops at this level
@@ -107,8 +114,8 @@ int Unit::is_supplying_nation(int supplierNationRecno)
 //--------- Begin of function Unit::is_supplied ---------//
 //
 // return : <int> 1 if the unit is in its own or an allied kingdom's
-//			  territory, near its or an ally's town or building, or near a road
-//			  not in enemy territory.
+//			  territory, near a road not in enemy territory, near its or an
+//			  ally's supply wagon, or near its or an ally's town or building.
 //
 int Unit::is_supplied()
 {
@@ -156,6 +163,32 @@ int Unit::is_supplied()
 		}
 	}
 
+	//------ near an own or allied supply wagon ------//
+
+	xLoc1 = MAX(0, xLoc-SUPPLY_WAGON_RANGE), xLoc2 = MIN(MAX_WORLD_X_LOC-1, xLoc+SUPPLY_WAGON_RANGE);
+	yLoc1 = MAX(0, yLoc-SUPPLY_WAGON_RANGE), yLoc2 = MIN(MAX_WORLD_Y_LOC-1, yLoc+SUPPLY_WAGON_RANGE);
+
+	for( int y=yLoc1 ; y<=yLoc2 ; y++ )
+	{
+		Location* locPtr = world.get_loc(xLoc1, y);
+
+		for( int x=xLoc1 ; x<=xLoc2 ; x++, locPtr++ )
+		{
+			if( !locPtr->has_unit(UNIT_LAND) )
+				continue;
+
+			int unitRecno = locPtr->unit_recno(UNIT_LAND);
+
+			if( unit_array.is_deleted(unitRecno) )
+				continue;
+
+			Unit* unitPtr = unit_array[unitRecno];
+
+			if( unitPtr->unit_id == UNIT_SUPPLY_WAGON && is_supplying_nation(unitPtr->nation_recno) )
+				return 1;
+		}
+	}
+
 	//------ near an own or allied town or building ------//
 
 	int i;
@@ -191,6 +224,40 @@ int Unit::is_supplied()
 	return 0;
 }
 //----------- End of function Unit::is_supplied -----------//
+
+
+//--------- Begin of function Unit::supply_wagon_follow ---------//
+//
+// A supply wagon can't attack. Ordered to attack along with an army, it
+// follows the army instead, stopping SUPPLY_WAGON_FOLLOW_DISTANCE short of
+// the target, on its way there.
+//
+// <int> targetXLoc, targetYLoc - location of the target
+//
+// return : <int> 1 if this is a supply wagon and it has been given the order
+//
+int Unit::supply_wagon_follow(int targetXLoc, int targetYLoc)
+{
+	if( unit_id != UNIT_SUPPLY_WAGON || is_unit_dead() )
+		return 0;
+
+	int curXLoc = next_x_loc();
+	int curYLoc = next_y_loc();
+	int curDistance = misc.points_distance(curXLoc, curYLoc, targetXLoc, targetYLoc);
+
+	if( curDistance <= SUPPLY_WAGON_FOLLOW_DISTANCE )
+	{
+		stop2(KEEP_DEFENSE_MODE);
+		return 1;
+	}
+
+	int destXLoc = targetXLoc + (curXLoc-targetXLoc) * SUPPLY_WAGON_FOLLOW_DISTANCE / curDistance;
+	int destYLoc = targetYLoc + (curYLoc-targetYLoc) * SUPPLY_WAGON_FOLLOW_DISTANCE / curDistance;
+
+	move_to(destXLoc, destYLoc);
+	return 1;
+}
+//----------- End of function Unit::supply_wagon_follow -----------//
 
 
 //--------- Begin of function Unit::process_supply ---------//

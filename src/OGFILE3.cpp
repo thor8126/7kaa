@@ -1903,7 +1903,7 @@ static void visit_nation(Visitor *v, Nation *nat)
 	visit<int16_t>(v, &nat->lead_attack_camp_recno);
 }
 
-enum { NATION_RECORD_SIZE = 2196 + 2*MAX_RAW };		// 2202 with 3 raw materials
+enum { NATION_RECORD_SIZE = 2108 + 2*MAX_RAW + 2*MAX_UNIT_TYPE };		// 2202 with 3 raw materials and 44 unit types
 
 //--------- Begin of function Nation::write_file ---------//
 //

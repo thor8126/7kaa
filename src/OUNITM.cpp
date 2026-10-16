@@ -1676,6 +1676,14 @@ void Unit::process_move()
 	{
 		process_move_step();
 	}
+
+	//--- supply wagons use the caravan sprite, but keep up with soldiers: another step every third frame, see OUNITSUP.CPP ---//
+
+	if( cur_action == SPRITE_MOVE && unit_id == UNIT_SUPPLY_WAGON &&
+		 (sys.frame_count + sprite_recno) % 3 == 0 )
+	{
+		process_move_step();
+	}
 }
 //---------- End of function Unit::process_move ----------//
 

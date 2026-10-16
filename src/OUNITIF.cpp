@@ -234,6 +234,11 @@ void Unit::disp_main_menu(int refreshFlag)
 		disp_unit_info( y, refreshFlag );
 		y += 89;
 	}
+	else if( unit_id == UNIT_SUPPLY_WAGON )
+	{
+		disp_supply_wagon_info( y, refreshFlag );
+		y += 41;
+	}
 
 	//---------------------------------//
 
@@ -1205,6 +1210,27 @@ void Unit::disp_unit_info(int dispY1, int refreshFlag)
 	}
 }
 //----------- End of function Unit::disp_unit_info -----------//
+
+
+//--------- Begin of function Unit::disp_supply_wagon_info ---------//
+//
+// <int> 	dispY1		 - the top y coordination of the info area
+// <int>    refreshFlag  - refresh flag
+//
+void Unit::disp_supply_wagon_info(int dispY1, int refreshFlag)
+{
+	if( refreshFlag != INFO_REPAINT )
+		return;
+
+	vga_util.d3_panel_up( INFO_X1, dispY1, INFO_X2, dispY1+38 );
+
+	String str;
+	snprintf( str, MAX_STR_LEN+1, _("%d locations of it."), SUPPLY_WAGON_RANGE );
+
+	font_san.put( INFO_X1+6, dispY1+4, _("Supplies your units within") );
+	font_san.put( INFO_X1+6, dispY1+20, str );
+}
+//----------- End of function Unit::disp_supply_wagon_info -----------//
 
 
 //--------- Begin of function Unit::disp_unit_profile ---------//

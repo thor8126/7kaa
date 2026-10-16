@@ -82,11 +82,12 @@ enum { UNIT_NORMAN=1,
 		 UNIT_INDIAN_GOD,
 		 UNIT_ZULU_GOD,
 		 UNIT_F_BALLISTA,
+		 UNIT_SUPPLY_WAGON,		// see OUNITSUP.CPP
 		 UNIT_LAST					// keep this line after the last unit
 	  };
 
 enum { MAX_UNIT_TYPE = UNIT_LAST-1,
-		 MAX_WEAPON_TYPE = 6,		// no. of types of weapons
+		 MAX_WEAPON_TYPE = 7,		// no. of types of weapons, including the supply wagon
 		 MAX_SHIP_TYPE = 4, 			// no. of types of ships
 	  };
 
