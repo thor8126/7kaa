@@ -128,6 +128,7 @@ static int loaded_game_version;
 #define FIRST_VERSION_WITH_IDLE_RETURN		220		// earlier saved games have smaller unit records, without Unit::idle_far_days
 #define FIRST_VERSION_WITH_REPEAT_BUILD		221		// earlier saved games have smaller war factory and harbor records, without repeat_build
 #define FIRST_VERSION_WITH_CIVIL_TECH		222		// earlier saved games have fewer and smaller technology records, without the civil technologies
+#define FIRST_VERSION_WITH_NEW_TREATIES	223		// earlier saved games have smaller nation relation and talk records, without road treaties and peace pacts
 
 bool GameFile::read_file_same_version = true;
 
@@ -239,6 +240,9 @@ int GameFile::read_file(File* filePtr)
 
 	if(load_file_game_version < FIRST_VERSION_WITH_CIVIL_TECH)
 		return -1;		// technology records saved before the civil technologies are fewer and of a different size
+
+	if(load_file_game_version < FIRST_VERSION_WITH_NEW_TREATIES)
+		return -1;		// nation relation and talk records saved before road treaties and peace pacts are of a different size
 
 	read_file_same_version = ( load_file_game_version/100==GAME_VERSION/100 );
 	loaded_game_version = load_file_game_version;
@@ -1067,7 +1071,7 @@ static void visit_talk_res(Visitor *v, TalkRes *tr)
 	v->skip(39); /* &tr->talk_msg_array */
 }
 
-enum { TALK_RES_RECORD_SIZE = 214 };
+enum { TALK_RES_RECORD_SIZE = 228 };		// 214 with 20 talk types
 
 //-------- Start of function TalkRes::write_file -------------//
 //

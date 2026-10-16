@@ -610,6 +610,24 @@ static void disp_nation_info()
 #endif
 			}
 
+			//--- road treaties and peace pacts, see OTALKMSG.H ---//
+
+			else if( nationPtr->get_relation(i)->has_peace_pact() || nationPtr->get_relation(i)->road_treaty )
+			{
+				String treatyStr;
+
+				if( nationPtr->get_relation(i)->has_peace_pact() )
+					treatyStr = _("Peace Pact");
+
+				if( nationPtr->get_relation(i)->road_treaty )
+				{
+					if( treatyStr.len() ) treatyStr += ", ";
+					treatyStr += _("Roads");
+				}
+
+				font_san.put( x1+330, y, treatyStr );
+			}
+
 			if( config.show_ai_info )
 			{
 				font_san.put( x1+500, y, nationPtr->get_relation(i)->ai_relation_level );

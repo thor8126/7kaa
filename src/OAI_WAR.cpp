@@ -832,6 +832,11 @@ int AiWarState::can_declare_war(int nationRecno, int targetNationRecno)
 	if( !warRecord )
 		return 1;
 
+	//--- a peace pact is kept, see OTALKMSG.H ---//
+
+	if( nation_array[nationRecno]->get_relation(targetNationRecno)->has_peace_pact() )
+		return 0;
+
 	//--- no new wars in the opening years: kingdoms build up first, sooner when a rival is close by ---//
 
 	int openingDays = get_strategy(nationRecno) == AI_STRATEGY_MILITARY ? OPENING_PEACE_DAYS_MILITARY : OPENING_PEACE_DAYS;

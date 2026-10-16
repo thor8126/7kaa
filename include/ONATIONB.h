@@ -131,6 +131,10 @@ struct NationRelation			// many-to-many relationships between nations
 
 	char	contact_msg_flag;										// used only in multiplayer
 
+	char	road_treaty;						// caravans of the two nations use each other's roads free of tolls, see OCIVIL.CPP
+	int	peace_pact_end_date;				// neither nation may declare war before this date, 0 if no pact
+	int	has_peace_pact()					{ return peace_pact_end_date > info.game_date; }
+
 	static const char* relation_status_str_array[5];
 	static const char* duration_of_status_str_array[5];
 };
@@ -290,6 +294,7 @@ public:
 	char		 is_allied_with_player;								// for fast access in visiting world functions
 
 	void		 set_relation_status(short nationRecno, char newStatus, char recursiveCall=0);
+	void		 break_peace_pact(int victimNationRecno);
 	char		 get_relation_status(short nationRecno);
 	void		 set_relation_passable(short nationRecno, char status);
 	char		 get_relation_passable(short nationRecno);

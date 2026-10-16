@@ -70,6 +70,12 @@ void Nation::think_diplomacy()
 	if( think_end_treaty() )
 		return;
 
+	if( think_propose_peace_pact() )
+		return;
+
+	if( think_propose_road_treaty() )
+		return;
+
 	//-------- think about other matters --------//
 
 	if( think_demand_tribute_aid() )
@@ -215,6 +221,14 @@ void Nation::ai_notify_reply(int talkMsgRecno)
 			break;
 
 		case TALK_REQUEST_SURRENDER:		// no relation change on this request 
+			break;
+
+		case TALK_PROPOSE_ROAD_TREATY:
+		case TALK_PROPOSE_PEACE_PACT:
+			if( talkMsg->reply_type == REPLY_ACCEPT )
+				relationChange = 5;
+			else
+				relationChange = -3;
 			break;
 
 		default:
@@ -639,6 +653,93 @@ int Nation::think_request_buy_food()
 	return 1;
 }
 //------ End of function Nation::think_request_buy_food ------//
+
+
+//----- Begin of function Nation::think_propose_road_treaty -----//
+//
+// Propose a road treaty to a trade partner when either side collects
+// tolls (see OCIVIL.CPP).
+//
+int Nation::think_propose_road_treaty()
+{
+	for( int i=1 ; i<=nation_array.size() ; i++ )
+	{
+		if( nation_array.is_deleted(i) || i==nation_recno )
+			continue;
+
+		NationRelation* nationRelation = get_relation(i);
+
+		if( !nationRelation->has_contact || !nationRelation->trade_treaty || nationRelation->road_treaty ||
+			 nationRelation->ai_relation_level < 40 )
+		{
+			continue;
+		}
+
+		if( !talk_res.can_send_msg(i, nation_recno, TALK_PROPOSE_ROAD_TREATY) ||
+			 !should_diplomacy_retry(TALK_PROPOSE_ROAD_TREATY, i) )
+		{
+			continue;
+		}
+
+		AiWarState::log( "TREATY      nation %d proposes a road treaty to %d", nation_recno, i );
+
+		talk_res.ai_send_talk_msg(i, nation_recno, TALK_PROPOSE_ROAD_TREATY);
+		return 1;
+	}
+
+	return 0;
+}
+//------ End of function Nation::think_propose_road_treaty ------//
+
+
+//----- Begin of function Nation::think_propose_peace_pact -----//
+//
+// Propose a peace pact to a much stronger kingdom that can reach us, or
+// to a former enemy when weary of war.
+//
+int Nation::think_propose_peace_pact()
+{
+	int ourMilitary = military_rank_rating();
+
+	for( int i=1 ; i<=nation_array.size() ; i++ )
+	{
+		if( nation_array.is_deleted(i) || i==nation_recno )
+			continue;
+
+		NationRelation* nationRelation = get_relation(i);
+
+		if( !nationRelation->has_contact || nationRelation->has_peace_pact() ||
+			 !talk_res.can_send_msg(i, nation_recno, TALK_PROPOSE_PEACE_PACT) )
+		{
+			continue;
+		}
+
+		//--- not with the leader the coalition is against ---//
+
+		if( i == nation_array.max_overall_nation_recno && common_threat_rating(i) == 0 && is_coalition_target(i) &&
+			 nation_array[i]->overall_rank_rating() >= overall_rank_rating() + 30 )
+		{
+			continue;
+		}
+
+		int isThreat = intel_military_rank_rating(i) > ourMilitary*3/2 + 10 && nation_array[i]->ai_can_reach_nation(nation_recno);
+		int isWeary  = nationRelation->status == NATION_TENSE && ai_war_state.weariness(nation_recno, i) >= 40;
+
+		if( !isThreat && !isWeary )
+			continue;
+
+		if( !should_diplomacy_retry(TALK_PROPOSE_PEACE_PACT, i) )
+			continue;
+
+		AiWarState::log( "TREATY      nation %d proposes a peace pact to %d (%s)", nation_recno, i, isThreat ? "a much stronger neighbour" : "weary of war with it" );
+
+		talk_res.ai_send_talk_msg(i, nation_recno, TALK_PROPOSE_PEACE_PACT);
+		return 1;
+	}
+
+	return 0;
+}
+//------ End of function Nation::think_propose_peace_pact ------//
 
 
 //----- Begin of function Nation::think_declare_war -----//

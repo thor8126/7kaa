@@ -1147,6 +1147,14 @@ void NationBase::set_relation_status(short nationRecno, char newStatus, char rec
 
 	int oldStatus = nationRelation->status;
 
+	//--- a war ends road treaties and peace pacts ---//
+
+	if( newStatus == NATION_HOSTILE )
+	{
+		nationRelation->road_treaty = 0;
+		nationRelation->peace_pact_end_date = 0;
+	}
+
 	relation_status_array[nationRecno-1] = newStatus;
 	nationRelation->status = newStatus;
 
@@ -1403,6 +1411,34 @@ void NationBase::establish_contact(int nationRecno)
 //------- End of function NationBase::establish_contact -------//
 
 
+//------- Begin of function NationBase::break_peace_pact --------//
+//
+// This nation breaks its peace pact with the given nation by declaring
+// war on it or attacking it: its reputation falls and every other kingdom
+// trusts it less.
+//
+void NationBase::break_peace_pact(int victimNationRecno)
+{
+	AiWarState::log( "TREATY      nation %d breaks its peace pact with %d", nation_recno, victimNationRecno );
+
+	get_relation(victimNationRecno)->peace_pact_end_date = 0;
+
+	if( !nation_array.is_deleted(victimNationRecno) )
+		nation_array[victimNationRecno]->get_relation(nation_recno)->peace_pact_end_date = 0;
+
+	change_reputation( -30 );
+
+	for( int i=nation_array.size() ; i>0 ; i-- )
+	{
+		if( nation_array.is_deleted(i) || i==nation_recno )
+			continue;
+
+		nation_array[i]->change_ai_relation_level( nation_recno, i==victimNationRecno ? -40 : -15 );
+	}
+}
+//-------- End of function NationBase::break_peace_pact --------//
+
+
 //------- Begin of function NationBase::being_attacked ------//
 //
 // <int> attackNationRecno - recno of the nation that does the attack.
@@ -1425,6 +1461,11 @@ void NationBase::being_attacked(int attackNationRecno)
 
 	if( nationRelation->status != NATION_HOSTILE )
 	{
+		//--- attacking a nation it has a peace pact with ---//
+
+		if( nationRelation->has_peace_pact() )
+			attackNation->break_peace_pact(nation_recno);
+
 		//--- if this nation (the one being attacked) has a higher than 0 reputation, the attacker's reputation will decrease ---//
 
 		if( reputation > 0 )

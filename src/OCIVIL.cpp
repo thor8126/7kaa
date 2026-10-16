@@ -1451,8 +1451,11 @@ void CivilTech::process_tolls()
 
 		int relationStatus = ownerNation->get_relation_status(unitPtr->nation_recno);
 
-		if( relationStatus == NATION_HOSTILE || relationStatus == NATION_ALLIANCE )
+		if( relationStatus == NATION_HOSTILE || relationStatus == NATION_ALLIANCE ||
+			 ownerNation->get_relation(unitPtr->nation_recno)->road_treaty )		// a road treaty, see OTALKMSG.H
+		{
 			continue;
+		}
 
 		if( payerNation->cash <= 0 )
 			continue;

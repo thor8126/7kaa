@@ -146,6 +146,8 @@ int TalkRes::set_talk_choices()
 		case TALK_REQUEST_CEASE_WAR:
 		case TALK_DECLARE_WAR:
 		case TALK_REQUEST_MILITARY_AID:
+		case TALK_PROPOSE_ROAD_TREATY:
+		case TALK_PROPOSE_PEACE_PACT:
 			return 0;
 
 		case TALK_REQUEST_TRADE_EMBARGO:
@@ -225,6 +227,8 @@ void TalkRes::add_main_choices()
 		N_("Request technology."),
 		N_("Offer to purchase throne and unite kingdoms."),
 		N_("Surrender."),
+		N_("Propose a road treaty (no tolls)."),
+		N_("Propose a five-year peace pact."),
 	};
 
 	//-----------------------------------------//
@@ -603,6 +607,15 @@ int TalkRes::can_send_msg(int toNationRecno, int fromNationRecno, int talkId)
 
 		case TALK_SURRENDER:
 			return 1;
+
+		//--- treaties for the civil technologies and wars, see OCIVIL.CPP and OAI_WAR.CPP ---//
+
+		case TALK_PROPOSE_ROAD_TREATY:		// when either kingdom collects tolls
+			return relationStatus != NATION_HOSTILE && !nationRelation->road_treaty &&
+					 ( tech_res.civil_level(fromNationRecno, CIVIL_COMMERCE) || tech_res.civil_level(toNationRecno, CIVIL_COMMERCE) );
+
+		case TALK_PROPOSE_PEACE_PACT:
+			return relationStatus != NATION_HOSTILE && relationStatus != NATION_ALLIANCE && !nationRelation->has_peace_pact();
 	}
 
 	return 0;

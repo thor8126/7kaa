@@ -110,6 +110,7 @@ public:
 	void		demand_tech();
 	void		request_surrender();
 	void		surrender();
+	void		propose_new_treaty();		// a road treaty or a peace pact
 
 	// ###### begin Gilbert 10/10 #########//
 	uint8_t		crc8();

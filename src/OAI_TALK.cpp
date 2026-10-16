@@ -94,6 +94,8 @@ int Nation::consider_talk_msg(TalkMsg* talkMsg)
 		case TALK_REQUEST_TRADE_EMBARGO:
 		case TALK_REQUEST_CEASE_WAR:
 		case TALK_REQUEST_DECLARE_WAR:
+		case TALK_PROPOSE_ROAD_TREATY:
+		case TALK_PROPOSE_PEACE_PACT:
 			if( has_sent_same_msg(talkMsg) )
 				return 1;
 	};
@@ -146,6 +148,12 @@ int Nation::consider_talk_msg(TalkMsg* talkMsg)
 
 		case TALK_REQUEST_SURRENDER:
 			return consider_accept_surrender_request(talkMsg);
+
+		case TALK_PROPOSE_ROAD_TREATY:
+			return consider_road_treaty(talkMsg->from_nation_recno);
+
+		case TALK_PROPOSE_PEACE_PACT:
+			return consider_peace_pact(talkMsg->from_nation_recno);
 
 		default:
 			err_here();
@@ -255,6 +263,94 @@ int Nation::consider_trade_treaty(int withNationRecno)
 	return ai_trade_with_rating(withNationRecno) > 0;
 }
 //------ End of function Nation::consider_trade_treaty ------//
+
+
+//----- Begin of function Nation::consider_road_treaty -----//
+//
+// A road treaty lets the caravans of both kingdoms use each other's roads
+// free of tolls (see OCIVIL.CPP). A kingdom collecting more tolls than the
+// other gives up more, so it wants a better relation first.
+//
+// return : <int> 1 to accept
+//
+int Nation::consider_road_treaty(int withNationRecno)
+{
+	NationRelation* nationRelation = get_relation(withNationRecno);
+
+	int ourCommerce   = tech_res.civil_level(nation_recno, CIVIL_COMMERCE);
+	int theirCommerce = tech_res.civil_level(withNationRecno, CIVIL_COMMERCE);
+
+	int neededRelation = ourCommerce > theirCommerce ? 60 : 30;
+
+	if( nationRelation->trade_treaty )
+		neededRelation -= 10;
+
+	int acceptFlag = nationRelation->status != NATION_HOSTILE && nationRelation->ai_relation_level >= neededRelation;
+
+	AiWarState::log( "TREATY      nation %d %s a road treaty with %d (relation %d, needs %d, commerce %d vs %d)",
+						  nation_recno, acceptFlag ? "accepts" : "turns down", withNationRecno,
+						  nationRelation->ai_relation_level, neededRelation, ourCommerce, theirCommerce );
+
+	return acceptFlag;
+}
+//------ End of function Nation::consider_road_treaty ------//
+
+
+//----- Begin of function Nation::consider_peace_pact -----//
+//
+// A peace pact: neither kingdom may declare war for PEACE_PACT_YEARS.
+// Welcome against a stronger kingdom or when the nation needs peace; not
+// with a kingdom it is planning to fight, nor with the leading kingdom
+// it trails far behind (see OAI_GRAN.CPP).
+//
+// return : <int> 1 to accept
+//
+int Nation::consider_peace_pact(int withNationRecno)
+{
+	NationRelation* nationRelation = get_relation(withNationRecno);
+
+	if( nationRelation->status == NATION_HOSTILE )
+		return 0;
+
+	//--- not with the kingdom we are capturing towns of ---//
+
+	if( ai_capture_enemy_town_recno && !town_array.is_deleted(ai_capture_enemy_town_recno) &&
+		 town_array[ai_capture_enemy_town_recno]->nation_recno == withNationRecno )
+	{
+		AiWarState::log( "TREATY      nation %d turns down a peace pact with %d: it is capturing its town", nation_recno, withNationRecno );
+		return 0;
+	}
+
+	//--- not with the leader the coalition is against ---//
+
+	if( withNationRecno == nation_array.max_overall_nation_recno && is_coalition_target(withNationRecno) &&
+		 nation_array[withNationRecno]->overall_rank_rating() >= overall_rank_rating() + 30 )
+	{
+		AiWarState::log( "TREATY      nation %d turns down a peace pact with %d: it is the leading kingdom", nation_recno, withNationRecno );
+		return 0;
+	}
+
+	int theirMilitary = intel_military_rank_rating(withNationRecno);
+	int ourMilitary   = military_rank_rating();
+	int curPosture    = ai_war_state.get_posture(nation_recno);
+
+	int rating = nationRelation->ai_relation_level - 30							// a neutral kingdom is 40
+					 + (theirMilitary - ourMilitary) / 2							// a stronger kingdom is safer as a friend
+					 + pref_peacefulness/5 - pref_military_courage/10
+					 - nationRelation->started_war_on_us_count*10;
+
+	if( curPosture == AI_POSTURE_CONSOLIDATE || curPosture == AI_POSTURE_RECOVER )
+		rating += 20;
+
+	int acceptFlag = rating > 10;
+
+	AiWarState::log( "TREATY      nation %d %s a peace pact with %d (rating %d: relation %d, their military %d, ours %d, posture %d)",
+						  nation_recno, acceptFlag ? "accepts" : "turns down", withNationRecno, rating,
+						  nationRelation->ai_relation_level, theirMilitary, ourMilitary, curPosture );
+
+	return acceptFlag;
+}
+//------ End of function Nation::consider_peace_pact ------//
 
 
 //----- Begin of function Nation::ai_trade_with_rating -----//

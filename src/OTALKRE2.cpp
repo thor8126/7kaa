@@ -190,6 +190,9 @@ void TalkRes::process_accepted_reply(TalkMsg *talkMsg)
 		}
 
 		case TALK_DECLARE_WAR:
+			if( fromRelation->has_peace_pact() )		// breaking a peace pact
+				fromNation->break_peace_pact(talkMsg->to_nation_recno);
+
 			toRelation->started_war_on_us_count++;			// how many times this nation has started a war with us, the more the times the worse this nation is.
 			AiWarState::log("WAR CAUSE   nation %d declares war on %d", talkMsg->from_nation_recno, talkMsg->to_nation_recno);
 			toNation->set_relation_status(talkMsg->from_nation_recno, NATION_HOSTILE);
@@ -237,6 +240,18 @@ void TalkRes::process_accepted_reply(TalkMsg *talkMsg)
 
 		case TALK_SURRENDER:
 			fromNation->surrender(talkMsg->to_nation_recno);
+			break;
+
+		case TALK_PROPOSE_ROAD_TREATY:		// see OCIVIL.CPP
+			fromRelation->road_treaty = 1;
+			toRelation->road_treaty   = 1;
+			AiWarState::log("TREATY      nations %d and %d sign a road treaty", talkMsg->from_nation_recno, talkMsg->to_nation_recno);
+			break;
+
+		case TALK_PROPOSE_PEACE_PACT:		// see AiWarState::can_declare_war()
+			fromRelation->peace_pact_end_date = info.game_date + 365*PEACE_PACT_YEARS;
+			toRelation->peace_pact_end_date   = info.game_date + 365*PEACE_PACT_YEARS;
+			AiWarState::log("TREATY      nations %d and %d sign a %d-year peace pact", talkMsg->from_nation_recno, talkMsg->to_nation_recno, PEACE_PACT_YEARS);
 			break;
 
 		default:

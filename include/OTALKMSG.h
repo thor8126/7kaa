@@ -26,7 +26,7 @@
 
 //-------- define talk id. --------//
 
-enum { MAX_TALK_TYPE	= 20 };
+enum { MAX_TALK_TYPE	= 22 };
 
 enum { TALK_PROPOSE_TRADE_TREATY=1,
 		 TALK_PROPOSE_FRIENDLY_TREATY,
@@ -48,7 +48,11 @@ enum { TALK_PROPOSE_TRADE_TREATY=1,
 		 TALK_DEMAND_TECH,
        TALK_REQUEST_SURRENDER, 
 		 TALK_SURRENDER,
+		 TALK_PROPOSE_ROAD_TREATY,		// caravans use each other's roads free of tolls, see OCIVIL.CPP
+		 TALK_PROPOSE_PEACE_PACT,		// neither kingdom may declare war for PEACE_PACT_YEARS
 	  };
+
+#define PEACE_PACT_YEARS		5
 
 //----------------------------------//
 

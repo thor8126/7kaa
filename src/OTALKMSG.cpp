@@ -56,6 +56,8 @@ static char talk_msg_reply_needed_array[] =
 	1,
 	1,
 	0,
+	1,		// TALK_PROPOSE_ROAD_TREATY
+	1,		// TALK_PROPOSE_PEACE_PACT
 };
 
 //------- Begin of function TalkMsg::TalkMsg --------//

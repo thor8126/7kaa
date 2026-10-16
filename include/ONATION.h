@@ -610,6 +610,8 @@ public:
 	int			think_propose_friendly_treaty();
 	int			think_propose_alliance_treaty();
 	int 			think_end_treaty();
+	int			think_propose_road_treaty();
+	int			think_propose_peace_pact();
 	int 			think_request_cease_war();
 	int 			think_request_buy_food();
 	int			think_declare_war();
@@ -628,6 +630,8 @@ public:
 	void			notify_talk_msg(TalkMsg* talkMsg);
 
 	int 			consider_trade_treaty(int withNationRecno);
+	int			consider_road_treaty(int withNationRecno);
+	int			consider_peace_pact(int withNationRecno);
 	int 			consider_friendly_treaty(int withNationRecno);
 	int 			consider_alliance_treaty(int withNationRecno);
 	int 			consider_military_aid(TalkMsg* talkMsg);

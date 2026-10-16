@@ -153,6 +153,11 @@ char* TalkMsg::msg_str(int viewingNationRecno, int dispReply, int dispSecondLine
 			surrender();
 			break;
 
+		case TALK_PROPOSE_ROAD_TREATY:
+		case TALK_PROPOSE_PEACE_PACT:
+			propose_new_treaty();
+			break;
+
 		default:
 			err_here();
 	}
@@ -160,6 +165,61 @@ char* TalkMsg::msg_str(int viewingNationRecno, int dispReply, int dispSecondLine
 	return str;
 }
 //-------- End of function TalkMsg::msg_str ---------//
+
+
+//----- Begin of function TalkMsg::propose_new_treaty ------//
+//
+// A road treaty (caravans use each other's roads free of tolls) or a
+// five-year peace pact.
+//
+void TalkMsg::propose_new_treaty()
+{
+	const char* treatyStr = talk_id == TALK_PROPOSE_ROAD_TREATY ? _("road treaty (no tolls)") : _("five-year peace pact");
+
+	if( reply_type == REPLY_WAITING || !should_disp_reply )
+	{
+		if( viewing_nation_recno == from_nation_recno )
+		{
+			// TRANSLATORS: You propose a <treaty> to <King>'s Kingdom<Color>.
+			snprintf(str, MAX_STR_LEN+1, _("You propose a %s to %s's Kingdom%s."), treatyStr, TO_NATION, TO_COLOR);
+		}
+		else
+		{
+			// TRANSLATORS: <King>'s Kingdom<Color> proposes a <treaty> to you.
+			snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s proposes a %s to you."), FROM_NATION, FROM_COLOR, treatyStr);
+		}
+	}
+	else
+	{
+		if( viewing_nation_recno == from_nation_recno )
+		{
+			if( reply_type == REPLY_ACCEPT )
+			{
+				// TRANSLATORS: <King>'s Kingdom<Color> accepts your proposed <treaty>.
+				snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s accepts your proposed %s."), TO_NATION, TO_COLOR, treatyStr);
+			}
+			else
+			{
+				// TRANSLATORS: <King>'s Kingdom<Color> rejects your proposed <treaty>.
+				snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s rejects your proposed %s."), TO_NATION, TO_COLOR, treatyStr);
+			}
+		}
+		else
+		{
+			if( reply_type == REPLY_ACCEPT )
+			{
+				// TRANSLATORS: You accept the <treaty> proposed by <King>'s Kingdom<Color>.
+				snprintf(str, MAX_STR_LEN+1, _("You accept the %s proposed by %s's Kingdom%s."), treatyStr, FROM_NATION, FROM_COLOR);
+			}
+			else
+			{
+				// TRANSLATORS: You reject the <treaty> proposed by <King>'s Kingdom<Color>.
+				snprintf(str, MAX_STR_LEN+1, _("You reject the %s proposed by %s's Kingdom%s."), treatyStr, FROM_NATION, FROM_COLOR);
+			}
+		}
+	}
+}
+//------- End of function TalkMsg::propose_new_treaty ------//
 
 
 //----- Begin of function TalkMsg::propose_treaty ------//

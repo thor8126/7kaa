@@ -1492,6 +1492,9 @@ static void visit_nation_relation(Visitor *v, NationRelation *nr)
 	visit<int16_t>(v, &nr->total_given_gift_amount);
 
 	visit<int8_t>(v, &nr->contact_msg_flag);
+
+	visit<int8_t>(v, &nr->road_treaty);
+	visit<int32_t>(v, &nr->peace_pact_end_date);
 }
 
 template <typename Visitor>
@@ -1908,7 +1911,7 @@ static void visit_nation(Visitor *v, Nation *nat)
 	visit<int16_t>(v, &nat->lead_attack_camp_recno);
 }
 
-enum { NATION_RECORD_SIZE = 2132 + 2*MAX_RAW + 2*MAX_UNIT_TYPE };		// 2202 with 3 raw materials, 44 unit types, 8 income types and 16 expense types
+enum { NATION_RECORD_SIZE = 2223 + 2*MAX_RAW + 2*MAX_UNIT_TYPE };		// 2202 with 3 raw materials, 44 unit types, 8 income types, 16 expense types, 20 talk types and no road treaties and peace pacts
 
 //--------- Begin of function Nation::write_file ---------//
 //
