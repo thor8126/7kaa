@@ -1436,6 +1436,7 @@ void NationBase::being_attacked(int attackNationRecno)
 		}
 		else
 		{
+			AiWarState::log("WAR CAUSE   nation %d is attacked by %d (relation status %d)", nation_recno, attackNationRecno, nationRelation->status);
 			set_relation_status(attackNationRecno, NATION_HOSTILE);
 		}
 	}

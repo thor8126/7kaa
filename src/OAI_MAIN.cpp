@@ -324,6 +324,11 @@ void Nation::process_ai()
 	if( info.game_date%360 == nation_recno%360 )
 		ai_improve_relation();
 
+	//----- think about going after enemy towns while at war, see OAI_OFFN.CPP -----//
+
+	if( info.game_date%20 == (nation_recno*3)%20 )
+		think_war_offensive();
+
 	//----- think about raiding the economy of enemies every month, see OAI_RAID.CPP -----//
 
 	if( info.game_date%30 == (nation_recno*7)%30 )

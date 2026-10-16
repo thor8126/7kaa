@@ -23,6 +23,7 @@
 //Description : Object TalkRes Message Processing
 
 #include <ONATION.h>
+#include <OAIWAR.h>
 #include <OTALKRES.h>
 #include <OTECHRES.h>
 
@@ -190,6 +191,7 @@ void TalkRes::process_accepted_reply(TalkMsg *talkMsg)
 
 		case TALK_DECLARE_WAR:
 			toRelation->started_war_on_us_count++;			// how many times this nation has started a war with us, the more the times the worse this nation is.
+			AiWarState::log("WAR CAUSE   nation %d declares war on %d", talkMsg->from_nation_recno, talkMsg->to_nation_recno);
 			toNation->set_relation_status(talkMsg->from_nation_recno, NATION_HOSTILE);
 
 			fromRelation->last_talk_reject_date_array[TALK_REQUEST_CEASE_WAR-1] = info.game_date;

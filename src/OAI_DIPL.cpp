@@ -256,7 +256,8 @@ void Nation::ai_notify_reply(int talkMsgRecno)
 			//--------- declare war ---------//
 
 			if( ( config.ai_aggressiveness >= OPTION_HIGH || pref_peacefulness < 50 ) &&
-				 ai_war_state.can_declare_war(nation_recno, talkMsg->to_nation_recno) )		// don't start a war out of spite when it is not the right time
+				 ai_war_state.can_declare_war(nation_recno, talkMsg->to_nation_recno) &&		// don't start a war out of spite when it is not the right time
+				 ai_can_reach_nation(talkMsg->to_nation_recno) )		// nor one it can't fight, see OAI_OFFN.CPP
 			{
 				talk_res.ai_send_talk_msg(talkMsg->to_nation_recno, nation_recno, TALK_DECLARE_WAR);
 
@@ -673,6 +674,9 @@ int Nation::think_declare_war()
 		if( !ai_war_state.can_declare_war(nation_recno, i) )		// in a truce, still weary from the last war, or not in an expanding posture
 			continue;
 
+		if( !ai_knows_nation(i) || !ai_can_reach_nation(i) )		// only a war it can fight, see OAI_INTEL.CPP and OAI_OFFN.CPP
+			continue;
+
 		if( !ai_should_spend( 100-trade_rating(i) ) )		// if trade_rating is 0, importanceRating will be 100, if trade_rating is 100, importanceRating will be 0
 			continue;
 
@@ -682,13 +686,15 @@ int Nation::think_declare_war()
 
 		//--- don't pick a fight with a kingdom stronger than us ---//
 
+		int targetMilitary = intel_military_rank_rating(i);		// its strength as far as we know, see OAI_INTEL.CPP
+
 		if( config_adv.nation_ai_posture &&
-			 targetNation->military_rank_rating() > military_rank_rating() )
+			 targetMilitary > military_rank_rating() )
 		{
 			continue;
 		}
 
-		targetStrength = targetNation->military_rank_rating() +
+		targetStrength = targetMilitary +
 							  targetNation->population_rank_rating()/2 +
 							  targetNation->economic_rank_rating()/3;
 

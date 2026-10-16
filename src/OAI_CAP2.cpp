@@ -46,32 +46,49 @@ int Nation::think_capture_new_enemy_town(Town* capturerTown, int useAllCamp)
 	if( ai_capture_enemy_town_recno )		// no new action if we are still trying to capture a town
 		return 0;
 
+	if( ai_capture_operation_busy() )		// nor while a fort for capturing a town is ordered or there are enough already, see OAI_OFFN.CPP
+		return 0;
+
 	//---- only attack when we have enough money to support the war ----//
 
 	if( cash < 1000 + 2000 * pref_cash_reserve / 100 )		// if the cash is really too low now
+	{
+		AiWarState::log( "OFFENSIVE   nation %d: not enough cash to capture an enemy town (%.0f < %d)", nation_recno, cash, 1000 + 2000 * pref_cash_reserve / 100 );
 		return 0;
+	}
 
 	//--------------------------------------//
 
 	Town* targetTown = think_capture_enemy_town_target(capturerTown);
 
 	if( !targetTown )
+	{
+		AiWarState::log( "OFFENSIVE   nation %d: no suitable enemy town to capture from town %d", nation_recno, capturerTown->town_recno );
 		return 0;
+	}
 
 	//--- don't start a new offensive when weary of the war or busy defending/recovering ---//
 
 	if( !ai_war_state.can_start_offensive(nation_recno, targetTown->nation_recno) )
+	{
+		AiWarState::log( "OFFENSIVE   nation %d: can't start an offensive on nation %d (weary or on the defensive)", nation_recno, targetTown->nation_recno );
 		return 0;
+	}
 
 	//---- attack enemy's defending forces on the target town ----//
 
 	int rc = attack_enemy_town_defense(targetTown, useAllCamp);
 
 	if( rc==0 ) 		// 0 means we don't have enough troop to attack the enemy
+	{
+		AiWarState::log( "OFFENSIVE   nation %d: not enough troops to attack the defense of town %d of nation %d", nation_recno, targetTown->town_recno, targetTown->nation_recno );
 		return 0;
+	}
 
 	else if( rc == 1 )		// 1 means a troop has been sent to attack the town
 	{
+		AiWarState::log( "OFFENSIVE   nation %d attacks the defense of town %d of nation %d", nation_recno, targetTown->town_recno, targetTown->nation_recno );
+
 		ai_capture_enemy_town_recno = targetTown->town_recno;		// this nation is currently trying to capture this town
 		ai_capture_enemy_town_plan_date = info.game_date;
 		ai_capture_enemy_town_start_attack_date = 0;
@@ -82,7 +99,11 @@ int Nation::think_capture_new_enemy_town(Town* capturerTown, int useAllCamp)
 
 	else if( rc == -1 )		// -1 means no defense on the target town, no attacking is needed.
 	{
-		return start_capture( targetTown->town_recno, 0 );		// call AI functions in OAI_CAPT.CPP to capture the town
+		int captureRc = start_capture( targetTown->town_recno, 0 );		// call AI functions in OAI_CAPT.CPP to capture the town
+
+		AiWarState::log( "OFFENSIVE   nation %d %s a fort next to undefended town %d of nation %d to capture it", nation_recno,
+							  captureRc ? "orders" : "can't order (no room or no general)", targetTown->town_recno, targetTown->nation_recno );
+		return captureRc;
 	}
 
 	return 0;

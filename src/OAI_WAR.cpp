@@ -807,6 +807,15 @@ int AiWarState::cease_war_rating(int nationRecno, int withNationRecno)
 	if( get_posture(nationRecno) == AI_POSTURE_RECOVER )
 		rating += 20;
 
+	//--- a war neither side can fight, see OAI_OFFN.CPP ---//
+
+	if( !nation_array.is_deleted(nationRecno) && !nation_array.is_deleted(withNationRecno) &&
+		 !nation_array[nationRecno]->ai_can_reach_nation(withNationRecno) &&
+		 !nation_array[withNationRecno]->ai_can_reach_nation(nationRecno) )
+	{
+		rating += 40;
+	}
+
 	return rating;
 }
 //-------- End of function AiWarState::cease_war_rating --------//

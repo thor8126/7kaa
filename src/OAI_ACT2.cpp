@@ -29,6 +29,9 @@
 #include <OUNIT.h>
 #include <OFIRM.h>
 #include <ONATION.h>
+#include <OWORLD.h>
+#include <OTOWN.h>
+#include <OAIWAR.h>
 
 
 //-------- Begin of function Nation::ai_build_firm -------//
@@ -63,16 +66,42 @@ int Nation::ai_build_firm(ActionNode* actionNode)
 		skillId = SKILL_CONSTRUCTION;						// for military camps, use construction workers instead of generals for facilitating migration of military camps
 	}
 
+	//--- forts ordered next to towns of other nations are for capturing them, log their progress ---//
+
+	int isCaptureCamp = 0;
+
+	if( firmId == FIRM_CAMP && actionNode->ref_x_loc >= 0 && actionNode->ref_y_loc >= 0 )
+	{
+		Location* refLocPtr = world.get_loc(actionNode->ref_x_loc, actionNode->ref_y_loc);
+
+		isCaptureCamp = refLocPtr->is_town() && town_array[refLocPtr->town_recno()]->nation_recno &&
+							 town_array[refLocPtr->town_recno()]->nation_recno != nation_recno;
+	}
+
 	//------------- get a skilled unit --------------//
 
 	Unit* skilledUnit = get_skilled_unit(skillId, raceId, actionNode);
 
 	if( !skilledUnit )
+	{
+		if( isCaptureCamp )
+			AiWarState::log( "ACTION      nation %d: no unit to build the fort at %d,%d for capturing (skill %d, action unit %d, retry %d)",
+								  nation_recno, actionNode->action_x_loc, actionNode->action_y_loc, skillId, actionNode->unit_recno, actionNode->retry_count );
 		return 0;
+	}
 
 	//------- build the firm now ---------//
 
 	skilledUnit->build_firm(actionNode->action_x_loc, actionNode->action_y_loc, firmId, COMMAND_AI);
+
+	if( isCaptureCamp )
+	{
+		AiWarState::log( "ACTION      nation %d: unit %d %s the fort at %d,%d for capturing (cash %.0f, can build %d)",
+							  nation_recno, skilledUnit->sprite_recno,
+							  skilledUnit->action_x_loc==actionNode->action_x_loc && skilledUnit->action_y_loc==actionNode->action_y_loc ? "goes to build" : "can't build",
+							  actionNode->action_x_loc, actionNode->action_y_loc, cash,
+							  world.can_build_firm(actionNode->action_x_loc, actionNode->action_y_loc, firmId, skilledUnit->sprite_recno) );
+	}
 
 	if(skilledUnit->action_x_loc==actionNode->action_x_loc && skilledUnit->action_y_loc==actionNode->action_y_loc)
 	{

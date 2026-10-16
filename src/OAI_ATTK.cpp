@@ -844,7 +844,7 @@ int Nation::think_secret_attack()
 
 		//--- a surprise war can only be planned on a nation it has found, see OAI_INTEL.CPP ---//
 
-		if( !ai_knows_nation(i) )
+		if( !ai_knows_nation(i) || !ai_can_reach_nation(i) )		// nor on a nation it can't reach, see OAI_OFFN.CPP
 		{
 			nationRelation->ai_secret_attack = 0;
 			continue;

@@ -34,6 +34,8 @@
 #include <OF_MONS.h>
 #include <OU_GOD.h>
 #include <OF_HARB.h>
+#include <OAIWAR.h>
+#include <OINFO.h>
 
 #ifdef NO_DEBUG_UNIT
 #undef err_when
@@ -1193,7 +1195,22 @@ void Unit::process_build_firm()
 			//---------------------------------------------------------//
 			if(!is_in_surrounding(move_to_x_loc, move_to_y_loc, sprite_info->loc_width, action_x_loc, action_y_loc, width, height))
 			{
-				//---------- not in the building surrounding ---------//
+				//------------------------------------------------------------------//
+				// not in the building surrounding: the unit has gone as close as it
+				// could but can't reach the site. It used to stay in this state
+				// forever; now the building fails, and AI actions are told so.
+				//------------------------------------------------------------------//
+
+				if( ai_unit )
+				{
+					AiWarState::log( "BUILD       nation %d: unit %d can't reach the site of a %s at %d,%d (stopped at %d,%d)",
+										  nation_recno, sprite_recno, firm_res[action_para]->name, action_x_loc, action_y_loc, cur_x_loc(), cur_y_loc() );
+				}
+
+				if( ai_action_id && nation_recno )
+					nation_array[nation_recno]->action_failure(ai_action_id, sprite_recno);
+
+				reset_action_para();
 				return;
 			}
 
