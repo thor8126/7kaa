@@ -565,6 +565,7 @@ public:
 	int 	 		think_against_mine_monopoly();
 	int 	 		think_ally_against_big_enemy();
 	int 	 		think_unite_against_big_enemy();
+	int			think_merge_into_coalition();
 	int			think_form_coalition(int enemyNationRecno);
 	int			think_build_road();
 
@@ -584,6 +585,9 @@ public:
 	int			ai_capture_operation_busy();
 	int			is_coalition_target(int leaderNationRecno);
 	int			common_threat_rating(int withNationRecno);
+	int			co_belligerent_military(int enemyNationRecno);
+	int			total_co_belligerent_military();
+	int			war_target_rating(int nationRecno);
 
 	void 			think_deal_with_all_enemy();
 	void 			think_deal_with_one_enemy(int enemyNationRecno);

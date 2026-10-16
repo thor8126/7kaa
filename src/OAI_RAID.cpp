@@ -66,9 +66,9 @@ int Nation::think_raid()
 	if( !config_adv.nation_ai_raids || !ai_camp_count )
 		return 0;
 
-	int curPosture = ai_war_state.get_posture(nation_recno);
+	//--- an outmatched nation defending itself still harasses the enemy's economy with spare troops, an exhausted one doesn't ---//
 
-	if( curPosture == AI_POSTURE_DEFEND || curPosture == AI_POSTURE_RECOVER )
+	if( ai_war_state.get_posture(nation_recno) == AI_POSTURE_RECOVER )
 		return 0;
 
 	//------- only while at war -------//

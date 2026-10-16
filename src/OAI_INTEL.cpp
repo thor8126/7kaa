@@ -405,6 +405,10 @@ int Nation::ai_knows_nation(int nationRecno)
 // forts of the nation it has seen and its units it currently sees,
 // counted the same way as NationArray::update_military_rating().
 //
+// A kingdom's military score is public in the Kingdoms ranking report
+// (see OR_RANK.CPP), so it is never rated below that: an army that hasn't
+// been seen is not an army that doesn't exist.
+//
 // return : <int> 0 to 100
 //
 int Nation::intel_military_rank_rating(int nationRecno)
@@ -454,7 +458,9 @@ int Nation::intel_military_rank_rating(int nationRecno)
 		combatLevel += unitPtr->unit_power() + 20;
 	}
 
-	return MIN( 100, 100 * (combatLevel/50) / nation_array.max_military_rating );
+	int scoutedRating = MIN( 100, 100 * (combatLevel/50) / nation_array.max_military_rating );
+
+	return MAX( scoutedRating, nation_array[nationRecno]->military_rank_rating() );
 }
 //----------- End of function Nation::intel_military_rank_rating -----------//
 

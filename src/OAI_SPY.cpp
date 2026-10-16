@@ -27,6 +27,8 @@
 #include <OUNIT.h>
 #include <ONATION.h>
 #include <OSPY.h>
+#include <OAIWAR.h>
+#include <OMISC.h>
 
 //--------- Begin of function Nation::think_spy --------//
 
@@ -355,6 +357,17 @@ int Nation::ai_assign_spy(ActionNode* actionNode)
 //
 // Think about planting spies into enemy buildings.
 //
+// The AI only uses what a player could know: a player sees who is inside
+// another kingdom's building (its commander, his loyalty and the race of
+// its workers) only while one of its spies is in there (see
+// Firm::should_show_info()). Without a spy inside, it only knows the
+// building is there once it has scouted it (see OAI_INTEL.CPP), and can
+// only guess the race of its soldiers from its linked towns, whose people
+// anyone can see. At most MAX_SPY_PER_TARGET_FIRM of its spies are sent
+// into the same building.
+//
+#define MAX_SPY_PER_TARGET_FIRM		2
+
 int Nation::think_assign_spy_target_camp(int raceId, int regionId)
 {
 	Firm  *firmPtr;
@@ -373,29 +386,85 @@ int Nation::think_assign_spy_target_camp(int raceId, int regionId)
 		if( firmPtr->region_id != regionId )
 			continue;
 
-		if( firmPtr->overseer_recno == 0 ||
-			 firmPtr->worker_count == MAX_WORKER )
-		{
+		if( !firmPtr->worker_array || firmPtr->worker_count == MAX_WORKER )
 			continue;
+
+		if( !ai_has_seen_firm(firmPtr) )		// only buildings it has scouted, see OAI_INTEL.CPP
+			continue;
+
+		//------- what its spies already in there report -------//
+
+		int spyCount;
+
+		spy_array.total_spy_skill_level( SPY_FIRM, firmRecno, nation_recno, spyCount );
+
+		if( spyCount >= MAX_SPY_PER_TARGET_FIRM )
+			continue;
+
+		if( spyCount > 0 )
+		{
+			if( firmPtr->overseer_recno == 0 || firmPtr->majority_race() != raceId )
+				continue;
+
+			Unit* overseerUnit = unit_array[firmPtr->overseer_recno];
+
+			if( overseerUnit->spy_recno )		// if the overseer is already a spy
+				continue;
+
+			curRating = 100 - overseerUnit->loyalty;
 		}
 
-		if( firmPtr->majority_race() != raceId )
-			continue;
+		//------- from outside: the soldiers mostly come from its linked towns -------//
 
-		//---------------------------------//
+		else
+		{
+			int i;
 
-		Unit* overseerUnit = unit_array[firmPtr->overseer_recno];
+			for( i=0 ; i<firmPtr->linked_town_count ; i++ )
+			{
+				Town* townPtr = town_array[ firmPtr->linked_town_array[i] ];
 
-		if( overseerUnit->spy_recno )		// if the overseer is already a spy
-			continue;
+				if( townPtr->nation_recno == firmPtr->nation_recno && townPtr->majority_race() == raceId )
+					break;
+			}
 
-		curRating = 100 - overseerUnit->loyalty;
+			if( i == firmPtr->linked_town_count )
+				continue;
+
+			curRating = 40;
+		}
+
+		//------- enemies first, and not always the same building -------//
+
+		if( firmPtr->nation_recno )
+		{
+			int relationStatus = get_relation_status(firmPtr->nation_recno);
+
+			if( relationStatus == NATION_HOSTILE )
+				curRating += 30;
+			else if( relationStatus == NATION_TENSE )
+				curRating += 10;
+		}
+
+		curRating += misc.random(20);
 
 		if( curRating > bestRating )
 		{
 			bestRating 	  = curRating;
 			bestFirmRecno = firmRecno;
 		}
+	}
+
+	if( bestFirmRecno )
+	{
+		Firm* bestFirm = firm_array[bestFirmRecno];
+		int   spyCount;
+
+		spy_array.total_spy_skill_level( SPY_FIRM, bestFirmRecno, nation_recno, spyCount );
+
+		AiWarState::log( "SPY         nation %d sends a spy (race %d) into the %s of nation %d at %d,%d (rating %d, %d of its spies already inside)",
+							  nation_recno, raceId, bestFirm->firm_name(), bestFirm->nation_recno, bestFirm->loc_x1, bestFirm->loc_y1,
+							  bestRating, spyCount );
 	}
 
 	return bestFirmRecno;

@@ -38,8 +38,15 @@
 // couldn't reach each other: AI nations no longer plan surprise wars on
 // nations they can't reach (ai_can_reach_nation()), and accept peace more
 // readily in wars where neither side can reach the other.
+//
+// New wars are chosen by war_target_rating(): an old grudge, how close the
+// kingdom is, the odds counting the kingdoms already fighting it and the
+// coalition partners trailing the same leader, whether it is the leading
+// kingdom, whether it is a human player (by AI aggressiveness) and the
+// trade with it. Kingdoms trailing the same leader don't fight each other.
 
 #include <ALL.h>
+#include <OCONFIG.h>
 #include <ONATION.h>
 #include <OWORLD.h>
 #include <OTOWN.h>
@@ -181,6 +188,204 @@ int Nation::ai_capture_operation_busy()
 	return 0;
 }
 //----------- End of function Nation::ai_capture_operation_busy -----------//
+
+
+//--------- Begin of function Nation::co_belligerent_military ---------//
+//
+// return : <int> the military rank ratings of the other kingdoms at war
+//			  with the given enemy and not with us, counted at 3/4 as they
+//			  fight it on their own terms
+//
+int Nation::co_belligerent_military(int enemyNationRecno)
+{
+	int totalMilitary = 0;
+
+	for( int i=nation_array.size() ; i>0 ; i-- )
+	{
+		if( nation_array.is_deleted(i) || i==nation_recno || i==enemyNationRecno )
+			continue;
+
+		if( get_relation_status(i) == NATION_HOSTILE )
+			continue;
+
+		if( nation_array[i]->get_relation_status(enemyNationRecno) == NATION_HOSTILE )
+			totalMilitary += nation_array[i]->military_rank_rating() * 3 / 4;
+	}
+
+	return totalMilitary;
+}
+//----------- End of function Nation::co_belligerent_military -----------//
+
+
+//--------- Begin of function Nation::total_co_belligerent_military ---------//
+//
+// return : <int> the military rank ratings of the other kingdoms at war
+//			  with any of our enemies and not with us, counted at 3/4
+//
+int Nation::total_co_belligerent_military()
+{
+	int totalMilitary = 0;
+
+	for( int i=nation_array.size() ; i>0 ; i-- )
+	{
+		if( nation_array.is_deleted(i) || i==nation_recno || get_relation_status(i) == NATION_HOSTILE )
+			continue;
+
+		Nation* nationPtr = nation_array[i];
+
+		for( int j=nation_array.size() ; j>0 ; j-- )
+		{
+			if( nation_array.is_deleted(j) || j==nation_recno || j==i )
+				continue;
+
+			if( get_relation_status(j) == NATION_HOSTILE && nationPtr->get_relation_status(j) == NATION_HOSTILE )
+			{
+				totalMilitary += nationPtr->military_rank_rating() * 3 / 4;
+				break;
+			}
+		}
+	}
+
+	return totalMilitary;
+}
+//----------- End of function Nation::total_co_belligerent_military -----------//
+
+
+//--------- Begin of function Nation::war_target_rating ---------//
+//
+// How much this nation wants a war with the given nation, for
+// think_declare_war(). It logs how the rating is made up.
+//
+// return : <int> the rating, 0 for a war it can't win even with the
+//			  kingdoms already fighting the target and its coalition partners
+//
+int Nation::war_target_rating(int nationRecno)
+{
+	Nation*			 targetNation   = nation_array[nationRecno];
+	NationRelation* nationRelation = get_relation(nationRecno);
+	int				 isHuman			 = !targetNation->is_ai();
+	int				 leaderNationRecno = nation_array.max_overall_nation_recno;
+
+	//------ an old grudge: a former enemy has a relation level near 0, a neutral kingdom 40 ------//
+
+	int grudgeRating = MAX( -30, MIN( 40, 40 - nationRelation->ai_relation_level ) );
+
+	grudgeRating += MIN( 30, nationRelation->started_war_on_us_count*10 );
+
+	//------ how close it is: our town nearest to one of its towns we know of on the same land ------//
+
+	int minDistance = 0x7FFF;
+
+	for( int i=town_array.size() ; i>0 ; i-- )
+	{
+		if( town_array.is_deleted(i) )
+			continue;
+
+		Town* townPtr = town_array[i];
+
+		if( townPtr->nation_recno != nationRecno || !ai_has_seen_town(townPtr) )
+			continue;
+
+		for( int j=0 ; j<ai_town_count ; j++ )
+		{
+			Town* ownTown = town_array[ ai_town_array[j] ];
+
+			if( ownTown->region_id != townPtr->region_id )
+				continue;
+
+			int curDistance = misc.points_distance( ownTown->center_x, ownTown->center_y, townPtr->center_x, townPtr->center_y );
+
+			if( curDistance < minDistance )
+				minDistance = curDistance;
+		}
+	}
+
+	int nearRating = minDistance < 0x7FFF ? MAX( 0, 30 - minDistance/4 ) : 0;		// 30 next door, 0 at 120 locations or across the sea
+
+	//------ the odds, counting those already fighting it and the coalition partners trailing the same leader ------//
+
+	int ownMilitary = military_rank_rating();
+	int coBelligerentMilitary = co_belligerent_military(nationRecno);
+	int partnerMilitary = 0;
+
+	for( int i=nation_array.size() ; i>0 ; i-- )
+	{
+		if( nation_array.is_deleted(i) || i==nation_recno || i==nationRecno )
+			continue;
+
+		if( get_relation_status(i) >= NATION_FRIENDLY && common_threat_rating(i) > 0 &&
+			 nationRecno == leaderNationRecno &&
+			 nation_array[i]->get_relation_status(nationRecno) != NATION_HOSTILE )		// those at war with it are co-belligerents already
+		{
+			partnerMilitary += nation_array[i]->military_rank_rating() / 3;		// they may join, see consider_declare_war()
+		}
+	}
+
+	int ourSideMilitary = ownMilitary + coBelligerentMilitary + partnerMilitary;
+	int theirMilitary   = intel_military_rank_rating(nationRecno);		// as far as we know, see OAI_INTEL.CPP
+
+	int minOddsPercent = 80;		// our side must be at least this strong compared with the target
+
+	if( isHuman )
+	{
+		if( config.ai_aggressiveness == OPTION_HIGH )
+			minOddsPercent = 60;
+		else if( config.ai_aggressiveness >= OPTION_VERY_HIGH )
+			minOddsPercent = 50;
+	}
+
+	if( config_adv.nation_ai_posture && ourSideMilitary*100 < theirMilitary*minOddsPercent )
+	{
+		AiWarState::log( "WAR TARGET  nation %d rates %d%s: hopeless (our side %d = own %d + co-belligerents %d + partners %d, theirs as we know %d, needs %d%%)",
+							  nation_recno, nationRecno, isHuman ? " (human)" : "", ourSideMilitary, ownMilitary,
+							  coBelligerentMilitary, partnerMilitary, theirMilitary, minOddsPercent );
+		return 0;
+	}
+
+	int oddsRating = MAX( -40, MIN( 40, (ourSideMilitary - theirMilitary)/2 ) );
+
+	//------ the leading kingdom, which the trailing kingdoms should stop ------//
+
+	int leaderRating = 0;
+
+	if( nationRecno == leaderNationRecno && is_coalition_target(nationRecno) &&
+		 targetNation->overall_rank_rating() >= overall_rank_rating() + 30 )
+	{
+		leaderRating = 25;
+	}
+
+	//------ humans, by AI aggressiveness ------//
+
+	int humanRating = 0;
+
+	if( isHuman )
+	{
+		switch( config.ai_aggressiveness )
+		{
+			case OPTION_MODERATE:  humanRating = 10; break;
+			case OPTION_HIGH:		  humanRating = 20; break;
+			case OPTION_VERY_HIGH: humanRating = 30; break;
+		}
+	}
+
+	//------ kingdoms trailing the same leader don't fight each other, see OAI_GRAN.CPP ------//
+
+	int threatRating = -2 * common_threat_rating(nationRecno);
+
+	int tradeRating = -trade_rating(nationRecno)/2;
+
+	int totalRating = grudgeRating + nearRating + oddsRating + leaderRating + humanRating + threatRating + tradeRating;
+
+	AiWarState::log( "WAR TARGET  nation %d rates %d%s: %d = grudge %d (relation %d, wars on us %d) + near %d (distance %d) + odds %d (our side %d = own %d + co-belligerents %d + partners %d, theirs %d) + leader %d + human %d + common threat %d + trade %d",
+						  nation_recno, nationRecno, isHuman ? " (human)" : "", totalRating,
+						  grudgeRating, nationRelation->ai_relation_level, nationRelation->started_war_on_us_count,
+						  nearRating, minDistance < 0x7FFF ? minDistance : -1,
+						  oddsRating, ourSideMilitary, ownMilitary, coBelligerentMilitary, partnerMilitary, theirMilitary,
+						  leaderRating, humanRating, threatRating, tradeRating );
+
+	return totalRating;
+}
+//----------- End of function Nation::war_target_rating -----------//
 
 
 //--------- Begin of function Nation::think_war_offensive ---------//

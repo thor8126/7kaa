@@ -376,10 +376,10 @@ int Nation::think_surrender()
 //
 int Nation::think_unite_against_big_enemy()
 {
-	//--- with coalitions, trailing kingdoms ally against the leader in think_ally_against_big_enemy() instead of surrendering to each other ---//
+	//--- with coalitions, trailing kingdoms ally against the leader in think_ally_against_big_enemy(), and merge only to fight it as one ---//
 
 	if( config_adv.nation_ai_coalition )
-		return 0;
+		return think_merge_into_coalition();
 
 	if( info.game_date - info.game_start_date <
 		 365 * 3 * (100+pref_military_development) / 100 )		// only do this after 3 to 6 years into the game
@@ -466,6 +466,91 @@ int Nation::think_unite_against_big_enemy()
 	return 0;
 }
 //------ End of function Nation::think_unite_against_big_enemy ------//
+
+
+//----- Begin of function Nation::think_merge_into_coalition -----//
+//
+// A tactical merger: a kingdom too weak to matter on its own in its war
+// against the leading kingdom joins its strongest ally in that war,
+// surrendering to it so that their towns, buildings and armies fight the
+// leader as one. Follows the AI aggressiveness rules of
+// is_coalition_target(): at high aggressiveness only against a human
+// leader, at low aggressiveness never against one.
+//
+// return : <int> 1 - this nation has merged into another one (it is deleted)
+//
+int Nation::think_merge_into_coalition()
+{
+	if( info.game_date - info.game_start_date < 365 * 3 )		// not before the rankings have settled
+		return 0;
+
+	int leaderNationRecno = nation_array.max_overall_nation_recno;
+
+	if( !leaderNationRecno || leaderNationRecno == nation_recno ||
+		 nation_array.is_deleted(leaderNationRecno) || !is_coalition_target(leaderNationRecno) )
+	{
+		return 0;
+	}
+
+	if( get_relation_status(leaderNationRecno) != NATION_HOSTILE )		// only a kingdom at war with the leader
+		return 0;
+
+	Nation* leaderNation = nation_array[leaderNationRecno];
+	int     ownOverall   = overall_rank_rating();
+
+	if( ownOverall > 25 || leaderNation->overall_rank_rating() < ownOverall*3 )		// far behind the leader
+		return 0;
+
+	//--- and losing: weary of the war, too weak to defend itself, or it has lost towns to the leader ---//
+
+	WarRecord* warRecord = ai_war_state.get_record(nation_recno, leaderNationRecno);
+
+	int isLosing = military_rank_rating() < 15 ||
+						( warRecord && ( warRecord->weariness >= 50.0f || warRecord->towns_lost > 0 ) );
+
+	if( !isLosing )
+		return 0;
+
+	//--- its strongest ally fighting the same leader ---//
+
+	int bestNationRecno = 0;
+	int bestOverall = ownOverall * 3 / 2;		// clearly stronger than us
+
+	for( int i=nation_array.size() ; i>0 ; i-- )
+	{
+		if( nation_array.is_deleted(i) || i==nation_recno || i==leaderNationRecno )
+			continue;
+
+		Nation* nationPtr = nation_array[i];
+
+		if( !nationPtr->is_ai() || get_relation_status(i) != NATION_ALLIANCE ||
+			 nationPtr->get_relation_status(leaderNationRecno) != NATION_HOSTILE )
+		{
+			continue;
+		}
+
+		if( nationPtr->overall_rank_rating() > bestOverall )
+		{
+			bestOverall = nationPtr->overall_rank_rating();
+			bestNationRecno = i;
+		}
+	}
+
+	if( !bestNationRecno )
+	{
+		AiWarState::log( "MERGE       nation %d (overall %d, military %d) is losing to leader %d (overall %d) but has no stronger ally at war with it to merge into",
+							  nation_recno, ownOverall, military_rank_rating(), leaderNationRecno, leaderNation->overall_rank_rating() );
+		return 0;
+	}
+
+	AiWarState::log( "MERGE       nation %d (overall %d, military %d, towns %d) merges into its ally %d (overall %d) to fight leader %d (overall %d) as one",
+						  nation_recno, ownOverall, military_rank_rating(), ai_town_count, bestNationRecno, bestOverall,
+						  leaderNationRecno, leaderNation->overall_rank_rating() );
+
+	surrender(bestNationRecno);
+	return 1;
+}
+//------ End of function Nation::think_merge_into_coalition ------//
 
 
 //----- Begin of function Nation::ai_surrender_to_rating -----//

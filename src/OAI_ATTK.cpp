@@ -110,6 +110,22 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 	if( attack_camp_count )
 		return 0;
 
+	//--- attacking a nation it is not at war with starts a new war: not in a truce, when weary or not expanding, see OAI_WAR.CPP ---//
+
+	if( !defenseMode )
+	{
+		int targetNationRecno = get_target_nation_recno(targetXLoc, targetYLoc);
+
+		if( targetNationRecno > 0 && targetNationRecno != nation_recno && !nation_array.is_deleted(targetNationRecno) &&
+			 get_relation_status(targetNationRecno) != NATION_HOSTILE &&
+			 !ai_war_state.can_declare_war(nation_recno, targetNationRecno) )
+		{
+			AiWarState::log( "WAR REASON  nation %d: won't attack a target of nation %d at %d,%d, a new war isn't allowed now (truce, weariness or posture %d)",
+								  nation_recno, targetNationRecno, targetXLoc, targetYLoc, ai_war_state.get_posture(nation_recno) );
+			return 0;
+		}
+	}
+
 	//---- first locate for camps that do not need to protect any towns ---//
 
 	#define MAX_SUITABLE_TOWN_CAMP      10    // no. of camps in a town
@@ -675,7 +691,16 @@ void Nation::ai_attack_target_execute(int directAttack)
 				//------- declare war with the target nation -------//
 
 				if( ai_attack_target_nation_recno )
+				{
+					if( get_relation_status(ai_attack_target_nation_recno) != NATION_HOSTILE )
+					{
+						AiWarState::log( "WAR REASON  nation %d attacks a target of nation %d at %d,%d (relation level %d)",
+											  nation_recno, ai_attack_target_nation_recno, ai_attack_target_x_loc, ai_attack_target_y_loc,
+											  get_relation(ai_attack_target_nation_recno)->ai_relation_level );
+					}
+
 					talk_res.ai_send_talk_msg(ai_attack_target_nation_recno, nation_recno, TALK_DECLARE_WAR);
+				}
 
 				//--- in defense mode, just move close to the target, the unit will start attacking themselves as their relationship is hostile already ---//
 

@@ -341,6 +341,16 @@ Town* Nation::think_capture_enemy_town_target(Town* capturerTown)
 		if( !rc )
 			continue;
 
+		//--- attacking a nation it is not at war with starts a war: not in a truce, when weary or not expanding, see OAI_WAR.CPP ---//
+
+		if( nationRelation->status != NATION_HOSTILE &&
+			 !ai_war_state.can_declare_war(nation_recno, targetTown->nation_recno) )
+		{
+			AiWarState::log( "OFFENSIVE   nation %d: won't attack town %d of nation %d, they are not at war and a new war isn't allowed now (truce, weariness or posture)",
+								  nation_recno, targetTown->town_recno, targetTown->nation_recno );
+			continue;
+		}
+
 		//----- if this town does not have any linked camps, capture this town immediately -----//
 
 		if( targetTown->has_linked_camp(targetTown->nation_recno, 0) )		//0-count both camps with or without overseers

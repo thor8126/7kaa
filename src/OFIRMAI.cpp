@@ -571,6 +571,9 @@ void Firm::ai_firm_captured(int capturerNationRecno)
 	if( ownNation->get_relation(capturerNationRecno)->status >= NATION_FRIENDLY )
 		ownNation->ai_end_treaty(capturerNationRecno);
 
+	if( ownNation->get_relation_status(capturerNationRecno) != NATION_HOSTILE )
+		AiWarState::log( "WAR REASON  nation %d: its %s at %d,%d is being captured by nation %d", nation_recno, firm_name(), loc_x1, loc_y1, capturerNationRecno );
+
 	talk_res.ai_send_talk_msg(capturerNationRecno, nation_recno, TALK_DECLARE_WAR);
 }
 //--------- End of function Firm::ai_firm_captured --------//

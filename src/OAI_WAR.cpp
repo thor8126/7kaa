@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <OAIWAR.h>
+#include <OCONFIG.h>
 #include <ONATION.h>
 #include <OUNIT.h>
 #include <OUNITRES.h>
@@ -391,6 +392,42 @@ void AiWarState::town_captured(int fromNationRecno, int toNationRecno)
 //-------- End of function AiWarState::town_captured --------//
 
 
+//------- Begin of function AiWarState::peace_refused -------//
+//
+// Called by Nation::ai_notify_reply() when the nation's request for a
+// cease-fire is rejected or left unanswered (an unanswered request counts
+// as rejected after a month, see TalkRes::process_talk_msg()).
+//
+// Weariness only falls in peace time, so a nation whose enemy refuses
+// peace (a human player usually does) would otherwise stay exhausted
+// and in the recover posture for the rest of the war, never attacking
+// again. Instead it rallies: with peace refused, the war must be fought.
+// It asks for peace again when it is worn out again
+// (Nation::should_diplomacy_retry() waits 3 to 12 months between requests).
+//
+void AiWarState::peace_refused(int nationRecno, int refusingNationRecno)
+{
+	WarRecord* warRecord = get_record(nationRecno, refusingNationRecno);
+
+	if( !warRecord || !warRecord->start_date )
+		return;
+
+	float oldWeariness = warRecord->weariness;
+
+	if( warRecord->weariness > (float) WEARINESS_AFTER_PEACE_REFUSED )
+		warRecord->weariness = (float) WEARINESS_AFTER_PEACE_REFUSED;
+
+	log( "WEARINESS   nation %d: nation %d refused peace, it rallies to fight on (weariness %.1f -> %.1f, posture %d)",
+		  nationRecno, refusingNationRecno, oldWeariness, warRecord->weariness, get_posture(nationRecno) );
+
+	//--- leave the recover posture now if exhaustion was the only reason for it ---//
+
+	if( get_posture(nationRecno) == AI_POSTURE_RECOVER && !nation_array.is_deleted(nationRecno) )
+		update_posture(nationRecno);
+}
+//-------- End of function AiWarState::peace_refused --------//
+
+
 //------- Begin of function AiWarState::next_day -------//
 //
 void AiWarState::next_day()
@@ -505,7 +542,7 @@ void AiWarState::update_posture(int nationRecno)
 	//------ gather the nation's situation ------//
 
 	float maxWeariness = 0.0f;
-	int   hasEnemy = 0;
+	int   hasEnemy = 0, hasHumanEnemy = 0;
 
 	for( int i=nation_array.size() ; i>0 ; i-- )
 	{
@@ -517,6 +554,9 @@ void AiWarState::update_posture(int nationRecno)
 
 		hasEnemy = 1;
 
+		if( !nation_array[i]->is_ai() )
+			hasHumanEnemy = 1;
+
 		if( weariness(nationRecno, i) > maxWeariness )
 			maxWeariness = weariness(nationRecno, i);
 	}
@@ -526,6 +566,19 @@ void AiWarState::update_posture(int nationRecno)
 	int   isStarving = nationPtr->food <= 0;
 	int   enemyMilitary = nationPtr->total_enemy_military();
 	int   ownMilitary   = nationPtr->military_rank_rating();
+	int   coBelligerentMilitary = nationPtr->total_co_belligerent_military();		// other kingdoms fighting our enemies, see OAI_OFFN.CPP
+
+	//--- outmatched means the enemies are stronger than us and those fighting them with us; a more aggressive AI fights on against humans at worse odds ---//
+
+	int defendRatio = 13;		// in tenths
+
+	if( hasHumanEnemy )
+	{
+		if( config.ai_aggressiveness == OPTION_HIGH )
+			defendRatio = 20;
+		else if( config.ai_aggressiveness >= OPTION_VERY_HIGH )
+			defendRatio = 30;
+	}
 
 	int curPosture  = posture[nationRecno-1];
 	int daysInPosture = info.game_date - posture_date[nationRecno-1];
@@ -538,7 +591,7 @@ void AiWarState::update_posture(int nationRecno)
 	{
 		newPosture = AI_POSTURE_RECOVER;
 	}
-	else if( hasEnemy && enemyMilitary >= 30 && enemyMilitary > ownMilitary*13/10 + 10 )
+	else if( hasEnemy && enemyMilitary >= 30 && enemyMilitary > (ownMilitary+coBelligerentMilitary)*defendRatio/10 + 10 )
 	{
 		newPosture = AI_POSTURE_DEFEND;
 	}
@@ -569,9 +622,10 @@ void AiWarState::update_posture(int nationRecno)
 	{
 		static const char* postureName[AI_POSTURE_COUNT] = { "EXPAND", "CONSOLIDATE", "DEFEND", "RECOVER" };
 
-		log( "POSTURE     nation %d: %s -> %s (cash %.0f, food %.0f, own mil %d, enemy mil %d, max weariness %.1f)",
+		log( "POSTURE     nation %d: %s -> %s (cash %.0f, food %.0f, own mil %d, co-belligerents %d, enemy mil %d%s, defend ratio %d/10, max weariness %.1f, broke %d, starving %d)",
 			  nationRecno, postureName[curPosture], postureName[newPosture],
-			  nationPtr->cash, nationPtr->food, ownMilitary, enemyMilitary, maxWeariness );
+			  nationPtr->cash, nationPtr->food, ownMilitary, coBelligerentMilitary, enemyMilitary,
+			  hasHumanEnemy ? " incl. a human" : "", defendRatio, maxWeariness, isBroke, isStarving );
 
 		posture[nationRecno-1] = newPosture;
 		posture_date[nationRecno-1] = info.game_date;
@@ -815,6 +869,11 @@ int AiWarState::cease_war_rating(int nationRecno, int withNationRecno)
 	{
 		rating += 40;
 	}
+
+	//--- kingdoms trailing far behind the same leader would rather fight it than each other, see OAI_GRAN.CPP ---//
+
+	if( !nation_array.is_deleted(nationRecno) && !nation_array.is_deleted(withNationRecno) )
+		rating += nation_array[nationRecno]->common_threat_rating(withNationRecno);
 
 	return rating;
 }

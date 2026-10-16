@@ -53,6 +53,7 @@ enum { AI_STRATEGY_ECONOMY=0,		// raw materials nearby: mines, factories and tra
 #define MAX_WAR_WEARINESS				100
 #define WEARINESS_BLOCK_OFFENSIVE	70		// no new offensives against an enemy at or above this weariness
 #define WEARINESS_FORCE_PEACE			75		// willing to cease fire even during an attack mission
+#define WEARINESS_AFTER_PEACE_REFUSED	45		// a nation whose request for peace is refused rallies to fight on, see AiWarState::peace_refused()
 
 //------- Define struct WarRecord -------//
 //
@@ -100,6 +101,7 @@ public:
 	void			unit_killed(int attackerNationRecno, Unit* targetUnit);
 	void			firm_destroyed(int attackerNationRecno, int victimNationRecno);
 	void			town_captured(int fromNationRecno, int toNationRecno);
+	void			peace_refused(int nationRecno, int refusingNationRecno);
 	void			next_day();
 
 	//------ AI decision helpers ------//

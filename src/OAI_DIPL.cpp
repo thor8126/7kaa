@@ -166,7 +166,10 @@ void Nation::ai_notify_reply(int talkMsgRecno)
 
 		case TALK_REQUEST_CEASE_WAR:
 			if( talkMsg->reply_type == REPLY_REJECT )
+			{
 				relationChange = -5;
+				ai_war_state.peace_refused(nation_recno, talkMsg->to_nation_recno);		// with peace refused, the war must be fought, see OAI_WAR.CPP
+			}
 			break;
 
 		case TALK_REQUEST_DECLARE_WAR:
@@ -259,6 +262,12 @@ void Nation::ai_notify_reply(int talkMsgRecno)
 				 ai_war_state.can_declare_war(nation_recno, talkMsg->to_nation_recno) &&		// don't start a war out of spite when it is not the right time
 				 ai_can_reach_nation(talkMsg->to_nation_recno) )		// nor one it can't fight, see OAI_OFFN.CPP
 			{
+				if( get_relation_status(talkMsg->to_nation_recno) != NATION_HOSTILE )
+				{
+					AiWarState::log( "WAR REASON  nation %d: nation %d rejected its demand (talk %d) and the relation level is 0",
+										  nation_recno, talkMsg->to_nation_recno, talkMsg->talk_id );
+				}
+
 				talk_res.ai_send_talk_msg(talkMsg->to_nation_recno, nation_recno, TALK_DECLARE_WAR);
 
 				//------- attack immediately --------//
@@ -634,10 +643,14 @@ int Nation::think_request_buy_food()
 
 //----- Begin of function Nation::think_declare_war -----//
 //
+// Choose a kingdom to declare war on, rated by Nation::war_target_rating()
+// (see OAI_OFFN.CPP): an old grudge, how close it is, the odds counting the
+// kingdoms already fighting it, whether it is the leading kingdom, whether
+// it is a human player (by AI aggressiveness) and the trade with it.
+//
 int Nation::think_declare_war()
 {
 	NationRelation* nationRelation;
-	int rc=0;
 
 	//---- don't declare a new war if we already has enemies ---//
 
@@ -653,7 +666,8 @@ int Nation::think_declare_war()
 
 	//------------------------------------------------//
 
-	int targetStrength, minStrength=0x1000, bestTargetNation=0;
+	int bestRating=0, bestTargetNation=0;
+	int neededRating = 35 + pref_peacefulness/5;		// 35 to 55
 
 	for( i=1 ; i<=nation_array.size() ; i++ )
 	{
@@ -665,10 +679,7 @@ int Nation::think_declare_war()
 		if( !nationRelation->has_contact )
 			continue;
 
-		if( nationRelation->status == NATION_HOSTILE )		// already at war
-			continue;
-
-		if( nationRelation->ai_relation_level >= 10 )
+		if( nationRelation->status >= NATION_FRIENDLY )		// a treaty is ended first, see think_end_treaty()
 			continue;
 
 		if( !ai_war_state.can_declare_war(nation_recno, i) )		// in a truce, still weary from the last war, or not in an expanding posture
@@ -677,46 +688,38 @@ int Nation::think_declare_war()
 		if( !ai_knows_nation(i) || !ai_can_reach_nation(i) )		// only a war it can fight, see OAI_INTEL.CPP and OAI_OFFN.CPP
 			continue;
 
-		if( !ai_should_spend( 100-trade_rating(i) ) )		// if trade_rating is 0, importanceRating will be 100, if trade_rating is 100, importanceRating will be 0
-			continue;
+		int curRating = war_target_rating(i);		// it logs the rating, 0 for a hopeless war
 
-		//----------------------------------------//
-
-		Nation* targetNation = nation_array[i];
-
-		//--- don't pick a fight with a kingdom stronger than us ---//
-
-		int targetMilitary = intel_military_rank_rating(i);		// its strength as far as we know, see OAI_INTEL.CPP
-
-		if( config_adv.nation_ai_posture &&
-			 targetMilitary > military_rank_rating() )
+		if( curRating >= neededRating && curRating > bestRating )
 		{
-			continue;
-		}
-
-		targetStrength = targetMilitary +
-							  targetNation->population_rank_rating()/2 +
-							  targetNation->economic_rank_rating()/3;
-
-		if( targetStrength < minStrength )
-		{
-			minStrength = targetStrength;
+			bestRating = curRating;
 			bestTargetNation = i;
 		}
 	}
 
 	//------------------------------------------//
 
-	if( bestTargetNation )
+	if( !bestTargetNation )
+		return 0;
+
+	if( !ai_should_spend( 100-trade_rating(bestTargetNation) ) )		// if trade_rating is 0, importanceRating will be 100, if trade_rating is 100, importanceRating will be 0
 	{
-		if( should_diplomacy_retry(TALK_DECLARE_WAR, bestTargetNation) )
-		{
-			talk_res.ai_send_talk_msg(bestTargetNation, nation_recno, TALK_DECLARE_WAR);
-			return 1;
-		}
+		AiWarState::log( "WAR TARGET  nation %d: would declare war on %d (rating %d, needs %d) but can't spend on a war now (cash %.0f)",
+							  nation_recno, bestTargetNation, bestRating, neededRating, cash );
+		return 0;
 	}
 
-	return 0;
+	if( !should_diplomacy_retry(TALK_DECLARE_WAR, bestTargetNation) )
+	{
+		AiWarState::log( "WAR TARGET  nation %d: would declare war on %d (rating %d, needs %d) but can't send the declaration yet",
+							  nation_recno, bestTargetNation, bestRating, neededRating );
+		return 0;
+	}
+
+	AiWarState::log( "WAR TARGET  nation %d declares war on %d (rating %d, needs %d)", nation_recno, bestTargetNation, bestRating, neededRating );
+
+	talk_res.ai_send_talk_msg(bestTargetNation, nation_recno, TALK_DECLARE_WAR);
+	return 1;
 }
 //------ End of function Nation::think_declare_war ------//
 

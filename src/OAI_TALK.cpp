@@ -924,6 +924,27 @@ int Nation::consider_give_tech(TalkMsg* talkMsg)
 //
 int Nation::consider_declare_war(TalkMsg* talkMsg)
 {
+	//--- a request to fight the leading kingdom both trail far behind is judged by the odds of the coalition, see OAI_GRAN.CPP ---//
+
+	int againstNationRecno = talkMsg->talk_para1;
+
+	if( againstNationRecno == nation_array.max_overall_nation_recno &&
+		 common_threat_rating(talkMsg->from_nation_recno) > 0 &&
+		 get_relation_status(againstNationRecno) != NATION_HOSTILE )
+	{
+		int ourSideMilitary = military_rank_rating() + co_belligerent_military(againstNationRecno);
+		int theirMilitary	  = intel_military_rank_rating(againstNationRecno);
+		int canDeclareWar   = ai_war_state.can_declare_war(nation_recno, againstNationRecno);		// not in a truce, weary or busy
+		int hasCash			  = cash >= 1000 * pref_cash_reserve / 100;
+		int acceptFlag		  = canDeclareWar && hasCash && ourSideMilitary*100 >= theirMilitary*60;
+
+		AiWarState::log( "COALITION   nation %d %s the request of %d to join the war on leader %d (our side %d vs theirs %d, can declare %d, cash %.0f)",
+							  nation_recno, acceptFlag ? "accepts" : "turns down", talkMsg->from_nation_recno, againstNationRecno,
+							  ourSideMilitary, theirMilitary, canDeclareWar, cash );
+
+		return acceptFlag;
+	}
+
 	//--- if it even won't consider trade embargo, there is no reason that it will consider declaring war ---//
 
 	if( !consider_trade_embargo(talkMsg) )
