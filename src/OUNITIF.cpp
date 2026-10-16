@@ -237,7 +237,7 @@ void Unit::disp_main_menu(int refreshFlag)
 	else if( unit_id == UNIT_SUPPLY_WAGON )
 	{
 		disp_supply_wagon_info( y, refreshFlag );
-		y += 41;
+		y += 77;
 	}
 
 	//---------------------------------//
@@ -1214,21 +1214,74 @@ void Unit::disp_unit_info(int dispY1, int refreshFlag)
 
 //--------- Begin of function Unit::disp_supply_wagon_info ---------//
 //
+// What the supply wagon does and is doing now, see OUNITSUP.CPP.
+//
 // <int> 	dispY1		 - the top y coordination of the info area
 // <int>    refreshFlag  - refresh flag
 //
 void Unit::disp_supply_wagon_info(int dispY1, int refreshFlag)
 {
-	if( refreshFlag != INFO_REPAINT )
-		return;
+	//------- count the units it supplies now, every few frames -------//
 
-	vga_util.d3_panel_up( INFO_X1, dispY1, INFO_X2, dispY1+38 );
+	static int lastCountFrame = -1000, lastUnitRecno = 0, nearCount = 0, keptCount = 0;
+
+	if( refreshFlag == INFO_REPAINT || lastUnitRecno != sprite_recno || sys.frame_count >= lastCountFrame + 20 )
+	{
+		lastCountFrame = sys.frame_count;
+		lastUnitRecno  = sprite_recno;
+		nearCount = keptCount = 0;
+
+		int xLoc = next_x_loc(), yLoc = next_y_loc();
+
+		for( int i=unit_array.size() ; i>0 ; i-- )
+		{
+			if( unit_array.is_deleted(i) || i == sprite_recno )
+				continue;
+
+			Unit* unitPtr = unit_array[i];
+
+			if( !unitPtr->is_supply_unit() || !is_supplying_nation_of(unitPtr->nation_recno) )
+				continue;
+
+			if( abs(unitPtr->next_x_loc()-xLoc) > SUPPLY_WAGON_RANGE || abs(unitPtr->next_y_loc()-yLoc) > SUPPLY_WAGON_RANGE )
+				continue;
+
+			nearCount++;
+
+			if( !unitPtr->is_supplied(0) )		// out of supply without the wagons
+				keptCount++;
+		}
+	}
+
+	//------------- display ---------------//
+
+	vga_util.d3_panel_up( INFO_X1, dispY1, INFO_X2, dispY1+74 );
 
 	String str;
-	snprintf( str, MAX_STR_LEN+1, _("%d locations of it."), SUPPLY_WAGON_RANGE );
 
-	font_san.put( INFO_X1+6, dispY1+4, _("Supplies your units within") );
-	font_san.put( INFO_X1+6, dispY1+20, str );
+	snprintf( str, MAX_STR_LEN+1, _("Supplies all within %d squares:"), SUPPLY_WAGON_RANGE );
+	font_san.put( INFO_X1+6, dispY1+4, str, 1, INFO_X2-4 );
+
+	font_san.put( INFO_X1+6, dispY1+20, _("they heal, no attrition."), 1, INFO_X2-4 );
+
+	snprintf( str, MAX_STR_LEN+1, _("Near: %d  Kept supplied: %d"), nearCount, keptCount );
+	font_san.put( INFO_X1+6, dispY1+38, str, 1, INFO_X2-4 );
+
+	const char* statusStr;
+
+	if( cur_action == SPRITE_MOVE )
+		statusStr = _("On the move");
+	else if( keptCount > 0 )
+		statusStr = _("Supplying an army");
+	else if( is_supplied(0) )
+		statusStr = _("Near home, not needed");
+	else if( nearCount == 0 )
+		statusStr = _("Alone in the field");
+	else
+		statusStr = _("Standing by");
+
+	snprintf( str, MAX_STR_LEN+1, _("Now: %s"), statusStr );
+	font_san.put( INFO_X1+6, dispY1+54, str, 1, INFO_X2-4 );
 }
 //----------- End of function Unit::disp_supply_wagon_info -----------//
 

@@ -272,6 +272,39 @@ static void draw_unit_way_point_on_zoom_map()
 //------------ end of static function draw_unit_way_point_on_zoom_map -----------//
 
 
+//------------ begin of static function draw_supply_wagon_range_on_zoom_map -----------//
+//
+// The area the player's selected supply wagon supplies, see OUNITSUP.CPP.
+//
+static void draw_supply_wagon_range_on_zoom_map()
+{
+	if( !unit_array.selected_recno || unit_array.is_deleted(unit_array.selected_recno) )
+		return;
+
+	Unit* unitPtr = unit_array[unit_array.selected_recno];
+
+	if( unitPtr->unit_id != UNIT_SUPPLY_WAGON || !unitPtr->is_own() || !unitPtr->is_visible() )
+		return;
+
+	int x1 = (unitPtr->next_x_loc()-SUPPLY_WAGON_RANGE - world.zoom_matrix->top_x_loc)*ZOOM_LOC_WIDTH + ZOOM_X1;
+	int y1 = (unitPtr->next_y_loc()-SUPPLY_WAGON_RANGE - world.zoom_matrix->top_y_loc)*ZOOM_LOC_HEIGHT + ZOOM_Y1;
+	int x2 = (unitPtr->next_x_loc()+SUPPLY_WAGON_RANGE+1 - world.zoom_matrix->top_x_loc)*ZOOM_LOC_WIDTH + ZOOM_X1 - 1;
+	int y2 = (unitPtr->next_y_loc()+SUPPLY_WAGON_RANGE+1 - world.zoom_matrix->top_y_loc)*ZOOM_LOC_HEIGHT + ZOOM_Y1 - 1;
+
+	int cx1 = MAX(x1, ZOOM_X1), cx2 = MIN(x2, ZOOM_X2);
+	int cy1 = MAX(y1, ZOOM_Y1), cy2 = MIN(y2, ZOOM_Y2);
+
+	if( cx1 > cx2 || cy1 > cy2 )
+		return;
+
+	if( y1 >= ZOOM_Y1 )	anim_line.draw_line(&vga_back, cx1, y1, cx2, y1);
+	if( y2 <= ZOOM_Y2 )	anim_line.draw_line(&vga_back, cx1, y2, cx2, y2);
+	if( x1 >= ZOOM_X1 )	anim_line.draw_line(&vga_back, x1, cy1, x1, cy2);
+	if( x2 <= ZOOM_X2 )	anim_line.draw_line(&vga_back, x2, cy1, x2, cy2);
+}
+//------------ end of static function draw_supply_wagon_range_on_zoom_map -----------//
+
+
 //------------ begin of static function draw_firm_rally_point_on_zoom_map -----------//
 //
 // Draw a line from the selected fort or war factory to its rally point, see OFIRMRAL.CPP
@@ -1711,6 +1744,7 @@ void ZoomMatrix::draw_objects()
 	draw_unit_path_on_zoom_map(AIR_DISP_LAYER_MASK);
 	draw_unit_way_point_on_zoom_map();
 	draw_firm_rally_point_on_zoom_map();
+	draw_supply_wagon_range_on_zoom_map();
 	draw_objects_now(&air_disp_sort_array);
 	// ##### end Gilbert 9/10 ######//
 

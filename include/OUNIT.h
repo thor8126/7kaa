@@ -747,7 +747,7 @@ protected:
 	void  process_recover();
 	void  process_supply();
 	int   is_supply_unit();
-	int   is_supplied();
+	int   is_supplied(int countWagons=1);
 	int   is_supplying_nation(int supplierNationRecno);
 	void  process_auto_return();
 	int   is_near_own_building();
@@ -756,6 +756,8 @@ protected:
 public:
 	int   supply_wagon_follow(int targetXLoc, int targetYLoc);
 	void  disp_supply_wagon_info(int dispY1, int refreshFlag);
+	int	is_supplying_nation_of(int nationRecno);
+	void	draw_supply_wagon_extras(int dispX1, int dispY1, int spriteWidth);
 
 protected:
 };

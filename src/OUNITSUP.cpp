@@ -124,7 +124,10 @@ int Unit::is_supplying_nation(int supplierNationRecno)
 //			  territory, near a road not in enemy territory, near its or an
 //			  ally's supply wagon, or near its or an ally's town or building.
 //
-int Unit::is_supplied()
+//
+// [int] countWagons - whether supply wagons count (default: 1)
+//
+int Unit::is_supplied(int countWagons)
 {
 	Nation* ownNation = nation_array[nation_recno];
 
@@ -175,7 +178,7 @@ int Unit::is_supplied()
 	xLoc1 = MAX(0, xLoc-SUPPLY_WAGON_RANGE), xLoc2 = MIN(MAX_WORLD_X_LOC-1, xLoc+SUPPLY_WAGON_RANGE);
 	yLoc1 = MAX(0, yLoc-SUPPLY_WAGON_RANGE), yLoc2 = MIN(MAX_WORLD_Y_LOC-1, yLoc+SUPPLY_WAGON_RANGE);
 
-	for( int y=yLoc1 ; y<=yLoc2 ; y++ )
+	for( int y=yLoc1 ; y<=yLoc2 && countWagons ; y++ )
 	{
 		Location* locPtr = world.get_loc(xLoc1, y);
 
@@ -231,6 +234,22 @@ int Unit::is_supplied()
 	return 0;
 }
 //----------- End of function Unit::is_supplied -----------//
+
+
+//--------- Begin of function Unit::is_supplying_nation_of ---------//
+//
+// return : <int> 1 if this supply wagon supplies the units of the given
+//			  nation: its own and those of its allies
+//
+int Unit::is_supplying_nation_of(int nationRecno)
+{
+	if( !nationRecno || !nation_recno || nation_array.is_deleted(nationRecno) )
+		return 0;
+
+	return nationRecno == nation_recno ||
+			 nation_array[nationRecno]->get_relation_status(nation_recno) == NATION_ALLIANCE;
+}
+//----------- End of function Unit::is_supplying_nation_of -----------//
 
 
 //--------- Begin of function Unit::supply_wagon_follow ---------//
