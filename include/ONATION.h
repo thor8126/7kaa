@@ -577,6 +577,8 @@ public:
 	int			ai_sees_unit(Unit* unitPtr);
 	int			ai_knows_nation(int nationRecno);
 	int			intel_military_rank_rating(int nationRecno);
+
+	int			think_raid();		// see OAI_RAID.CPP
 	int			is_coalition_target(int leaderNationRecno);
 	int			common_threat_rating(int withNationRecno);
 

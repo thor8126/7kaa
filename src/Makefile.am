@@ -28,6 +28,7 @@ bin_PROGRAMS = 7kaa
 	OAI_MILI.cpp \
 	OAI_MONS.cpp \
 	OAI_QUER.cpp \
+	OAI_RAID.cpp \
 	OAI_SEEK.cpp \
 	OAI_SPY.cpp \
 	OAI_TALK.cpp \

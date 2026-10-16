@@ -245,6 +245,7 @@ void ConfigAdv::reset()
 
 	nation_ai_build_roads = 1;
 	nation_ai_fog_of_war = 1;
+	nation_ai_raids = 1;
 	nation_ai_coalition = 1;
 	nation_ai_opening_strategy = 1;
 	nation_ai_posture = 1;
@@ -379,6 +380,12 @@ int ConfigAdv::set(char *name, char *value)
 	else if( !strcmp(name, "nation_ai_fog_of_war") )
 	{
 		if( !read_bool(value, &nation_ai_fog_of_war) )
+			return 0;
+		update_check_sum(name, value);
+	}
+	else if( !strcmp(name, "nation_ai_raids") )
+	{
+		if( !read_bool(value, &nation_ai_raids) )
 			return 0;
 		update_check_sum(name, value);
 	}
