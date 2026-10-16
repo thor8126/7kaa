@@ -27,8 +27,6 @@
 #include <OWORLD.h>
 #include <OINFO.h>
 #include <OSERES.h>
-#include <OU_CARA.h>
-#include <OU_MARI.h>
 
 //--------------- begin of function GroupSelect::GroupSelect ----------------//
 GroupSelect::GroupSelect()
@@ -293,8 +291,8 @@ void GroupSelect::select_army()
 
 //--------------- begin of function GroupSelect::is_idle_unit ----------------//
 //
-// Whether the player's unit out on the map has nothing to do: people
-// (except the king), war machines, and caravans and ships without a route.
+// Whether the player's unit out on the map has nothing to do: people,
+// except the king. War machines, caravans and ships are not counted.
 // Units waiting for a ferry are not idle.
 //
 int GroupSelect::is_idle_unit(Unit* unitPtr)
@@ -311,22 +309,8 @@ int GroupSelect::is_idle_unit(Unit* unitPtr)
 		return 0;
 	}
 
-	switch( unit_res[unitPtr->unit_id]->unit_class )
-	{
-		case UNIT_CLASS_HUMAN:
-			return unitPtr->rank_id != RANK_KING;
-
-		case UNIT_CLASS_WEAPON:
-			return 1;
-
-		case UNIT_CLASS_CARAVAN:
-			return ((UnitCaravan*)unitPtr)->stop_defined_num == 0;
-
-		case UNIT_CLASS_SHIP:
-			return ((UnitMarine*)unitPtr)->stop_defined_num == 0;
-	}
-
-	return 0;
+	return unit_res[unitPtr->unit_id]->unit_class == UNIT_CLASS_HUMAN && unitPtr->race_id &&
+			 unitPtr->rank_id != RANK_KING;
 }
 //--------------- end of function GroupSelect::is_idle_unit ----------------//
 
