@@ -48,9 +48,9 @@ static TouchState state = TOUCH_IDLE;
 static int fingers_down;
 static SDL_FingerID finger1, finger2;
 static Uint32 down_time;
-static float start_wx, start_wy;      // finger1 start, window pixels
+static float start_gx, start_gy;      // finger1 start, game pixels (float)
 static int start_lx, start_ly;        // finger1 start, game (800x600) pixels
-static float f1_wx, f1_wy, f2_wx, f2_wy;
+static float f1_gx, f1_gy, f2_gx, f2_gy;  // current finger positions, game pixels
 static float pan_last_x, pan_last_y;  // centroid, game pixels
 static float pan_acc_x, pan_acc_y;
 static float pan_total;
@@ -66,77 +66,42 @@ Java_com_thor8126_sevenkaa_SevenKaaActivity_nativeSetRightClickMode(JNIEnv *, jc
 
 //------------------------------------------------------------------------
 
-static SDL_Window *touch_window(const SDL_TouchFingerEvent &f)
+// Finger position in game screen pixels (800x600).
+//
+// SDL already did the work: with SDL_RenderSetLogicalSize() active, SDL's
+// renderer rewrites every finger event (SDL_RendererEventWatch in
+// SDL_render.c) so that tfinger.x/y run from 0 to 1 across the game picture
+// itself, letterbox bars excluded and clamped to 0/1 outside it. Without a
+// logical size the picture is stretched over the whole window, which is again
+// 0..1. Either way the game position is simply x*800, y*600. (Converting
+// these values for the letterbox once more, as earlier versions did, threw
+// touches off and pushed the right-hand panel out of reach.)
+static void finger_game(const SDL_TouchFingerEvent &f, float *gx, float *gy)
 {
-	SDL_Window *win = SDL_GetWindowFromID(f.windowID);
-	if( !win )
-		win = SDL_GetKeyboardFocus();
-	return win;
+	*gx = f.x * 800.0f;
+	*gy = f.y * 600.0f;
 }
 
-// Window pixels of a finger event.
-static void finger_to_window(const SDL_TouchFingerEvent &f, float *wx, float *wy)
-{
-	int w = 1, h = 1;
-	SDL_Window *win = touch_window(f);
-	if( win )
-		SDL_GetWindowSize(win, &w, &h);
-	*wx = f.x * w;
-	*wy = f.y * h;
-}
-
-// Window coordinates -> game screen coordinates (800x600). Uses SDL's own
-// conversion, which also accounts for the window size differing from the
-// drawable's pixel size (dpi_scale) and for the letterboxing done by
-// SDL_RenderSetLogicalSize(): the same math SDL applies to mouse events.
-static void window_to_game(SDL_Window *win, float wx, float wy, float *gx, float *gy)
-{
-	int w = 800, h = 600, lw = 0, lh = 0;
-	SDL_Renderer *ren = win ? SDL_GetRenderer(win) : NULL;
-	if( win )
-		SDL_GetWindowSize(win, &w, &h);
-	if( ren )
-		SDL_RenderGetLogicalSize(ren, &lw, &lh);
-
-	if( ren && lw > 0 && lh > 0 )
-	{
-		SDL_RenderWindowToLogical(ren, (int) (wx + 0.5f), (int) (wy + 0.5f), gx, gy);
-	}
-	else
-	{
-		*gx = wx * 800.0f / (w > 0 ? w : 1);
-		*gy = wy * 600.0f / (h > 0 ? h : 1);
-	}
-}
+static int clamp_x(float gx) { int i = (int) gx; return i < 0 ? 0 : (i > 799 ? 799 : i); }
+static int clamp_y(float gy) { int i = (int) gy; return i < 0 ? 0 : (i > 599 ? 599 : i); }
 
 static void game_pos(const SDL_TouchFingerEvent &f, int *x, int *y)
 {
-	float wx, wy, gx, gy;
-	finger_to_window(f, &wx, &wy);
-	window_to_game(touch_window(f), wx, wy, &gx, &gy);
-	int ix = (int) gx, iy = (int) gy;
-	*x = ix < 0 ? 0 : (ix > 799 ? 799 : ix);
-	*y = iy < 0 ? 0 : (iy > 599 ? 599 : iy);
+	float gx, gy;
+	finger_game(f, &gx, &gy);
+	*x = clamp_x(gx);
+	*y = clamp_y(gy);
 }
 
-// Is the finger on the game screen (not in the letterbox bars)?
+// Is the finger on the game picture, not in the black bars at its sides?
+// SDL clamps touches in the bars to exactly 0 or 1.
 static int on_game_screen(const SDL_TouchFingerEvent &f)
 {
-	float wx, wy, gx, gy;
-	finger_to_window(f, &wx, &wy);
-	window_to_game(touch_window(f), wx, wy, &gx, &gy);
-	return gx >= -2 && gx < 802 && gy >= -2 && gy < 602;
+	return f.x > 0.0f && f.x < 1.0f;
 }
 
-static float move_threshold(const SDL_TouchFingerEvent &f)
-{
-	int w = 0, h = 0;
-	SDL_Window *win = touch_window(f);
-	if( win )
-		SDL_GetWindowSize(win, &w, &h);
-	float t = h * 0.03f;
-	return t < 12.0f ? 12.0f : t;
-}
+// How far (game pixels) a finger must move before a touch becomes a drag.
+static const float MOVE_THRESHOLD = 16.0f;
 
 //------------------------------------------------------------------------
 // Temporary debug aid: a red cross where the game thinks the finger is,
@@ -224,9 +189,10 @@ static void haptic_tick()
 		env->ExceptionClear();
 }
 
-static void centroid_game(const SDL_TouchFingerEvent &f, float *gx, float *gy)
+static void centroid_game(float *gx, float *gy)
 {
-	window_to_game(touch_window(f), (f1_wx + f2_wx) / 2, (f1_wy + f2_wy) / 2, gx, gy);
+	*gx = (f1_gx + f2_gx) / 2;
+	*gy = (f1_gy + f2_gy) / 2;
 }
 
 //------------------------------------------------------------------------
@@ -243,10 +209,11 @@ static void finger_down(const SDL_TouchFingerEvent &f)
 		long_press_armed = 0;
 		finger1 = f.fingerId;
 		down_time = SDL_GetTicks();
-		finger_to_window(f, &start_wx, &start_wy);
-		f1_wx = start_wx;
-		f1_wy = start_wy;
-		game_pos(f, &start_lx, &start_ly);
+		finger_game(f, &start_gx, &start_gy);
+		f1_gx = start_gx;
+		f1_gy = start_gy;
+		start_lx = clamp_x(start_gx);
+		start_ly = clamp_y(start_gy);
 		// a new touch can land anywhere: no button is held, so nothing may
 		// confine the cursor
 		mouse.reset_boundary();
@@ -256,8 +223,8 @@ static void finger_down(const SDL_TouchFingerEvent &f)
 	{
 		state = TOUCH_TWO;
 		finger2 = f.fingerId;
-		finger_to_window(f, &f2_wx, &f2_wy);
-		centroid_game(f, &pan_last_x, &pan_last_y);
+		finger_game(f, &f2_gx, &f2_gy);
+		centroid_game(&pan_last_x, &pan_last_y);
 		pan_acc_x = pan_acc_y = 0;
 		pan_total = 0;
 		panned = 0;
@@ -269,11 +236,8 @@ static void finger_motion(const SDL_TouchFingerEvent &f)
 {
 	if( state == TOUCH_PENDING && f.fingerId == finger1 )
 	{
-		float wx, wy;
-		finger_to_window(f, &wx, &wy);
-		f1_wx = wx;
-		f1_wy = wy;
-		if( hypotf(wx - start_wx, wy - start_wy) > move_threshold(f) )
+		finger_game(f, &f1_gx, &f1_gy);
+		if( hypotf(f1_gx - start_gx, f1_gy - start_gy) > MOVE_THRESHOLD )
 		{
 			// start a left-button drag from where the finger went down
 			move_cursor(start_lx, start_ly);
@@ -293,12 +257,12 @@ static void finger_motion(const SDL_TouchFingerEvent &f)
 	else if( state == TOUCH_TWO && (f.fingerId == finger1 || f.fingerId == finger2) )
 	{
 		if( f.fingerId == finger1 )
-			finger_to_window(f, &f1_wx, &f1_wy);
+			finger_game(f, &f1_gx, &f1_gy);
 		else
-			finger_to_window(f, &f2_wx, &f2_wy);
+			finger_game(f, &f2_gx, &f2_gy);
 
 		float cx, cy;
-		centroid_game(f, &cx, &cy);
+		centroid_game(&cx, &cy);
 		float dx = cx - pan_last_x, dy = cy - pan_last_y;
 		pan_last_x = cx;
 		pan_last_y = cy;
