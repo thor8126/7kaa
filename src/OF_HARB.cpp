@@ -80,6 +80,7 @@ enum { HARBOR_MENU_MAIN,
 
 static VBrowseIF 		browse_ship;
 static Button3D		button_build, button_sail;
+static Button			button_repeat_ship;		// keep building the same ship
 static Button3D		button_cancel_build;
 static ButtonGroup	button_mode(2);
 // ###### begin Gilbert 20/9 #######//
@@ -109,6 +110,7 @@ FirmHarbor::FirmHarbor()
 	ship_count = 0;
 	build_unit_id = 0;
 	build_queue_count = 0;
+	repeat_build = 0;
 
 	land_region_id = 0;
 	sea_region_id = 0;
@@ -338,6 +340,8 @@ void FirmHarbor::disp_main_menu(int refreshFlag)
 	{
 		button_build.paint( SHIP_DET_X1, SHIP_DET_Y2+4, 'A', "MAKESHIP" );
 		button_sail.paint ( SHIP_DET_X1+BUTTON_ACTION_WIDTH, SHIP_DET_Y2+4, 'A', "SAILOUT" );
+		button_repeat_ship.paint_text( SHIP_DET_X1+BUTTON_ACTION_WIDTH*2+4, SHIP_DET_Y2+16, SHIP_DET_X1+BUTTON_ACTION_WIDTH*3+20, SHIP_DET_Y2+34,
+			_("Repeat"), 1, repeat_build );
 	}
 
 	if( ship_count > 0 )
@@ -381,6 +385,15 @@ int FirmHarbor::detect_main_menu()
 		disable_refresh = 1;    // static var for disp_info() only
 		info.disp();
 		disable_refresh = 0;
+		return 1;
+	}
+
+	//-------- detect the repeat button ---------//
+
+	if( button_repeat_ship.detect() )
+	{
+		se_ctrl.immediate_sound( repeat_build ? (char*)"TURN_OFF" : (char*)"TURN_ON" );
+		toggle_repeat_build(COMMAND_PLAYER);
 		return 1;
 	}
 
@@ -1140,6 +1153,11 @@ void FirmHarbor::process_build()
 		if( own_firm() )
 			se_res.far_sound(center_x, center_y, 1, 'F', firm_id, "FINS", 'S', unit_res[build_unit_id]->sprite_id);
 
+		//--- the player's Repeat button: build another one ---//
+
+		if( repeat_build && !firm_ai && build_queue_count == 0 )
+			add_queue( build_unit_id );
+
 		build_unit_id = 0;
 
 		// ##### begin Gilbert 20/9 ########//
@@ -1308,6 +1326,26 @@ void FirmHarbor::process_queue()
 	}
 }
 //----------- End of function FirmHarbor::process_queue -----------//
+
+
+//--------- Begin of function FirmHarbor::toggle_repeat_build ---------//
+//
+void FirmHarbor::toggle_repeat_build(char remoteAction)
+{
+	if( !remoteAction && remote.is_enable() )
+	{
+		// packet structure : <firm recno>
+		short *shortPtr = (short *)remote.new_send_queue_msg(MSG_FIRM_TOGGLE_REPEAT, sizeof(short));
+		shortPtr[0] = firm_recno;
+		return;
+	}
+
+	repeat_build = !repeat_build;
+
+	if( firm_array.selected_recno == firm_recno )
+		info.disp();
+}
+//----------- End of function FirmHarbor::toggle_repeat_build -----------//
 
 
 //--------- Begin of function FirmHarbor::add_queue ---------//

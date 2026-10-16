@@ -35,6 +35,7 @@
 #include <OWORLD.h>
 #include <OTERRAIN.h>
 #include <OROAD.h>
+#include <OCALLARM.h>
 
 //-------- Begin of function MapMatrix::MapMatrix ----------//
 
@@ -342,6 +343,26 @@ void MapMatrix::draw_square()
 
 	if( squareFrameCount==6 ) // bi-directional color shift
 		squareFrameStep  = -1;
+
+	//------ a pulsing box where the player is under attack, see OCALLARM.CPP ------//
+
+	if( call_to_arms.is_active() )
+	{
+		int alertX = image_x1 + (call_to_arms.alert_x_loc - top_x_loc) * loc_width;
+		int alertY = image_y1 + (call_to_arms.alert_y_loc - top_y_loc) * loc_height;
+		int boxSize = 4 + (sys.frame_count/3) % 4;		// grows and shrinks
+
+		int bx1 = MAX(alertX-boxSize, image_x1), by1 = MAX(alertY-boxSize, image_y1);
+		int bx2 = MIN(alertX+boxSize, image_x2), by2 = MIN(alertY+boxSize, image_y2);
+
+		if( bx1 < bx2 && by1 < by2 )
+		{
+			vga_back.rect( bx1, by1, bx2, by2, 1, V_RED );
+
+			if( bx1+1 < bx2-1 && by1+1 < by2-1 )
+				vga_back.rect( bx1+1, by1+1, bx2-1, by2-1, 1, V_RED );
+		}
+	}
 }
 //----------- End of function MapMatrix::draw_square ------------//
 

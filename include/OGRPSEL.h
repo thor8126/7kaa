@@ -41,8 +41,12 @@ class GroupSelect
 		void	select_grouped_units(int groupNum);
 		void	select_army();
 
+		int	idle_unit_count();
+		void	select_next_idle_unit();
+
 	private:
 		static int is_army_unit(Unit* unitPtr);
+		static int is_idle_unit(Unit* unitPtr);
 };
 
 extern GroupSelect group_select;

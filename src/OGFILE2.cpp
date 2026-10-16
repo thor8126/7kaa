@@ -126,6 +126,7 @@ static int loaded_game_version;
 #define FIRST_VERSION_WITH_RALLY_POINT		218		// earlier saved games have smaller firm records, without Firm::rally_x_loc and rally_y_loc
 #define FIRST_VERSION_WITH_AI_INTEL			219		// earlier saved games have smaller firm and town records, without ai_seen_nation_mask
 #define FIRST_VERSION_WITH_IDLE_RETURN		220		// earlier saved games have smaller unit records, without Unit::idle_far_days
+#define FIRST_VERSION_WITH_REPEAT_BUILD		221		// earlier saved games have smaller war factory and harbor records, without repeat_build
 
 bool GameFile::read_file_same_version = true;
 
@@ -231,6 +232,9 @@ int GameFile::read_file(File* filePtr)
 
 	if(load_file_game_version < FIRST_VERSION_WITH_IDLE_RETURN)
 		return -1;		// unit records saved before idle units returned home are of a different size
+
+	if(load_file_game_version < FIRST_VERSION_WITH_REPEAT_BUILD)
+		return -1;		// war factory and harbor records saved before repeat production are of a different size
 
 	read_file_same_version = ( load_file_game_version/100==GAME_VERSION/100 );
 	loaded_game_version = load_file_game_version;

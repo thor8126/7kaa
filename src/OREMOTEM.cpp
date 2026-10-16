@@ -187,6 +187,7 @@ static MsgProcessFP msg_process_function_array[] =
 	&RemoteMsg::units_wait_ferry,
 	&RemoteMsg::firm_set_rally_point,
 	&RemoteMsg::call_to_arms_send,
+	&RemoteMsg::firm_toggle_repeat,
 };
 
 static_assert( sizeof(msg_process_function_array)/sizeof(msg_process_function_array[0]) == REMOTE_MSG_TYPE_COUNT,
@@ -3086,3 +3087,24 @@ void RemoteMsg::call_to_arms_send()
 	call_to_arms.send_troops( shortPtr[0], shortPtr[1] );
 }
 // ------- End of function RemoteMsg::call_to_arms_send ---------//
+
+
+// ------- Begin of function RemoteMsg::firm_toggle_repeat ---------//
+void RemoteMsg::firm_toggle_repeat()
+{
+	err_when( id != MSG_FIRM_TOGGLE_REPEAT );
+	// packet structure : <firm recno>
+	short *shortPtr = (short *)data_buf;
+
+	if( firm_array.is_deleted(shortPtr[0]) )
+		return;
+
+	Firm* firmPtr = firm_array[shortPtr[0]];
+
+	if( firmPtr->firm_id == FIRM_WAR_FACTORY )
+		((FirmWar*)firmPtr)->toggle_repeat_build(COMMAND_REMOTE);
+
+	else if( firmPtr->firm_id == FIRM_HARBOR )
+		((FirmHarbor*)firmPtr)->toggle_repeat_build(COMMAND_REMOTE);
+}
+// ------- End of function RemoteMsg::firm_toggle_repeat ---------//

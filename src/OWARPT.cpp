@@ -40,6 +40,7 @@
 #define WARPOINT_STRENGTH_MAX 0x1000000
 
 #define DRAW_PHASE_PERIOD 16
+#define WARPOINT_DECAY_FRAMES 4		// war points fade every this many frames, so they stay on the map for a few seconds
 
 
 // ---------- begin of function WarPoint::inc ----------//
@@ -150,6 +151,11 @@ void WarPointArray::draw_dot()
 // ------ begin of function WarPointArray::process -------//
 void WarPointArray::process()
 {
+	static int processCount = 0;
+
+	if( ++processCount % WARPOINT_DECAY_FRAMES )
+		return;
+
 	WarPoint *warPt = war_point;
 	for( int i = WARPOINT_ZONE_COLUMN * WARPOINT_ZONE_ROW; i > 0; --i, warPt++)
 	{

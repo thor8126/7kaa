@@ -74,6 +74,8 @@
 #include <OAIWAR.h>
 #include <OROAD.h>
 #include <OCALLARM.h>
+#include <OREBUILD.h>
+#include <OBATREP.h>
 // ##### end Gilbert 2/10 #######//
 
 //---------------- DETECT_SPREAD ----------------//
@@ -162,6 +164,8 @@ int Game::init(int loadGameCall)
 	ai_war_state.init();
 	road_res.init();
 	call_to_arms.reset();
+	rebuild_list.reset();
+	battle_report.reset();
 	firm_array.init();
 	// ##### begin Gilbert 2/10 #######//
 	firm_die_array.init();

@@ -1017,6 +1017,72 @@ void NewsArray::under_attack(int xLoc, int yLoc, int firmId, int townNameId)
 //------- End of function NewsArray::under_attack -----//
 
 
+//------ Begin of function NewsArray::rebuilding_firm -----//
+//
+// A construction worker is rebuilding a destroyed firm, see OREBUILD.CPP.
+//
+// short_para1 - id. of the firm
+// short_para2 - name id. of the town closest to it
+//
+void NewsArray::rebuilding_firm(int firmId, int xLoc, int yLoc)
+{
+	News* newsPtr = add_news( NEWS_REBUILDING_FIRM, NEWS_NORMAL, nation_array.player_recno, 0, 1 );
+
+	if( !newsPtr )
+		return;
+
+	int townNameId = 0, minDistance = 0x7FFF;
+
+	for( int i=town_array.size() ; i>0 ; i-- )
+	{
+		if( town_array.is_deleted(i) )
+			continue;
+
+		int curDistance = misc.points_distance( town_array[i]->center_x, town_array[i]->center_y, xLoc, yLoc );
+
+		if( curDistance < minDistance )
+		{
+			minDistance = curDistance;
+			townNameId = town_array[i]->town_name_id;
+		}
+	}
+
+	newsPtr->short_para1 = firmId;
+	newsPtr->short_para2 = townNameId;
+
+	newsPtr->set_loc( xLoc, yLoc, NEWS_LOC_ANY );
+}
+//------- End of function NewsArray::rebuilding_firm -----//
+
+
+//------ Begin of function NewsArray::battle_report -----//
+//
+// The losses of a battle the player fought, see OBATREP.CPP.
+//
+// short_para1 - name id. of the town closest to the battle
+// short_para2 - no. of the player's units lost
+// short_para3 - no. of the player's buildings lost
+// short_para4 - no. of enemy units killed
+// short_para5 - no. of enemy buildings destroyed
+//
+void NewsArray::battle_report(int xLoc, int yLoc, int townNameId, int enemyNationRecno, int ownUnitLost, int ownFirmLost, int enemyUnitLost, int enemyFirmLost)
+{
+	News* newsPtr = add_news( NEWS_BATTLE_REPORT, NEWS_NORMAL, nation_array.player_recno, enemyNationRecno, 1 );
+
+	if( !newsPtr )
+		return;
+
+	newsPtr->short_para1 = townNameId;
+	newsPtr->short_para2 = ownUnitLost;
+	newsPtr->short_para3 = ownFirmLost;
+	newsPtr->short_para4 = enemyUnitLost;
+	newsPtr->short_para5 = enemyFirmLost;
+
+	newsPtr->set_loc( xLoc, yLoc, NEWS_LOC_ANY );
+}
+//------- End of function NewsArray::battle_report -----//
+
+
 //------ Begin of function NewsArray::add_news -----//
 //
 // Called by news processing function to set news parameters

@@ -50,6 +50,7 @@ public:
 
 	char			 build_queue_array[MAX_BUILD_SHIP_QUEUE];	// it stores the unit id.
 	char			 build_queue_count;
+	char			 repeat_build;			// keep building the same ship after each one is finished (the player's Repeat button)
 
 	uint8_t			 land_region_id;
 	uint8_t			 sea_region_id;
@@ -107,6 +108,7 @@ public:
 	virtual FirmHarbor*     cast_to_FirmHarbor() { return this; };
 	void	add_queue(int unitId, int amount = 1);
 	void	remove_queue(int unitId, int amount = 1);
+	void	toggle_repeat_build(char remoteAction);
 	void	cancel_build_unit();
 
 	enum {HARBOR_BUILD_BATCH_COUNT = 5}; // Number of units enqueued when holding shift - ensure this is less than MAX_BUILD_SHIP_QUEUE

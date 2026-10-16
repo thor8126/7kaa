@@ -46,6 +46,7 @@ bin_PROGRAMS = 7kaa
 	OBULLETA.cpp \
 	OBUTT3D.cpp \
 	OBUTTCUS.cpp \
+	OBATREP.cpp \
 	OBUTTON.cpp \
 	OCALLARM.cpp \
 	OB_FLAME.cpp \
@@ -158,6 +159,7 @@ bin_PROGRAMS = 7kaa
 	OREMOTE2.cpp \
 	OREMOTEM.cpp \
 	OREMOTEQ.cpp \
+	OREBUILD.cpp \
 	ORES.cpp \
 	ORESDB.cpp \
 	ORESX.cpp \

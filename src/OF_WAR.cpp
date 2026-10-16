@@ -36,6 +36,7 @@
 #include <OSYS.h>
 #include <ONATION.h>
 #include <OF_WAR.h>
+#include <OBUTTON.h>
 #include <OREMOTE.h>
 #include <OIMGRES.h>
 #include <OSE.h>
@@ -78,6 +79,7 @@ static ButtonCustom button_queue_weapon[MAX_WEAPON_TYPE];
 static int queue_weapon_selected = -1;
 // ###### end Gilbert 10/9 #######//
 static ButtonCustom button_cancel;
+static Button	button_repeat;			// keep building the same weapon
 static Button3D	button_vacate_firm;
 
 
@@ -93,6 +95,7 @@ FirmWar::FirmWar()
 	firm_skill_id = SKILL_MFT;
 	build_unit_id = 0;
 	build_queue_count = 0;
+	repeat_build = 0;
 }
 //----------- End of function FirmWar::FirmWar -----------//
 
@@ -179,6 +182,9 @@ void FirmWar::disp_main_menu(int refreshFlag)
 
 		x += (BUTTON_ACTION_WIDTH * 2);
 
+		if( refreshFlag == INFO_REPAINT )
+			button_repeat.paint_text( INFO_X1+BUTTON_ACTION_WIDTH*3, INFO_Y1+247, INFO_X2-4, INFO_Y1+265, _("Repeat"), 1, repeat_build );
+
 		disp_rally_point( INFO_Y1+281, refreshFlag );
 	}
 
@@ -215,6 +221,13 @@ int FirmWar::detect_main_menu()
 
 	if( detect_rally_point() )		// see OFIRMRAL.CPP
 		return 1;
+
+	if( button_repeat.detect() )
+	{
+		se_ctrl.immediate_sound( repeat_build ? (char*)"TURN_OFF" : (char*)"TURN_ON" );
+		toggle_repeat_build(COMMAND_PLAYER);
+		return 1;
+	}
 
 	//---------- detect cancel build ------------//
 	if( build_unit_id && button_cancel_build.detect() )
@@ -733,6 +746,26 @@ static void i_disp_queue_button(ButtonCustom *button, int repaintBody)
 // ####### end Gilbert 10/9 ########//
 
 
+//--------- Begin of function FirmWar::toggle_repeat_build ---------//
+//
+void FirmWar::toggle_repeat_build(char remoteAction)
+{
+	if( !remoteAction && remote.is_enable() )
+	{
+		// packet structure : <firm recno>
+		short *shortPtr = (short *)remote.new_send_queue_msg(MSG_FIRM_TOGGLE_REPEAT, sizeof(short));
+		shortPtr[0] = firm_recno;
+		return;
+	}
+
+	repeat_build = !repeat_build;
+
+	if( firm_array.selected_recno == firm_recno )
+		info.disp();
+}
+//----------- End of function FirmWar::toggle_repeat_build -----------//
+
+
 //--------- Begin of function FirmWar::add_queue ---------//
 //
 void FirmWar::add_queue(int unitId, int amount)
@@ -954,6 +987,11 @@ void FirmWar::process_build()
 		short unitRecno = unit_array.add_unit( build_unit_id, nation_recno, 0, 0, xLoc, yLoc );
 
 		send_to_rally_point( &unitRecno, 1 );		// see OFIRMRAL.CPP
+
+		//--- the player's Repeat button: build another one ---//
+
+		if( repeat_build && !firm_ai && build_queue_count == 0 )
+			add_queue( build_unit_id );
 
 		if( firm_array.selected_recno == firm_recno )
 		{

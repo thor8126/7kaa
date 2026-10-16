@@ -47,6 +47,8 @@ public:
 	char  build_queue_array[MAX_BUILD_QUEUE];		// it stores the unit id.
 	char  build_queue_count;
 
+	char  repeat_build;		// keep building the same weapon after each one is finished (the player's Repeat button)
+
 	int	is_operating()		{ return productivity > 0 && build_unit_id; }
 
 public:
@@ -70,6 +72,7 @@ public:
 	virtual	FirmWar* cast_to_FirmWar() { return this; };
 	void	add_queue(int unitId, int amount = 1);
 	void	remove_queue(int unitId, int amount = 1);
+	void	toggle_repeat_build(char remoteAction);
 	void	cancel_build_unit();
 
 	//-------------- multiplayer checking codes ---------------//

@@ -92,6 +92,12 @@ static Button    button_defend;		// call to arms, below the road button while th
 #define DEFEND_BUTTON_Y1	(ZOOM_Y1+48)
 #define DEFEND_BUTTON_Y2	(ZOOM_Y1+66)
 
+static Button    button_idle;		// look at the next idle unit (also Ctrl+I), below the road or defend button
+static int       idle_button_count;	// no. of idle units shown on the button, 0 if the button is hidden
+
+#define IDLE_BUTTON_Y1		(call_to_arms.is_active() ? ZOOM_Y1+70 : ZOOM_Y1+48)
+#define IDLE_BUTTON_Y2		(IDLE_BUTTON_Y1+18)
+
 static int is_army_button_shown();
 
 //-------- Begin of function Sys::detect --------//
@@ -461,6 +467,14 @@ int Sys::detect_button()
 		return 1;
 	}
 
+	//--------- detect idle button -------//
+
+	if( is_army_button_shown() && idle_button_count > 0 && button_idle.detect() )
+	{
+		group_select.select_next_idle_unit();
+		return 1;
+	}
+
 	//------- detect view mode buttons -----//
 
 	#define VIEW_MODE_BUTTON_WIDTH   58
@@ -787,6 +801,16 @@ void Sys::update_view()
 
 			if( call_to_arms.is_active() )
 				button_defend.paint_text( ARMY_BUTTON_X1, DEFEND_BUTTON_Y1, ARMY_BUTTON_X2, DEFEND_BUTTON_Y2, _("Defend") );
+
+			if( sys.frame_count % 10 == 0 || !idle_button_count )		// counting the idle units every frame is not needed
+				idle_button_count = group_select.idle_unit_count();
+
+			if( idle_button_count > 0 )
+			{
+				String str(_("Idle "));
+				str += idle_button_count;
+				button_idle.paint_text( ARMY_BUTTON_X1, IDLE_BUTTON_Y1, ARMY_BUTTON_X2, IDLE_BUTTON_Y2, str );
+			}
 			vga.use_front();
 		}
 

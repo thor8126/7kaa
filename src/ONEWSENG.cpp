@@ -89,6 +89,8 @@ static NewsInfo news_info_array[] =
 	{ &News::multi_save_game, 1 },
 	{ &News::multi_connection_lost, 1 },
 	{ &News::under_attack, 1 },
+	{ &News::rebuilding_firm, 0 },
+	{ &News::battle_report, 1 },
 };
 
 //------- Define static variables --------//
@@ -1762,6 +1764,52 @@ void News::under_attack()
 	}
 }
 //------- End of function News::under_attack -----//
+
+
+//------ Begin of function News::rebuilding_firm -----//
+//
+// short_para1 - id. of the firm
+// short_para2 - name id. of the town closest to it
+//
+void News::rebuilding_firm()
+{
+	// TRANSLATORS: A construction worker is going to rebuild your <Firm> near <Town>.
+	snprintf(str, MAX_STR_LEN+1, _("A construction worker is going to rebuild your %s near %s."),
+		_(firm_res[short_para1]->name), town_res.get_name(short_para2));
+}
+//------- End of function News::rebuilding_firm -----//
+
+
+//------ Begin of function News::battle_report -----//
+//
+// short_para1 - name id. of the town closest to the battle
+// short_para2 - no. of the player's units lost
+// short_para3 - no. of the player's buildings lost
+// short_para4 - no. of enemy units killed
+// short_para5 - no. of enemy buildings destroyed
+//
+void News::battle_report()
+{
+	String lossStr;
+
+	// TRANSLATORS: You lost <n> units and <n> buildings, the enemy lost <n> units and <n> buildings.
+	snprintf(lossStr, MAX_STR_LEN+1, _("You lost %d units and %d buildings, the enemy lost %d units and %d buildings."),
+		short_para2, short_para3, short_para4, short_para5);
+
+	if( nation_name_id2 )
+	{
+		// TRANSLATORS: The battle near <Town> against <King>'s Kingdom<Color> is over. <losses>
+		snprintf(str, MAX_STR_LEN+1, _("The battle near %s against %s's Kingdom%s is over. %s"),
+			town_res.get_name(short_para1), king_name2(), nation_color_str2(), (char*) lossStr);
+	}
+	else
+	{
+		// TRANSLATORS: The battle near <Town> is over. <losses>
+		snprintf(str, MAX_STR_LEN+1, _("The battle near %s is over. %s"),
+			town_res.get_name(short_para1), (char*) lossStr);
+	}
+}
+//------- End of function News::battle_report -----//
 
 
 //------ Begin of function News::nation_name1 -----//

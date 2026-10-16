@@ -27,6 +27,8 @@
 #include <OWORLD.h>
 #include <OINFO.h>
 #include <OSERES.h>
+#include <OU_CARA.h>
+#include <OU_MARI.h>
 
 //--------------- begin of function GroupSelect::GroupSelect ----------------//
 GroupSelect::GroupSelect()
@@ -287,3 +289,112 @@ void GroupSelect::select_army()
 	info.disp();
 }
 //--------------- end of function GroupSelect::select_army ----------------//
+
+
+//--------------- begin of function GroupSelect::is_idle_unit ----------------//
+//
+// Whether the player's unit out on the map has nothing to do: people
+// (except the king), war machines, and caravans and ships without a route.
+// Units waiting for a ferry are not idle.
+//
+int GroupSelect::is_idle_unit(Unit* unitPtr)
+{
+	if( !unitPtr->is_own() || unitPtr->spy_recno || !unitPtr->is_visible() ||
+		 unitPtr->hit_points <= 0 || unitPtr->unit_mode != 0 || unitPtr->ferry_harbor_recno )
+	{
+		return 0;
+	}
+
+	if( unitPtr->cur_action != SPRITE_IDLE || unitPtr->action_mode != ACTION_STOP ||
+		 unitPtr->action_mode2 != ACTION_STOP )
+	{
+		return 0;
+	}
+
+	switch( unit_res[unitPtr->unit_id]->unit_class )
+	{
+		case UNIT_CLASS_HUMAN:
+			return unitPtr->rank_id != RANK_KING;
+
+		case UNIT_CLASS_WEAPON:
+			return 1;
+
+		case UNIT_CLASS_CARAVAN:
+			return ((UnitCaravan*)unitPtr)->stop_defined_num == 0;
+
+		case UNIT_CLASS_SHIP:
+			return ((UnitMarine*)unitPtr)->stop_defined_num == 0;
+	}
+
+	return 0;
+}
+//--------------- end of function GroupSelect::is_idle_unit ----------------//
+
+
+//--------------- begin of function GroupSelect::idle_unit_count ----------------//
+//
+int GroupSelect::idle_unit_count()
+{
+	if( !nation_array.player_recno )
+		return 0;
+
+	int idleCount = 0;
+
+	for( int i=unit_array.size() ; i>0 ; i-- )
+	{
+		if( !unit_array.is_deleted(i) && is_idle_unit(unit_array[i]) )
+			idleCount++;
+	}
+
+	return idleCount;
+}
+//--------------- end of function GroupSelect::idle_unit_count ----------------//
+
+
+//--------------- begin of function GroupSelect::select_next_idle_unit ----------------//
+//
+// Select the next idle unit of the player and look at it (the Idle button
+// and Ctrl+I). Pressing it again goes on to the next one.
+//
+void GroupSelect::select_next_idle_unit()
+{
+	if( !nation_array.player_recno )
+		return;
+
+	static int lastIdleRecno = 0;
+
+	int arraySize = unit_array.size();
+	int foundRecno = 0;
+
+	for( int n=1 ; n<=arraySize ; n++ )
+	{
+		int i = (lastIdleRecno + n - 1) % arraySize + 1;		// the units after the last one first, then from the start
+
+		if( !unit_array.is_deleted(i) && is_idle_unit(unit_array[i]) )
+		{
+			foundRecno = i;
+			break;
+		}
+	}
+
+	if( !foundRecno )
+		return;
+
+	lastIdleRecno = foundRecno;
+
+	Unit* unitPtr = unit_array[foundRecno];
+
+	power.reset_selection();
+
+	unitPtr->selected_flag = 1;
+	unit_array.selected_count = 1;
+	unit_array.selected_recno = foundRecno;
+
+	world.go_loc( unitPtr->next_x_loc(), unitPtr->next_y_loc() );
+
+	if( se_res.mark_select_object_time() )
+		se_res.sound( unitPtr->cur_x_loc(), unitPtr->cur_y_loc(), 1, 'S', unitPtr->sprite_id, "SEL" );
+
+	info.disp();
+}
+//--------------- end of function GroupSelect::select_next_idle_unit ----------------//

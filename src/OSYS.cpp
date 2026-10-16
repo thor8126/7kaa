@@ -1576,6 +1576,10 @@ void Sys::detect_letter_key(unsigned scanCode, unsigned skeyState)
          case 'a':                  // select the whole army
             group_select.select_army();
             break;
+
+         case 'i':                  // look at the next idle unit
+            group_select.select_next_idle_unit();
+            break;
       }
    }
 

@@ -39,6 +39,8 @@
 #include <OSYS.h>
 #include <OWARPT.h>
 #include <OAIWAR.h>
+#include <OREBUILD.h>
+#include <OBATREP.h>
 
 #ifdef NO_DEBUG_UNIT
 #undef err_when
@@ -176,6 +178,9 @@ void Unit::hit_target(Unit* parentUnit, Unit* targetUnit, float attackDamage, sh
 		{
 			ai_war_state.unit_killed(parentNationRecno, targetUnit);
 		}
+
+		if( hitPointsBefore > 0 && parentNationRecno != targetNationRecno )		// battles of the player, see OBATREP.CPP
+			battle_report.unit_killed(parentNationRecno, targetUnit);
 
 		//---- if the unit killed is a human unit -----//
 
@@ -640,6 +645,9 @@ void Unit::hit_firm(Unit* attackUnit, int targetXLoc, int targetYLoc, float atta
 
 		if( targetFirm->nation_recno == nation_array.player_recno )
 			news_array.firm_destroyed(targetFirm->firm_recno, attackUnit, attackNationRecno);
+
+		rebuild_list.add(targetFirm);											// the player's firms are rebuilt, see OREBUILD.CPP
+		battle_report.firm_destroyed(attackNationRecno, targetFirm);	// see OBATREP.CPP
 
 		if( targetFirm->nation_recno )
 		{
