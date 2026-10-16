@@ -44,6 +44,7 @@
 #include <OF_MONS.h>
 #include <OTECHRES.h>
 #include <ONATION.h>
+#include <OCIVIL.h>
 #include <OREBEL.h>
 #include <OREMOTE.h>
 #include <ConfigAdv.h>
@@ -794,6 +795,8 @@ void NationBase::next_day()
 //
 void NationBase::next_month()
 {
+	civil_tech.pay_interest(this);		// Commerce, see OCIVIL.CPP
+
 	//--------------------------------------------------//
 	// When the two nations, whose relationship is Tense,
 	// do not have new conflicts for 3 years, their
@@ -1533,7 +1536,7 @@ int NationBase::total_tech_level(int unitClass)
 		if( techLevel > 0 )
 		{
 			if( !unitClass ||
-				 (unit_res[techInfo->unit_id]->unit_class == unitClass) )
+				 (techInfo->unit_id && unit_res[techInfo->unit_id]->unit_class == unitClass) )		// civil technologies have no unit
 			{
 				totalTechLevel += techLevel;
 			}

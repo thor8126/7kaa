@@ -46,12 +46,16 @@
 #include <OREMOTE.h>
 #include <OSERES.h>
 #include <OSE.h>
+#include <OCIVIL.h>
+#include <OTECHRES.h>
+#include <OAIWAR.h>
 #include "gettext.h"
 
 
 //----------- Define static vars -------------//
 
 static Button3D button_patrol, button_reward, button_defense;
+static Button   button_auto_recruit;		// Military Drill, see OCIVIL.CPP
 
 //--------- Declare static functions ---------//
 
@@ -71,6 +75,7 @@ FirmCamp::FirmCamp()
 	defense_flag = 1;
 
 	is_attack_camp = 0;
+	auto_recruit_off = 0;
 }
 //----------- End of function FirmCamp::FirmCamp -----------//
 
@@ -392,7 +397,19 @@ void FirmCamp::put_info(int refreshFlag)
 
 		x=INFO_X1+BUTTON_ACTION_WIDTH*2;
 
-		disp_rally_point( INFO_Y1+288, refreshFlag );		// see OFIRMRAL.CPP
+		//--- Military Drill: the Auto-recruit switch next to the rally point, see OCIVIL.CPP ---//
+
+		int hasAutoRecruit = !remote.is_enable() && tech_res.civil_level(nation_recno, CIVIL_MILITARY_DRILL);
+
+		disp_rally_point( INFO_Y1+288, refreshFlag, hasAutoRecruit ? 76 : 0 );		// see OFIRMRAL.CPP
+
+		if( hasAutoRecruit )
+		{
+			if( refreshFlag == INFO_REPAINT )
+				button_auto_recruit.paint_text( INFO_X2-76, INFO_Y1+291, INFO_X2-4, INFO_Y1+309, auto_recruit_off ? _("Draft: Off") : _("Draft: On") );
+		}
+		else
+			button_auto_recruit.reset();
 	}
 	else
 		x=INFO_X1;
@@ -451,6 +468,19 @@ int FirmCamp::detect_info()
 
 	if( detect_rally_point() )		// see OFIRMRAL.CPP
 		return 1;
+
+	//------ Military Drill: the Auto-recruit switch, see OCIVIL.CPP ------//
+
+	if( button_auto_recruit.init_flag && button_auto_recruit.detect() )
+	{
+		auto_recruit_off = !auto_recruit_off;
+		se_ctrl.immediate_sound( auto_recruit_off ? "TURN_OFF" : "TURN_ON" );
+
+		AiWarState::log( "RECRUIT     the player turns auto-recruiting of fort %d %s", firm_recno, auto_recruit_off ? "off" : "on" );
+
+		info.disp();
+		return 1;
+	}
 
 	//------ detect the overseer button -----//
 
@@ -635,6 +665,10 @@ void FirmCamp::next_day()
 
 	validate_patrol_unit();
 
+	//----- Military Drill: recruit by itself, see OCIVIL.CPP -----//
+
+	civil_tech.auto_recruit(this);
+
 	//--------------------------------------//
 
 	if( info.game_date%15 == firm_recno%15 )			// once a week
@@ -720,7 +754,8 @@ void FirmCamp::train_unit()
 		{
 			incValue = MAX(20, overseerSkill-workerPtr->combat_level)
 						  * workerPtr->hit_points / workerPtr->max_hit_points()
-						  * (100+workerPtr->skill_potential*2) / 100;
+						  * (100+workerPtr->skill_potential*2) / 100
+						  * civil_tech.train_speed_percent(nation_recno) / 100;		// Military Drill, see OCIVIL.CPP
 
 			levelMinor = workerPtr->combat_level_minor + incValue;		// with random factors, resulting in 75% to 125% of the original
 
@@ -768,13 +803,19 @@ void FirmCamp::train_unit()
 void FirmCamp::recover_hit_point()
 {
 	Worker* workerPtr = worker_array;
+	int	  medicLevel = civil_tech.medic_recovery_bonus(nation_recno);		// Medicine, see OCIVIL.CPP
 
 	for( int i=0 ; i<worker_count ; i++, workerPtr++ )
 	{
 		//------- increase worker hit points --------//
 
 		if( workerPtr->hit_points < workerPtr->max_hit_points() )
-			workerPtr->hit_points++;
+		{
+			workerPtr->hit_points += 1 + workerPtr->max_hit_points() * 5 * medicLevel / 100;
+
+			if( workerPtr->hit_points > workerPtr->max_hit_points() )
+				workerPtr->hit_points = workerPtr->max_hit_points();
+		}
 	}
 }
 //------- End of function FirmCamp::recover_hit_point -------//

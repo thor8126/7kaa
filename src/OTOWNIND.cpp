@@ -235,7 +235,7 @@ int Town::form_new_nation()
 	switch( misc.random(10) )
 	{
 		case 1:		// knowledge of weapon in the beginning.
-			tech_res[ misc.random(tech_res.tech_count)+1 ]->set_nation_tech_level(nationRecno, 1);
+			tech_res[ misc.random(tech_res.military_tech_count)+1 ]->set_nation_tech_level(nationRecno, 1);		// not a civil technology
 			break;
 
 		case 2:		// random additional cash

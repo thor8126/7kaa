@@ -55,7 +55,7 @@ enum { IMPORT_RAW,
 
 //--------- income types --------//
 
-enum { INCOME_TYPE_COUNT = 8 };
+enum { INCOME_TYPE_COUNT = 10 };
 
 enum { INCOME_SELL_GOODS,
 		 INCOME_EXPORTS,
@@ -64,12 +64,14 @@ enum { INCOME_SELL_GOODS,
 		 INCOME_FOREIGN_WORKER,
 		 INCOME_SELL_FIRM,
 		 INCOME_TRIBUTE,
-		 INCOME_CHEAT,
+		 INCOME_TOLLS,			// from foreign caravans on roads, see OCIVIL.CPP
+		 INCOME_INTEREST,		// on the treasury, see OCIVIL.CPP
+		 INCOME_CHEAT,			// keep this the last one
 	  };
 
 //--------- expense types --------//
 
-enum { EXPENSE_TYPE_COUNT = 16 };
+enum { EXPENSE_TYPE_COUNT = 17 };
 
 enum { EXPENSE_GENERAL,
 		 EXPENSE_SPY,
@@ -87,6 +89,7 @@ enum { EXPENSE_GENERAL,
 		 EXPENSE_IMPORTS,
 		 EXPENSE_TRIBUTE,
 		 EXPENSE_BRIBE,
+		 EXPENSE_TOLLS,			// paid by caravans on foreign roads, see OCIVIL.CPP
 	  };
 
 //----- Define struct NationRelation -------//

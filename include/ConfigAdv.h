@@ -93,6 +93,7 @@ public:
 	int			town_ai_emerge_nation_pop_limit;
 	int			town_ai_emerge_town_pop_limit;
 	char			town_king_influence_all_races;
+	char			town_bigger_independent;		// independent villages start bigger and grow faster
 	char			town_migration;
 	char			town_loyalty_qol;
 

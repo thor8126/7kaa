@@ -75,6 +75,7 @@ public:
 	char			ai_recruiting_soldier;
 
 	char			is_attack_camp;
+	char			auto_recruit_off;		// 1 if the player has stopped the fort recruiting by itself, see OCIVIL.CPP
 
 	int 			total_combat_level();
 	int 			average_combat_level();

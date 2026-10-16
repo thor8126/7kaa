@@ -298,7 +298,8 @@ void GroupSelect::select_army()
 int GroupSelect::is_idle_unit(Unit* unitPtr)
 {
 	if( !unitPtr->is_own() || unitPtr->spy_recno || !unitPtr->is_visible() ||
-		 unitPtr->hit_points <= 0 || unitPtr->unit_mode != 0 || unitPtr->ferry_harbor_recno )
+		 unitPtr->hit_points <= 0 || unitPtr->unit_mode != 0 || unitPtr->ferry_harbor_recno ||
+		 unitPtr->farm_town_recno )		// farmers are at work, see OCIVIL.CPP
 	{
 		return 0;
 	}

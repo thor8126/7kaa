@@ -57,6 +57,9 @@ void Unit::process_ai()
 {
 	err_when( !nation_recno );
 
+	if( farm_town_recno )		// a farmer works the fields of its village, see OCIVIL.CPP
+		return;
+
 	//-*********** simulate aat ************-//
 	#ifdef DEBUG
 		if(debug_sim_game_type)

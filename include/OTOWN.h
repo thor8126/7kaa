@@ -205,6 +205,14 @@ public:
 
 	unsigned short ai_seen_nation_mask;		// bit n-1 is set when nation n has seen this town
 
+	//------- civil technologies, see OCIVIL.CPP -------//
+
+	char	 farming_off;				// 1 if the player has stopped this village's farming
+	short	 farmer_count;				// the village's peasants out farming the fields
+	char	 has_watchtower;
+	char	 edict_id;					// EDICT_???, see OCIVIL.H
+	int	 edict_end_date;
+
 	int 	 closest_own_camp();
 
 	//========== NOTE: The following members are not loaded from/saved to file ==========//

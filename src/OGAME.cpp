@@ -76,6 +76,7 @@
 #include <OCALLARM.h>
 #include <OREBUILD.h>
 #include <OBATREP.h>
+#include <OCIVIL.h>
 // ##### end Gilbert 2/10 #######//
 
 //---------------- DETECT_SPREAD ----------------//
@@ -166,6 +167,7 @@ int Game::init(int loadGameCall)
 	call_to_arms.reset();
 	rebuild_list.reset();
 	battle_report.reset();
+	civil_tech.reset();
 	firm_array.init();
 	// ##### begin Gilbert 2/10 #######//
 	firm_die_array.init();

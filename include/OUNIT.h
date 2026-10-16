@@ -339,6 +339,7 @@ public:
 	short			home_camp_firm_recno;
 	short			ferry_harbor_recno;			// the harbor where this unit waits for a ferry, see OU_FERRY.CPP
 	char			idle_far_days;					// days the player's unit has stood idle far from home, see OUNITSUP.CPP
+	short			farm_town_recno;				// the village of a peasant out farming its fields, see OCIVIL.CPP
 
 	char			aggressive_mode;
 

@@ -30,6 +30,7 @@
 #include <OREBEL.h>
 #include <OSPY.h>
 #include <ONATION.h>
+#include <OCIVIL.h>
 #include <OFONT.h>
 #include <OBULLET.h>
 #include <OGAME.h>
@@ -1080,6 +1081,9 @@ void Unit::process_recover()
    else
       return;
 
+   if( nation_recno )
+      hitPointsInc += civil_tech.medic_recovery_bonus(nation_recno);		// Medicine, see OCIVIL.CPP
+
    //---------- recover now -----------//
 
    hit_points += hitPointsInc;
@@ -1702,7 +1706,7 @@ void Unit::pay_expense()
 
       if( nationPtr->cash > 0 )
       {
-         if( rank_id == RANK_SOLDIER )
+         if( rank_id == RANK_SOLDIER && !farm_town_recno )		// farmers are peasants at work, see OCIVIL.CPP
             nationPtr->add_expense( EXPENSE_MOBILE_UNIT, (float) SOLDIER_YEAR_SALARY / 365, 1 );
 
          if( rank_id == RANK_GENERAL )

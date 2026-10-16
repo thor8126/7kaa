@@ -824,9 +824,11 @@ int Battle::create_town(int nationRecno, int raceId, int& xLoc, int& yLoc)
 
 			townResistance = town_array.independent_town_resistance();
 
+			int popScale = config_adv.town_bigger_independent ? 2 : 1;		// independent villages start twice as big
+
 			if( i==0 )
 			{
-				curPop = 15/mixedRaceCount + misc.random(15/mixedRaceCount);
+				curPop = (15/mixedRaceCount + misc.random(15/mixedRaceCount)) * popScale;
 				if(curPop>=MAX_TOWN_POPULATION)
 					curPop = MAX_TOWN_POPULATION;
 
@@ -836,7 +838,7 @@ int Battle::create_town(int nationRecno, int raceId, int& xLoc, int& yLoc)
 			}
 			else
 			{
-				curPop = 10/mixedRaceCount + misc.random(10/mixedRaceCount);
+				curPop = (10/mixedRaceCount + misc.random(10/mixedRaceCount)) * popScale;
 				if(curPop>=MAX_TOWN_POPULATION-totalPop)
 					curPop = MAX_TOWN_POPULATION-totalPop;
 

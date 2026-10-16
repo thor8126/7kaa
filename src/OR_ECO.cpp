@@ -205,6 +205,8 @@ static void put_income_rec(int recNo, int x, int y, int refreshFlag)
 		N_("Worker Income"),
 		N_("Sale of Buildings"),
 		N_("Aid/Tribute from Other Kingdoms"),
+		N_("Road Tolls"),
+		N_("Interest"),
 		N_("Cheating"),
 	};
 
@@ -245,6 +247,7 @@ static void put_expense_rec(int recNo, int x, int y, int refreshFlag)
 		N_("Imports"),
 		N_("Aid/Tribute to Other Kingdoms"),
 		N_("Bribes"),
+		N_("Road Tolls"),
 	};
 
 	//---------------------------------//

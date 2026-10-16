@@ -28,6 +28,7 @@
 #include <OSPY.h>
 #include <OREMOTE.h>
 #include <ONATION.h>
+#include <OCIVIL.h>
 #include <OREBEL.h>
 #include <OGODRES.h>
 #include <OUNITALL.h>
@@ -540,6 +541,8 @@ void UnitArray::process()
 	Unit* unitPtr;
 	int i;
 	int arraySize = size();
+
+	civil_tech.process_medics();		// carry fallen soldiers saved by medics back to forts, see OCIVIL.CPP
 
 	int sysFrameCount = int(sys.frame_count%FRAMES_PER_DAY);
 	int yearFrameCount = int(sys.frame_count%YEAR_FRAME_COUNT); 

@@ -26,6 +26,7 @@
 #include <ONEWS.h>
 #include <OWORLD.h>
 #include <ONATION.h>
+#include <OCIVIL.h>
 #include <OU_MARI.h>
 #include <OSPY.h>
 #include <OGAME.h>
@@ -171,6 +172,11 @@ void Unit::hit_target(Unit* parentUnit, Unit* targetUnit, float attackDamage, sh
 
 	if( targetUnit->hit_points <= 0 )
 	{
+		//--- Medicine: a soldier falling in its own territory may be carried back to a fort, see OCIVIL.CPP ---//
+
+		if( hitPointsBefore > 0 && civil_tech.medics_try_save(targetUnit) )
+			return;
+
 		targetUnit->hit_points = (float) 0;
 
 		if( hitPointsBefore > 0 && parentNationRecno && targetNationRecno &&

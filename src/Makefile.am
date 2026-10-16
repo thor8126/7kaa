@@ -47,6 +47,7 @@ bin_PROGRAMS = 7kaa
 	OBUTT3D.cpp \
 	OBUTTCUS.cpp \
 	OBATREP.cpp \
+	OCIVIL.cpp \
 	OBUTTON.cpp \
 	OCALLARM.cpp \
 	OB_FLAME.cpp \

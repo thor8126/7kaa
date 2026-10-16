@@ -322,7 +322,7 @@ void TownArray::think_new_independent_town()
 	//--------------- create town ---------------//
 
 	int townRecno  = town_array.add_town(0, raceId, xLoc, yLoc);
-	int maxTownPop = 20 + misc.random(10);
+	int maxTownPop = config_adv.town_bigger_independent ? 30 + misc.random(21) : 20 + misc.random(10);
 	int addPop, townResistance;
 	int loopCount=0;
 

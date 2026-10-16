@@ -37,6 +37,7 @@
 #include <OFIRMALL.h>
 #include <OLOG.h>
 #include <OAIWAR.h>
+#include <ConfigAdv.h>
 
 
 //--------- Begin of function Town::process_ai ----------//
@@ -982,7 +983,13 @@ int Town::think_build_war_factory()
 
 	int totalWeaponTechLevel = nationPtr->total_tech_level(UNIT_CLASS_WEAPON);
 
-	if( totalWeaponTechLevel==0 )
+	//--- without weapons, one war factory for supply wagons when the nation fights with many forts, see OUNITSUP.CPP ---//
+
+	int forWagons = totalWeaponTechLevel==0 && config_adv.unit_supply_attrition &&
+						 nationPtr->ai_war_count==0 && nationPtr->ai_camp_count >= 4 &&
+						 ( nationPtr->total_enemy_count() > 0 || ai_war_state.get_strategy(nation_recno) == AI_STRATEGY_MILITARY );
+
+	if( totalWeaponTechLevel==0 && !forWagons )
 		return 0;
 
 	//----- see if we have enough money to build & support the weapon ----//
@@ -996,6 +1003,9 @@ int Town::think_build_war_factory()
 	//--------------------------------------------//
 
 	int maxWarFactory = (1+totalWeaponTechLevel) * nationPtr->pref_use_weapon / 100;
+
+	if( forWagons )
+		maxWarFactory = 1;
 
 	maxWarFactory = MIN(nationPtr->ai_town_count, maxWarFactory);
 
@@ -1024,7 +1034,15 @@ int Town::think_build_war_factory()
 
 	//------- queue building a war factory -------//
 
-	return ai_build_neighbor_firm(FIRM_WAR_FACTORY);
+	int rc = ai_build_neighbor_firm(FIRM_WAR_FACTORY);
+
+	if( rc )
+	{
+		AiWarState::log( "WAGON       nation %d orders a war factory next to town %d (%s, weapon tech %d)",
+							  nation_recno, town_recno, forWagons ? "for supply wagons" : "for weapons", totalWeaponTechLevel );
+	}
+
+	return rc;
 }
 //-------- End of function Town::think_build_war_factory -------//
 

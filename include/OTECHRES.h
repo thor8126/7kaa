@@ -42,6 +42,23 @@ enum { TECH_CLASS_COUNT=2 };
 
 enum { TECH_WEAPON=1,
 		 TECH_SHIP,
+		 TECH_CIVIL,		// civil technologies, defined in OTECHRES.CPP instead of TECH.DBF, without a TechClass record
+	  };
+
+//------ define civil technologies, see OTECHRES.CPP ------//
+//
+// They come after the technologies of TECH.DBF, so the ids of those stay
+// the same. Each one brings a new game mechanic.
+//
+enum { CIVIL_AGRICULTURE=1,		// villagers farm the fields, see OCIVIL.CPP
+		 CIVIL_MEDICINE,				// soldiers falling in own territory may survive, see OCIVIL.CPP
+		 CIVIL_ENGINEERING,			// village watchtowers, see OCIVIL.CPP
+		 CIVIL_INDUSTRY,				// depleted mines dig deeper, see OCIVIL.CPP
+		 CIVIL_ADMINISTRATION,		// village edicts, see OCIVIL.CPP
+		 CIVIL_COMMERCE,				// road tolls and interest, see OCIVIL.CPP
+		 CIVIL_MILITARY_DRILL,		// forts recruit by themselves and train faster, see OCIVIL.CPP
+		 CIVIL_NAVIGATION,			// harbors fish and ships sail faster, see OCIVIL.CPP
+		 CIVIL_TECH_COUNT = CIVIL_NAVIGATION
 	  };
 
 //------ define struct TechClassRec ---------//
@@ -127,6 +144,11 @@ public:
 	char* tech_small_icon();
 	const char* tech_des();			// description of the technology
 
+	short civil_id;					// CIVIL_???, 0 for the technologies of TECH.DBF
+	short parent_tech_id;			// a civil technology may need a level of another one first
+	char  parent_tech_level;
+	const char* level_des(int techLevel);		// what a level of a civil technology brings, "" for others
+
 	//-------- dynamic game vars --------//
 
 	char   nation_tech_level_array[MAX_NATION];			// each nation's the technology level of this unit,
@@ -157,6 +179,7 @@ public:
 
 	short       tech_class_count;
 	short       tech_count;
+	short       military_tech_count;	// the technologies of TECH.DBF, the civil ones come after them
 	short			total_tech_level;		// the sum of research levels of all technology
 
 	TechClass* 	tech_class_array;
@@ -172,6 +195,9 @@ public:
 
 	void 			init_nation_tech(int nationRecno);
 	void 			inc_all_tech_level(int nationRecno);
+
+	int			civil_tech_id(int civilId)		{ return military_tech_count + civilId; }
+	int			civil_level(int nationRecno, int civilId);		// a nation's level of a civil technology, 0 if not researched
 
 	int         write_file(File*);
 	int         read_file(File*);

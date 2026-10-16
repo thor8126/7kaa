@@ -56,6 +56,7 @@
 #include <OLOG.h>
 #include <ConfigAdv.h>
 #include <OAIWAR.h>
+#include <OCIVIL.h>
 
 static char random_race();
 
@@ -660,7 +661,8 @@ void Town::process_food()
 {
 	//--------- Peasants produce food ---------//
 
-	nation_array[nation_recno]->add_food( (float) jobless_population * PEASANT_FOOD_YEAR_PRODUCTION / 365 );
+	nation_array[nation_recno]->add_food( (float) jobless_population * PEASANT_FOOD_YEAR_PRODUCTION
+													  * civil_tech.edict_food_multiplier(this) / 365 );		// a labour levy doubles it, see OCIVIL.CPP
 
 	//---------- People consume food ----------//
 
@@ -738,6 +740,10 @@ void Town::set_nation(int newNationRecno)
 
 	is_base_town = 0;
 	town_defender_count = 0; 	// reset defender count
+
+	edict_id = 0;					// the edict and farming settings of the old nation, see OCIVIL.CPP
+	edict_end_date = 0;
+	farming_off = 0;
 
 	//----- set power region of the new nation ------//
 
@@ -1103,7 +1109,7 @@ void Town::population_grow()
 	if( town_defender_count )
 		return;
 
-	if( population >= MAX_TOWN_GROWTH_POPULATION || population >= MAX_TOWN_POPULATION )
+	if( population >= MAX_TOWN_GROWTH_POPULATION || population + farmer_count >= MAX_TOWN_POPULATION )		// room is kept for the farmers out, see OCIVIL.CPP
 		return;
 
 	//-------- population growth by birth ---------//
@@ -1121,6 +1127,11 @@ void Town::population_grow()
 
 		if( nation_recno )
 			race_pop_growth_array[i] += race_pop_array[i] * (100+quality_of_life) / 100;
+
+		//--- with config_adv.town_bigger_independent, independent villages grow 1.5 times as fast, and a small one at least 10% of a person a month ---//
+
+		else if( config_adv.town_bigger_independent && race_pop_array[i] )
+			race_pop_growth_array[i] += MAX( race_pop_array[i] * 3 / 2, 10 );
 		else
 			race_pop_growth_array[i] += race_pop_array[i];
 
@@ -1234,6 +1245,8 @@ void Town::update_target_loyalty()
 
 		if( race_res.is_same_race(i+1, nationRaceId) )
 			targetLoyalty += 10;
+
+		targetLoyalty += civil_tech.edict_loyalty_change(this);		// edicts, see OCIVIL.CPP
 
 		if( targetLoyalty < 0 )		// targetLoyalty can be negative if there are hostile races conflicts
 			targetLoyalty = 0;
@@ -2254,7 +2267,7 @@ void Town::think_migrate()
 		if( townPtr->town_recno == town_recno )
 			continue;
 
-		if( townPtr->population>=MAX_TOWN_POPULATION )
+		if( townPtr->population + townPtr->farmer_count >= MAX_TOWN_POPULATION )		// room is kept for the farmers out, see OCIVIL.CPP
 			continue;
 
 		townDistance = misc.rects_distance(loc_x1, loc_y1, loc_x2, loc_y2,
@@ -2345,7 +2358,7 @@ int Town::think_migrate_one(Town* targetTown, int raceId, int townDistance)
 
 	//---- if the target town's population has already reached its MAX ----//
 
-	if( targetTown->population>=MAX_TOWN_POPULATION )
+	if( targetTown->population + targetTown->farmer_count >= MAX_TOWN_POPULATION )		// room is kept for the farmers out, see OCIVIL.CPP
 		return 0 ;
 
 	//-- do not migrate if the target town's population of that race is less than half of the population of the current town --//
@@ -2944,7 +2957,9 @@ int Town::mobilize_defender(int attackerNationRecno)
 	}
 	else
 	{
-		if( curLoyalty	< town_defender_count*5 )		// if no more defenders are allowed for the current loyalty
+		int loyaltyPerDefender = civil_tech.edict_militia_combat_bonus(this) ? 3 : 5;		// a militia sends out more defenders, see OCIVIL.CPP
+
+		if( curLoyalty	< town_defender_count*loyaltyPerDefender )		// if no more defenders are allowed for the current loyalty
 			return 0;
 	}
 
@@ -2999,6 +3014,8 @@ int Town::mobilize_defender(int attackerNationRecno)
 	unitPtr->skill.skill_level = (char) loyaltyDec;	// if the unit is a town defender, this var is temporary used for storing the loyalty that will be added back to the town if the defender returns to the town
 
 	int combatLevel = town_combat_level + misc.random(20) - 10;		// -10 to +10 random difference
+
+	combatLevel += civil_tech.edict_militia_combat_bonus(this);		// a militia, see OCIVIL.CPP
 
 	combatLevel = MIN(combatLevel, 100);
 	combatLevel = MAX(combatLevel, 10);

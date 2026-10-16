@@ -326,7 +326,7 @@ void Unit::process_auto_return()
 	int isEligible = config_adv.unit_auto_return_idle &&
 						  nation_recno && nation_recno == nation_array.player_recno &&
 						  !spy_recno && unit_mode == 0 && mobile_type == UNIT_LAND && is_visible() &&
-						  rank_id != RANK_KING &&
+						  rank_id != RANK_KING && !farm_town_recno &&		// not a farmer, see OCIVIL.CPP
 						  ( (unit_res[unit_id]->unit_class == UNIT_CLASS_HUMAN && race_id) ||
 							 unit_res[unit_id]->unit_class == UNIT_CLASS_WEAPON );
 

@@ -49,6 +49,7 @@ public:
 	float		reserve_qty;		// non-mined raw materials reserve
 	float		stock_qty;			// mined raw materials stock
 	float		max_stock_qty;
+	char		deep_dig_count;	// times the mine has dug deeper after running dry, see OCIVIL.CPP
 
 	short		next_output_link_id;
 	short		next_output_firm_recno;

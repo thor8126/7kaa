@@ -28,6 +28,7 @@
 #include <OFONT.h>
 #include <ONEWS.h>
 #include <OUNIT.h>
+#include <OCIVIL.h>
 #include <ORACERES.h>
 #include <OGAME.h>
 #include <OWORLD.h>
@@ -126,6 +127,7 @@ void FirmMine::init_derived()
 
 	stock_qty 	 	= (float) 0;
 	max_stock_qty  = (float) DEFAULT_MINE_MAX_STOCK_QTY;
+	deep_dig_count = 0;
 
 	//-------- increase AI raw count --------//
 
@@ -391,6 +393,11 @@ void FirmMine::set_next_output_firm()
 //
 void FirmMine::produce_raw()
 {
+	//--- a mine that ran dry before Industry was researched may dig deeper now, see OCIVIL.CPP ---//
+
+	if( reserve_qty==0 && !civil_tech.deep_dig(this) )
+		return;
+
 	//----- if stock capacity reached or reserve exhausted -----//
 
 	if( stock_qty == max_stock_qty || reserve_qty==0 )
@@ -417,14 +424,15 @@ void FirmMine::produce_raw()
 
 	cur_month_production += produceQty;
 
-	site_array[site_recno]->reserve_qty = (int) reserve_qty;		// update the reserve_qty in site_array
+	if( site_recno )		// the site is gone if the mine ran dry and dug deeper later, see OCIVIL.CPP
+		site_array[site_recno]->reserve_qty = (int) reserve_qty;		// update the reserve_qty in site_array
 
 	err_when( reserve_qty < 0 );
 	err_when( stock_qty > max_stock_qty );
 
-	//---- add news if run out of raw deposit ----//
+	//---- add news if run out of raw deposit, unless it digs deeper (see OCIVIL.CPP) ----//
 
-	if( reserve_qty == 0 )
+	if( reserve_qty == 0 && !civil_tech.deep_dig(this) && site_recno )
 	{
 		site_array.untapped_raw_count++;		// have to restore its first as del_site() will decrease uptapped_raw_count
 

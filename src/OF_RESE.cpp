@@ -46,8 +46,11 @@
 
 //------------- Define constant ------------//
 
-#define MAX_RESEARCH_OPTION		6
-#define RESEARCH_OPTION_HEIGHT 	48
+#define MAX_RESEARCH_OPTION		8
+#define RESEARCH_OPTION_HEIGHT 	48		// a military technology, with its large icon
+#define CIVIL_OPTION_HEIGHT		36		// a civil technology, with its small icon and what the level brings
+#define MAX_MILITARY_OPTION		6
+#define RESEARCH_TAB_HEIGHT		30		// the Military, Civil and Cancel buttons at the bottom
 
 //---------- Define constant ------------//
 
@@ -63,13 +66,18 @@ static char     disable_refresh=0;
 static ButtonCustom	button_research_array[MAX_RESEARCH_OPTION];
 // ######## begin Gilbert 16/8 ######//
 static ButtonCustom	button_cancel;
+static ButtonCustom	button_tab_military;
+static ButtonCustom	button_tab_civil;
+static char     research_menu_civil=0;		// 1 when the Civil tab of the research menu is shown
 // ######## end Gilbert 16/8 ######//
 static int added_count;			// no. of buttons in button_research_array
 static Button3D	button_vacate_firm;
 
+
 //---------- Declare static functions ---------//
 
 static void i_disp_research_button(ButtonCustom *, int);
+static void i_disp_civil_research_button(ButtonCustom *, int);
 static void set_all_research(int techId);
 
 //--------- Begin of function FirmResearch::FirmResearch ---------//
@@ -256,6 +264,10 @@ void set_all_research(int techId)
 
 //--------- Begin of function FirmResearch::disp_research_menu ---------//
 //
+// The Military tab lists the weapons and ships of TECH.DBF, the Civil tab
+// the civil technologies (see CIVIL_??? in OTECHRES.H), each with what
+// its next level brings. The tab buttons and Cancel are at the bottom.
+//
 void FirmResearch::disp_research_menu(int refreshFlag)
 {
 	if( refreshFlag != INFO_REPAINT )
@@ -266,23 +278,56 @@ void FirmResearch::disp_research_menu(int refreshFlag)
 
 	for( techId=1 ; techId<=tech_res.tech_count ; techId++ )
 	{
-		if( !tech_res[techId]->can_research(nation_recno) )
+		TechInfo* techInfo = tech_res[techId];
+
+		if( (techInfo->class_id == TECH_CIVIL) != research_menu_civil )
 			continue;
 
-		if( added_count < MAX_RESEARCH_OPTION )
+		if( !techInfo->can_research(nation_recno) )
+			continue;
+
+		if( research_menu_civil )
 		{
-			button_research_array[added_count].paint(INFO_X1, y, INFO_X2, y+RESEARCH_OPTION_HEIGHT-2,
-				i_disp_research_button, ButtonCustomPara(this, techId) );
-			added_count++;
-			y += RESEARCH_OPTION_HEIGHT;
+			if( added_count < MAX_RESEARCH_OPTION )
+			{
+				button_research_array[added_count].paint(INFO_X1, y, INFO_X2, y+CIVIL_OPTION_HEIGHT-2,
+					i_disp_civil_research_button, ButtonCustomPara(this, techId) );
+				added_count++;
+				y += CIVIL_OPTION_HEIGHT;
+			}
+		}
+		else
+		{
+			if( added_count < MAX_MILITARY_OPTION )
+			{
+				button_research_array[added_count].paint(INFO_X1, y, INFO_X2, y+RESEARCH_OPTION_HEIGHT-2,
+					i_disp_research_button, ButtonCustomPara(this, techId) );
+				added_count++;
+				y += RESEARCH_OPTION_HEIGHT;
+			}
 		}
 	}
 
-	// ###### begin Gilbert 16/8 ######//
-	// button_cancel.paint(INFO_X1, y, "CANCEL1", "CANCEL1D" );
-	button_cancel.paint(INFO_X1, y, INFO_X2, y+RESEARCH_OPTION_HEIGHT*3/4,
+	if( added_count==0 )
+	{
+		font_san.put( INFO_X1+6, INFO_Y1+8, research_menu_civil ?
+						  _("No civil technology to research now.") : _("No military technology to research now.") );
+	}
+
+	//------ Military, Civil and Cancel at the bottom ------//
+
+	int tabY1 = INFO_Y2 - RESEARCH_TAB_HEIGHT - 2;
+	int tabY2 = INFO_Y2 - 2;
+	int tabWidth = (INFO_X2-INFO_X1+1) / 3;
+
+	button_tab_military.paint(INFO_X1, tabY1, INFO_X1+tabWidth-2, tabY2,
+		ButtonCustom::disp_text_button_func, ButtonCustomPara((void*)_("Military"),0), 1, !research_menu_civil );
+
+	button_tab_civil.paint(INFO_X1+tabWidth, tabY1, INFO_X1+tabWidth*2-2, tabY2,
+		ButtonCustom::disp_text_button_func, ButtonCustomPara((void*)_("Civil"),0), 1, research_menu_civil );
+
+	button_cancel.paint(INFO_X1+tabWidth*2, tabY1, INFO_X2, tabY2,
 		ButtonCustom::disp_text_button_func, ButtonCustomPara((void*)_("Cancel"),0) );
-	// ###### end Gilbert 16/8 ######//
 }
 //----------- End of function FirmResearch::disp_research_menu -----------//
 
@@ -325,24 +370,97 @@ int FirmResearch::detect_research_menu()
 		}
 	}
 
+	//------ detect the Military and Civil tabs --------//
+
+	if( button_tab_military.detect() )
+	{
+		if( research_menu_civil )
+		{
+			se_ctrl.immediate_sound("TURN_ON");
+			research_menu_civil = 0;
+		}
+		disable_refresh = 1;
+		info.disp();
+		disable_refresh = 0;
+		return 1;
+	}
+
+	if( button_tab_civil.detect() )
+	{
+		if( !research_menu_civil )
+		{
+			se_ctrl.immediate_sound("TURN_ON");
+			research_menu_civil = 1;
+		}
+		disable_refresh = 1;
+		info.disp();
+		disable_refresh = 0;
+		return 1;
+	}
+
 	//------ detect the cancel button --------//
 
-	if( i >= added_count )		// no research button has been pressed
+	if( button_cancel.detect() )
 	{
-		if( button_cancel.detect() )
-		{
-			// ##### begin Gilbert 25/9 ######//
-			se_ctrl.immediate_sound("TURN_OFF");
-			// ##### end Gilbert 25/9 ######//
-			research_menu_mode = RESEARCH_MENU_MAIN;
-			info.disp();
-			return 1;
-		}
+		// ##### begin Gilbert 25/9 ######//
+		se_ctrl.immediate_sound("TURN_OFF");
+		// ##### end Gilbert 25/9 ######//
+		research_menu_mode = RESEARCH_MENU_MAIN;
+		info.disp();
+		return 1;
 	}
 
 	return 0;
 }
 //----------- End of function FirmResearch::detect_research_menu -----------//
+
+
+//-------- Begin of static function i_disp_civil_research_button --------//
+//
+// A civil technology: its small icon, its name with the level to be
+// researched, and what that level brings.
+//
+void i_disp_civil_research_button(ButtonCustom *button, int repaintBody)
+{
+	int x1 = button->x1;
+	int y1 = button->y1;
+	int x2 = button->x2;
+	int y2 = button->y2;
+
+	if( button->pushed_flag )
+	{
+		vga_util.d3_panel2_down(x1, y1, x2, y2);
+		x1++;
+		y1++;
+	}
+	else
+	{
+		vga_util.d3_panel2_up(x1, y1, x2, y2);
+		x2--;
+		y2--;
+	}
+
+	TechInfo* techInfo = tech_res[button->custom_para.value];
+	Firm*		 firmPtr  = (Firm *) button->custom_para.ptr;
+
+	Vga::active_buf->put_bitmap(x1+4, y1+(y2-y1-TECH_SMALL_ICON_HEIGHT)/2, techInfo->tech_small_icon() );
+
+	int researchVersion = techInfo->get_nation_tech_level(firmPtr->nation_recno)+1;		// research the next non-researched version
+
+	String str;
+
+	str = techInfo->tech_des();
+
+	if( researchVersion > 1 )
+	{
+		str += " ";
+		str += misc.roman_number(researchVersion);
+	}
+
+	font_san.put( x1+TECH_SMALL_ICON_WIDTH+10, y1+3, str, 0, x2-2 );
+	font_small.put( x1+TECH_SMALL_ICON_WIDTH+10, y1+19, techInfo->level_des(researchVersion), 0, x2-2 );
+}
+//--------- End of static function i_disp_civil_research_button ---------//
 
 
 //-------- Begin of static function i_disp_research_button --------//
@@ -441,7 +559,7 @@ void FirmResearch::disp_research_info(int dispY1, int refreshFlag)
 			str += misc.roman_number(researchVersion);
 		}
 
-		font_san.put( x, y+4, str);
+		font_san.put( x, y+4, str, 0, INFO_X2-4 );
 	}
 	else
 	{
@@ -586,8 +704,15 @@ void FirmResearch::process_research()
 		{
 			news_array.tech_researched( techId, tech_res[techId]->get_nation_tech_level(nation_recno) );
 
-			se_res.far_sound(center_x, center_y, 1, 'F', firm_id, "FINS", 
-				'S', unit_res[tech_res[techId]->unit_id]->sprite_id);
+			if( tech_res[techId]->unit_id )
+			{
+				se_res.far_sound(center_x, center_y, 1, 'F', firm_id, "FINS", 
+					'S', unit_res[tech_res[techId]->unit_id]->sprite_id);
+			}
+			else		// civil technologies have no unit
+			{
+				se_res.far_sound(center_x, center_y, 1, 'F', firm_id, "FINS");
+			}
 			if( firm_recno == firm_array.selected_recno )
 				info.disp();
 		}

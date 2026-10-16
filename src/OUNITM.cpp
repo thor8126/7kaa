@@ -28,6 +28,7 @@
 #include <OF_HARB.h>
 #include <OGAME.h>
 #include <ONATION.h>
+#include <OCIVIL.h>
 #include <OU_MARI.h>
 #include <OSPATH.h>
 #include <OSPREUSE.h>
@@ -1676,6 +1677,11 @@ void Unit::process_move()
 	{
 		process_move_step();
 	}
+
+	//--- ships of a nation with Navigation sail faster, see OCIVIL.CPP ---//
+
+	if( cur_action == SPRITE_MOVE && civil_tech.ship_extra_step(this) )
+		process_move_step();
 
 	//--- supply wagons use the caravan sprite, but keep up with soldiers: another step every third frame, see OUNITSUP.CPP ---//
 

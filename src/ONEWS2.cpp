@@ -1055,6 +1055,50 @@ void NewsArray::rebuilding_firm(int firmId, int xLoc, int yLoc)
 //------- End of function NewsArray::rebuilding_firm -----//
 
 
+//------ Begin of function NewsArray::mine_dug_deeper -----//
+//
+// A mine of the player that ran dry has dug deeper, see OCIVIL.CPP.
+//
+// short_para1 - id. of the raw material
+//
+void NewsArray::mine_dug_deeper(int rawId, int xLoc, int yLoc)
+{
+	News* newsPtr = add_news( NEWS_MINE_DUG_DEEPER, NEWS_NORMAL, nation_array.player_recno, 0, 1 );
+
+	if( !newsPtr )
+		return;
+
+	newsPtr->short_para1 = rawId;
+
+	newsPtr->set_loc( xLoc, yLoc, NEWS_LOC_ANY );
+}
+//------- End of function NewsArray::mine_dug_deeper -----//
+
+
+//------ Begin of function NewsArray::edict_ended -----//
+//
+// The edict of a village of the player has ended, see OCIVIL.CPP.
+//
+// short_para1 - name id. of the town
+// short_para2 - id. of the edict
+//
+void NewsArray::edict_ended(int townRecno, int edictId)
+{
+	News* newsPtr = add_news( NEWS_EDICT_ENDED, NEWS_NORMAL, nation_array.player_recno, 0, 1 );
+
+	if( !newsPtr )
+		return;
+
+	Town* townPtr = town_array[townRecno];
+
+	newsPtr->short_para1 = townPtr->town_name_id;
+	newsPtr->short_para2 = edictId;
+
+	newsPtr->set_loc( townPtr->center_x, townPtr->center_y, NEWS_LOC_TOWN, townRecno );
+}
+//------- End of function NewsArray::edict_ended -----//
+
+
 //------ Begin of function NewsArray::battle_report -----//
 //
 // The losses of a battle the player fought, see OBATREP.CPP.

@@ -39,6 +39,7 @@
 #include <OTOWN.h>
 #include <OTownNetwork.h>
 #include <OSE.h>
+#include <OCIVIL.h>
 
 
 //------- Begin of function Town::draw -----------//
@@ -66,6 +67,8 @@ void Town::draw(int displayLayer)
 		townY1 += (STD_TOWN_LOC_HEIGHT * ZOOM_LOC_HEIGHT - get_bitmap_height(townLayout->ground_bitmap_ptr))/2;	// adjust offset
 
 		world.zoom_matrix->put_bitmap_remap_clip( townX1, townY1, townLayout->ground_bitmap_ptr );
+
+		civil_tech.draw_town_extras(this, displayLayer);		// the fields being farmed, see OCIVIL.CPP
 		return;
 	}
 
@@ -99,6 +102,8 @@ void Town::draw(int displayLayer)
 				break;
 		}
 	}
+
+	civil_tech.draw_town_extras(this, displayLayer);		// the watchtower, see OCIVIL.CPP
 }
 //-------- End of function Town::draw -----------//
 

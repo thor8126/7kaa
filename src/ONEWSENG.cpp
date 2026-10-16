@@ -25,6 +25,7 @@
 #include <OTOWN.h>
 #include <OFIRMRES.h>
 #include <ONATION.h>
+#include <OCIVIL.h>
 #include <OUNIT.h>
 #include <OSPY.h>
 #include <OFONT.h>
@@ -91,6 +92,8 @@ static NewsInfo news_info_array[] =
 	{ &News::under_attack, 1 },
 	{ &News::rebuilding_firm, 0 },
 	{ &News::battle_report, 1 },
+	{ &News::mine_dug_deeper, 0 },
+	{ &News::edict_ended, 0 },
 };
 
 //------- Define static variables --------//
@@ -1810,6 +1813,31 @@ void News::battle_report()
 	}
 }
 //------- End of function News::battle_report -----//
+
+
+//------ Begin of function News::mine_dug_deeper -----//
+//
+// short_para1 - id. of the raw material
+//
+void News::mine_dug_deeper()
+{
+	// TRANSLATORS: Your <Raw material> mine has run dry and dug deeper for a new vein.
+	snprintf(str, MAX_STR_LEN+1, _("Your %s mine has run dry and dug deeper for a new vein."), _(raw_res[short_para1]->name));
+}
+//------- End of function News::mine_dug_deeper -----//
+
+
+//------ Begin of function News::edict_ended -----//
+//
+// short_para1 - name id. of the town
+// short_para2 - id. of the edict
+//
+void News::edict_ended()
+{
+	// TRANSLATORS: The <Edict> edict of <Town> has ended.
+	snprintf(str, MAX_STR_LEN+1, _("The %s edict of %s has ended."), CivilTech::edict_name(short_para2), town_res.get_name(short_para1));
+}
+//------- End of function News::edict_ended -----//
 
 
 //------ Begin of function News::nation_name1 -----//

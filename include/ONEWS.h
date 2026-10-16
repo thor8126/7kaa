@@ -93,6 +93,8 @@ enum { NEWS_DIPLOMACY=1,
 		 NEWS_UNDER_ATTACK,			// your town or firm is under attack, see OCALLARM.CPP
 		 NEWS_REBUILDING_FIRM,		// a construction worker is rebuilding a destroyed firm, see OREBUILD.CPP
 		 NEWS_BATTLE_REPORT,			// the losses of a battle, see OBATREP.CPP
+		 NEWS_MINE_DUG_DEEPER,		// a mine that ran dry has dug deeper, see OCIVIL.CPP
+		 NEWS_EDICT_ENDED,			// the edict of a village has ended, see OCIVIL.CPP
 	  };
 
 //------- Define struct News ---------//
@@ -182,6 +184,8 @@ public:
 	void  multi_connection_lost();
 	void  under_attack();
 	void  rebuilding_firm();
+	void  mine_dug_deeper();
+	void  edict_ended();
 	void  battle_report();
 };
 #pragma pack()
@@ -263,6 +267,8 @@ public:
 	void  multi_connection_lost(int nationRecno);
 	void  under_attack(int xLoc, int yLoc, int firmId, int townNameId);
 	void  rebuilding_firm(int firmId, int xLoc, int yLoc);
+	void  mine_dug_deeper(int rawId, int xLoc, int yLoc);
+	void  edict_ended(int townRecno, int edictId);
 	void  battle_report(int xLoc, int yLoc, int townNameId, int enemyNationRecno, int ownUnitLost, int ownFirmLost, int enemyUnitLost, int enemyFirmLost);
 
 	//--------------------------------------------//

@@ -295,10 +295,11 @@ static void visit_unit(Visitor *v, Unit *u)
 	visit<int8_t>(v, &u->ignore_power_nation);
 	visit<int16_t>(v, &u->ferry_harbor_recno);
 	visit<int8_t>(v, &u->idle_far_days);
+	visit<int16_t>(v, &u->farm_town_recno);
 	visit_pointer(v, &u->team_info);
 }
 
-enum { UNIT_RECORD_SIZE = 172 };		// 169 before ferry_harbor_recno and idle_far_days were added
+enum { UNIT_RECORD_SIZE = 174 };		// 169 before ferry_harbor_recno and idle_far_days were added, 172 before farm_town_recno
 
 //--------- Begin of function Unit::write_file ---------//
 //
@@ -1907,7 +1908,7 @@ static void visit_nation(Visitor *v, Nation *nat)
 	visit<int16_t>(v, &nat->lead_attack_camp_recno);
 }
 
-enum { NATION_RECORD_SIZE = 2108 + 2*MAX_RAW + 2*MAX_UNIT_TYPE };		// 2202 with 3 raw materials and 44 unit types
+enum { NATION_RECORD_SIZE = 2132 + 2*MAX_RAW + 2*MAX_UNIT_TYPE };		// 2202 with 3 raw materials, 44 unit types, 8 income types and 16 expense types
 
 //--------- Begin of function Nation::write_file ---------//
 //

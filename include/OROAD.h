@@ -72,10 +72,11 @@ public:
 
 	static const char* error_str(int errorCode);
 
+	int	pick_color(int r, int g, int b);		// also used for the fields of OCIVIL.CPP
+
 private:
 	int	line_locs(int xLoc1, int yLoc1, int xLoc2, int yLoc2, short* xLocArray, short* yLocArray);
 	char*	get_bitmap(int neighborMask);
-	int	pick_color(int r, int g, int b);
 };
 
 extern RoadRes road_res;

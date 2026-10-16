@@ -93,17 +93,18 @@ void FirmWar::think_new_production()
 {
 	//----- first see if we have enough money to build & support the weapon ----//
 
-	if( !should_build_new_weapon() )
-		return;
+	//---- supply wagons for armies attacking far from home, see OUNITSUP.CPP; they are cheap, so they don't wait for the weapon budget ----//
 
-	//---- supply wagons for armies attacking far from home, see OUNITSUP.CPP ----//
-
-	if( think_build_supply_wagon() )
+	if( think_build_supply_wagon() &&
+		 nation_array[nation_recno]->cash > unit_res[UNIT_SUPPLY_WAGON]->build_cost * 3 )
 	{
 		add_queue( UNIT_SUPPLY_WAGON );
 		AiWarState::log( "WAGON       nation %d builds a supply wagon at war factory %d", nation_recno, firm_recno );
 		return;
 	}
+
+	if( !should_build_new_weapon() )
+		return;
 
 	//---- calculate the average instance count of all available weapons ---//
 

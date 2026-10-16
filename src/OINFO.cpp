@@ -48,6 +48,7 @@
 #include <OREBUILD.h>
 #include <OBATREP.h>
 #include <OCALLARM.h>
+#include <OCIVIL.h>
 #include "gettext.h"
 
 //------------ Define static vars ----------------//
@@ -220,6 +221,7 @@ void Info::next_day()
 	rebuild_list.next_day();		// see OREBUILD.CPP
 	call_to_arms.next_day();		// see OCALLARM.CPP
 	battle_report.next_day();		// see OBATREP.CPP
+	civil_tech.next_day();			// see OCIVIL.CPP
 
 	//-----------------------------------------//
 

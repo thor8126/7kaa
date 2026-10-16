@@ -131,7 +131,11 @@ void Firm::send_to_rally_point(short* unitArray, int unitCount)
 // <int> dispY1      - the top y coordinate of the line
 // <int> refreshFlag - refresh flag
 //
-void Firm::disp_rally_point(int dispY1, int refreshFlag)
+//
+// [int] rightMargin - room to leave at the right for another button
+//                     (default: 0)
+//
+void Firm::disp_rally_point(int dispY1, int refreshFlag, int rightMargin)
 {
 	if( refreshFlag != INFO_REPAINT )
 		return;
@@ -140,12 +144,12 @@ void Firm::disp_rally_point(int dispY1, int refreshFlag)
 
 	if( has_rally_point() )
 	{
-		font_san.put( INFO_X1+6, dispY1+6, _("Rally point set") );
-		button_clear_rally.paint_text( INFO_X2-60, dispY1+3, INFO_X2-4, dispY1+21, _("Clear") );
+		font_san.put( INFO_X1+6, dispY1+6, rightMargin ? _("Rally set") : _("Rally point set") );
+		button_clear_rally.paint_text( INFO_X2-60-rightMargin, dispY1+3, INFO_X2-4-rightMargin, dispY1+21, _("Clear") );
 	}
 	else
 	{
-		font_san.put( INFO_X1+6, dispY1+6, _("Right-click map: rally point") );
+		font_san.put( INFO_X1+6, dispY1+6, rightMargin ? _("Rally: right-click") : _("Right-click map: rally point") );
 	}
 }
 //----------- End of function Firm::disp_rally_point -----------//
