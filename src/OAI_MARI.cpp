@@ -649,6 +649,9 @@ int Nation::think_sea_attack_enemy()
 		if( get_relation_status(firmPtr->nation_recno) != NATION_HOSTILE )
 			continue;
 
+		if( !ai_has_seen_firm(firmPtr) )		// only harbors it has scouted, see OAI_INTEL.CPP
+			continue;
+
 		//--- if the AI has more powerful fleets than the enemy ---//
 
 		if( total_ship_combat_level >

@@ -19,6 +19,7 @@ bin_PROGRAMS = 7kaa
 	OAI_DIPL.cpp \
 	OAI_ECO.cpp \
 	OAI_GRAN.cpp \
+	OAI_INTEL.cpp \
 	OAI_INFO.cpp \
 	OAI_MAIN.cpp \
 	OAI_MAR2.cpp \

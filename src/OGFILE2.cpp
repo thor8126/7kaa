@@ -124,6 +124,7 @@ static int loaded_game_version;
 #define FIRST_VERSION_WITH_FERRY				216		// earlier saved games have smaller unit records, without Unit::ferry_harbor_recno
 #define FIRST_VERSION_WITH_SUPPLY_WAGON		217		// earlier saved games have 44 unit types, without the supply wagon
 #define FIRST_VERSION_WITH_RALLY_POINT		218		// earlier saved games have smaller firm records, without Firm::rally_x_loc and rally_y_loc
+#define FIRST_VERSION_WITH_AI_INTEL			219		// earlier saved games have smaller firm and town records, without ai_seen_nation_mask
 
 bool GameFile::read_file_same_version = true;
 
@@ -223,6 +224,9 @@ int GameFile::read_file(File* filePtr)
 
 	if(load_file_game_version < FIRST_VERSION_WITH_RALLY_POINT)
 		return -1;		// firm records saved before rally points were added are of a different size
+
+	if(load_file_game_version < FIRST_VERSION_WITH_AI_INTEL)
+		return -1;		// firm and town records saved before the AI's knowledge was added are of a different size
 
 	read_file_same_version = ( load_file_game_version/100==GAME_VERSION/100 );
 	loaded_game_version = load_file_game_version;

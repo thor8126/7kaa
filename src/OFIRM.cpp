@@ -126,6 +126,7 @@ Firm::Firm()
     ai_should_build_factory_count = 0;
     rally_x_loc = -1;
     rally_y_loc = -1;
+    ai_seen_nation_mask = 0;
 }
 //----------- End of function Firm::Firm ---------//
 
@@ -167,6 +168,8 @@ void Firm::init(int xLoc, int yLoc, int nationRecno, int firmId, const char* bui
 
 	rally_x_loc = -1;		// no rally point, see OFIRMRAL.CPP
 	rally_y_loc = -1;
+
+	ai_seen_nation_mask = 0;		// no AI nations have seen it yet, see OAI_INTEL.CPP
 
 	if( buildCode )
 		firm_build_id = firmInfo->get_build_id(buildCode);

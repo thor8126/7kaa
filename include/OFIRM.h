@@ -242,6 +242,10 @@ public:
 	short	 rally_x_loc;					// -1 if no rally point is set
 	short	 rally_y_loc;
 
+	//------- AI knowledge, see OAI_INTEL.CPP -------//
+
+	uint16_t ai_seen_nation_mask;		// bit n-1 is set when nation n has seen this firm
+
 	//--------- static vars ----------//
 
 	static char  firm_menu_mode;

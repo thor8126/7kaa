@@ -256,6 +256,11 @@ void Nation::process_ai()
 		return;
 	}
 
+	//------ what this nation has scouted, see OAI_INTEL.CPP ------//
+
+	if( info.game_date%5 == nation_recno%5 )
+		update_ai_intel();
+
 	//-------- process main AI actions ---------//
 
    process_ai_main();
@@ -527,14 +532,6 @@ void Nation::process_ai_main()
 	LOG_MSG(misc.get_random_seed());
 }
 //---------- End of function Nation::process_ai_main --------//
-
-
-//--------- Begin of function Nation::think_explore --------//
-
-void Nation::think_explore()
-{
-}
-//---------- End of function Nation::think_explore --------//
 
 
 //-------- Begin of function Nation::think_succeed_king --------//

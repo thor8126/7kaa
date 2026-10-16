@@ -842,6 +842,14 @@ int Nation::think_secret_attack()
 
 		nationRelation = get_relation(i);
 
+		//--- a surprise war can only be planned on a nation it has found, see OAI_INTEL.CPP ---//
+
+		if( !ai_knows_nation(i) )
+		{
+			nationRelation->ai_secret_attack = 0;
+			continue;
+		}
+
 		tradeRating = trade_rating(i)/2 +        // existing trade
 			      ai_trade_with_rating(i)/2; // possible trade
 
@@ -885,7 +893,7 @@ int Nation::think_secret_attack()
 
 		//--------- calculate the rating ----------//
 
-		curRating = (ourMilitary - nationPtr->military_rank_rating()) * 2
+		curRating = (ourMilitary - intel_military_rank_rating(i)) * 2		// its strength as far as we know, see OAI_INTEL.CPP
 						 + (overall_rank_rating() - 50) 		// if <50 negative, if >50 positive
 						 - tradeRating*2
 						 - get_relation(i)->ai_relation_level/2

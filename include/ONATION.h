@@ -567,6 +567,16 @@ public:
 	int 	 		think_unite_against_big_enemy();
 	int			think_form_coalition(int enemyNationRecno);
 	int			think_build_road();
+
+	//------- the AI's knowledge of the world, see OAI_INTEL.CPP -------//
+
+	void			update_ai_intel();
+	int			ai_has_seen_firm(Firm* firmPtr);
+	int			ai_has_seen_town(Town* townPtr);
+	int			ai_sees_loc(int xLoc, int yLoc);
+	int			ai_sees_unit(Unit* unitPtr);
+	int			ai_knows_nation(int nationRecno);
+	int			intel_military_rank_rating(int nationRecno);
 	int			is_coalition_target(int leaderNationRecno);
 	int			common_threat_rating(int withNationRecno);
 

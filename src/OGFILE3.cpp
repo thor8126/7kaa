@@ -872,9 +872,10 @@ static void visit_firm(Visitor *v, Firm *f)
 	visit<int8_t>(v, &f->ai_should_build_factory_count);
 	visit<int16_t>(v, &f->rally_x_loc);
 	visit<int16_t>(v, &f->rally_y_loc);
+	visit<uint16_t>(v, &f->ai_seen_nation_mask);
 }
 
-enum { FIRM_RECORD_SIZE = 258 };		// 254 before the rally point was added
+enum { FIRM_RECORD_SIZE = 260 };		// 254 before the rally point and the AI's knowledge were added
 
 static bool read_firm(File *file, Firm *firm)
 {

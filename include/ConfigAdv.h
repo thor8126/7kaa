@@ -67,6 +67,7 @@ public:
 	// nation settings
 	char			nation_ai_build_roads;
 	char			nation_ai_coalition;
+	char			nation_ai_fog_of_war;
 	char			nation_ai_opening_strategy;
 	char			nation_ai_posture;
 	char			nation_ai_smart_diplomacy;

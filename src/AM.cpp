@@ -121,7 +121,7 @@
 //------- define game version constant --------//
 
 	const char *GAME_VERSION_STR = SKVERSION;
-	const int GAME_VERSION = 218;	// Version 2.00, don't change it unless the format of save game files has been changed
+	const int GAME_VERSION = 219;	// Version 2.00, don't change it unless the format of save game files has been changed
 
 //-------- System class ----------//
 

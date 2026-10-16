@@ -522,7 +522,7 @@ int Nation::think_eliminate_enemy_town(int enemyNationRecno)
 
 		townPtr = town_array[i];
 
-		if( townPtr->nation_recno != enemyNationRecno )
+		if( townPtr->nation_recno != enemyNationRecno || !ai_has_seen_town(townPtr) )		// only towns it has scouted, see OAI_INTEL.CPP
 			continue;
 
 		//--- only attack if we have any base town in the enemy town's region ---//
@@ -568,7 +568,7 @@ int Nation::think_eliminate_enemy_firm(int enemyNationRecno)
 
 		firmPtr = firm_array[i];
 
-		if( firmPtr->nation_recno != enemyNationRecno )
+		if( firmPtr->nation_recno != enemyNationRecno || !ai_has_seen_firm(firmPtr) )		// only firms it has scouted, see OAI_INTEL.CPP
 			continue;
 
 		//--- only attack if we have any base town in the enemy firm's region ---//
@@ -981,7 +981,8 @@ int Nation::think_attack_enemy_firm(int enemyNationRecno, int firmId)
 		firmPtr = firm_array[i];
 
 		if( firmPtr->firm_id != firmId ||
-			 firmPtr->nation_recno != enemyNationRecno )
+			 firmPtr->nation_recno != enemyNationRecno ||
+			 !ai_has_seen_firm(firmPtr) )		// only firms it has scouted, see OAI_INTEL.CPP
 		{
 			continue;
 		}

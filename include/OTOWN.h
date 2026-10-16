@@ -201,6 +201,10 @@ public:
 	char   linked_firm_enable_array[MAX_LINKED_FIRM_TOWN];
 	char   linked_town_enable_array[MAX_LINKED_TOWN_TOWN];
 
+	//------- AI knowledge, see OAI_INTEL.CPP -------//
+
+	unsigned short ai_seen_nation_mask;		// bit n-1 is set when nation n has seen this town
+
 	int 	 closest_own_camp();
 
 	//========== NOTE: The following members are not loaded from/saved to file ==========//

@@ -209,7 +209,8 @@ int Nation::attack_enemy_town_defense(Town* targetTown, int useAllCamp)
 		firmPtr = firm_array[ targetTown->linked_firm_array[i] ];
 
 		if( firmPtr->nation_recno == targetTown->nation_recno &&
-			 firmPtr->firm_id == FIRM_CAMP )
+			 firmPtr->firm_id == FIRM_CAMP &&
+			 ai_has_seen_firm(firmPtr) )		// forts it hasn't scouted are a surprise, see OAI_INTEL.CPP
 		{
 			campCombatLevel = ((FirmCamp*)firmPtr)->total_combat_level();
 
@@ -289,6 +290,9 @@ Town* Nation::think_capture_enemy_town_target(Town* capturerTown)
 		if( targetTown->region_id != capturerTown->region_id )
 			continue;
 
+		if( !ai_has_seen_town(targetTown) )		// only towns it has scouted, see OAI_INTEL.CPP
+			continue;
+
 		//----- if we have already built a camp next to this town -----//
 
 		if( targetTown->has_linked_camp(nation_recno, 0) )		//0-count both camps with or without overseers
@@ -321,9 +325,9 @@ Town* Nation::think_capture_enemy_town_target(Town* capturerTown)
 		if( targetTown->has_linked_camp(targetTown->nation_recno, 0) )		//0-count both camps with or without overseers
 			return targetTown;
 
-		//--- if the enemy is very powerful overall, don't attack it yet ---//
+		//--- if the enemy is very powerful overall (as far as we know), don't attack it yet ---//
 
-		if( nation_array[targetTown->nation_recno]->military_rank_rating() >
+		if( intel_military_rank_rating(targetTown->nation_recno) >
 			 ourMilitary * (80+pref_military_courage/2) / 100 )
 		{
 			continue;
@@ -512,7 +516,8 @@ int Nation::enemy_firm_combat_level(Firm* targetFirm, int returnIfWar, int& hasW
 			firmPtr = firm_array[ linkedTown->linked_firm_array[j] ];
 
 			if( firmPtr->nation_recno == targetNationRecno &&
-				 firmPtr->firm_id == FIRM_CAMP )
+				 firmPtr->firm_id == FIRM_CAMP &&
+				 ai_has_seen_firm(firmPtr) )		// forts it hasn't scouted are a surprise, see OAI_INTEL.CPP
 			{
 				enemyCombatLevel += ((FirmCamp*)firmPtr)->total_combat_level();
 			}
@@ -599,11 +604,12 @@ int Nation::mobile_defense_combat_level(int targetXLoc, int targetYLoc, int targ
 				}
 			}
 
-			//---- if this unit is guarding the town -----//
+			//---- if this unit is guarding the town, as far as we can see, see OAI_INTEL.CPP -----//
 
 			if( unitPtr->nation_recno == targetNationRecno )
 			{
-				totalCombatLevel += unitPtr->unit_power();
+				if( ai_sees_unit(unitPtr) )
+					totalCombatLevel += unitPtr->unit_power();
 			}
 
 			//------- if this is our own unit ------//
