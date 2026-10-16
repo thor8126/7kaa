@@ -248,6 +248,7 @@ bin_PROGRAMS = 7kaa
 	OU_CARAS.cpp \
 	OU_CARAT.cpp \
 	OU_CART.cpp \
+	OU_FERRY.cpp \
 	OU_GOD.cpp \
 	OU_GOD2.cpp \
 	OU_MARI.cpp \

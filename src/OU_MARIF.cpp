@@ -78,17 +78,18 @@ void UnitMarine::disp_info(int refreshFlag)
 
 	int y=INFO_Y1+54;
 
-	if( unitInfo->carry_unit_capacity && unitInfo->carry_goods_capacity )
+	if( has_menu_switch() )
 	{
 		if( refreshFlag == INFO_REPAINT )
 		{
 			vga_util.d3_panel_up( INFO_X1, y, INFO_X2, y+22 );
 
 			button_mode[0].create_text( INFO_X1+5, y+3, INFO_X1+80, y+19, _("Units") );
-			button_mode[1].create_text( INFO_X1+90, y+3, INFO_X1+155, y+19, _("Goods") );
+			button_mode[1].create_text( INFO_X1+90, y+3, INFO_X1+155, y+19,
+				unitInfo->carry_goods_capacity ? _("Goods") : _("Route") );		// ships carrying units only have a ferry route
 			button_mode.paint(menu_mode);
 
-			button_auto_trade.paint_text( INFO_X1+165, y+3, INFO_X2-10, y+19, auto_mode ? (char*)"T" : (char*)"C");
+			button_auto_trade.paint_text( INFO_X1+165, y+3, INFO_X2-10, y+19, auto_mode_str() );
 		}
 
 		y += 25;
@@ -128,9 +129,7 @@ void UnitMarine::detect_info()
 
 	//----- detect switching the menu mode -----//
 
-	UnitInfo* unitInfo = unit_res[unit_id];
-
-	if( unitInfo->carry_unit_capacity && unitInfo->carry_goods_capacity )
+	if( has_menu_switch() )
 	{
 		int rc;
 
@@ -160,19 +159,19 @@ void UnitMarine::detect_info()
 
 	//---- detect toggling auto trade mode ----//
 
-	if( button_auto_trade.detect() )
+	if( has_menu_switch() && button_auto_trade.detect() )
 	{
 		if( !remote.is_enable() )
 		{
-			auto_mode = !auto_mode;
-			button_auto_trade.paint_text( INFO_X1+165, INFO_Y1+57, INFO_X2-10, INFO_Y1+73, auto_mode ? (char*)"T" : (char*)"C");
+			auto_mode = next_auto_mode();
+			button_auto_trade.paint_text( INFO_X1+165, INFO_Y1+57, INFO_X2-10, INFO_Y1+73, auto_mode_str() );
 		}
 		else
 		{
 			// packet structure <unit recno> <new mode>
 			short *shortPtr = (short *)remote.new_send_queue_msg(MSG_U_SHIP_CHANGE_MODE, 2*sizeof(short) );
 			*shortPtr = sprite_recno;
-			shortPtr[1] = !auto_mode;
+			shortPtr[1] = next_auto_mode();
 		}
 	}
 }
@@ -558,7 +557,16 @@ void UnitMarine::disp_goods_menu(int dispY1, int refreshFlag)
 {
 	disp_stop(dispY1, refreshFlag);
 
-	disp_goods(dispY1+180, refreshFlag);
+	if( unit_res[unit_id]->carry_goods_capacity )
+	{
+		disp_goods(dispY1+180, refreshFlag);
+	}
+	else if( refreshFlag == INFO_REPAINT )		// a ship carrying units only: explain its ferry route, see OU_FERRY.CPP
+	{
+		vga_util.d3_panel_up( INFO_X1, dispY1+180, INFO_X2, dispY1+222 );
+		font_san.put( INFO_X1+6, dispY1+185, _("Ferry: right-click a stop harbor") );
+		font_san.put( INFO_X1+6, dispY1+201, _("with units to ferry them.") );
+	}
 }
 //----------- End of function UnitMarine::disp_goods_menu -----------//
 
@@ -626,7 +634,7 @@ void UnitMarine::disp_stop(int dispY1, int refreshFlag)
 				firmPtr = firm_array[ stop_array[i].firm_recno ];
 				nation_array[firmPtr->nation_recno]->disp_nation_color(x+4, y+4);
 				font_san.put(x+20, y+4, firmPtr->firm_name());
-				if( GOODS_SELECT_SHOW_LABEL )		// the goods buttons take the whole row when there are many goods types
+				if( GOODS_SELECT_SHOW_LABEL && unit_res[unit_id]->carry_goods_capacity )		// the goods buttons take the whole row when there are many goods types
 					font_san.put(x+4, y+19, _("Pick up:"));
 
 #if(defined(FRENCH))
@@ -648,7 +656,8 @@ void UnitMarine::disp_stop(int dispY1, int refreshFlag)
 				button_cancel_stop[i].set_help_code( "SDELSTOP" );
 			}
 
-			disp_goods_select_button(i, y+1, refreshFlag);
+			if( unit_res[unit_id]->carry_goods_capacity )		// ferries carrying units only have no goods to pick up
+				disp_goods_select_button(i, y+1, refreshFlag);
 		}
 	}
 //###### end trevor 3/10 #######//
@@ -805,7 +814,7 @@ void UnitMarine::detect_stop()
 			}
 		}
 
-		for(int b=0; b<MAX_GOODS_SELECT_BUTTON; ++b)
+		for(int b=0; b<MAX_GOODS_SELECT_BUTTON && unit_res[unit_id]->carry_goods_capacity; ++b)
 		{
 			if(button_select_array[i][b].detect())
 			{
@@ -878,7 +887,7 @@ void UnitMarine::set_stop_pick_up(int stopId, int newPickUpType, int remoteActio
 				{
 					int y=INFO_Y1+54;
 					UnitInfo* unitInfo = unit_res[unit_id];
-					if( unitInfo->carry_unit_capacity && unitInfo->carry_goods_capacity )
+					if( has_menu_switch() )
 						y+=25;
 
 					disp_stop(y, INFO_UPDATE);
@@ -932,8 +941,7 @@ void UnitMarine::set_stop_pick_up(int stopId, int newPickUpType, int remoteActio
 		if(nation_recno==nation_array.player_recno || config.show_ai_info)
 		{
 			int y=INFO_Y1+54;
-			UnitInfo* unitInfo = unit_res[unit_id];
-			if( unitInfo->carry_unit_capacity && unitInfo->carry_goods_capacity )
+			if( has_menu_switch() )
 				y+=25;
 
 			disp_stop(y, INFO_UPDATE);

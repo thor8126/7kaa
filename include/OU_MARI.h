@@ -41,11 +41,20 @@
 #define MAX_UNIT_IN_SHIP	   9	
 #define MAX_STOP_FOR_SHIP		3		// Maximum no. of destination stations per train
 #define MAX_SHIP_WAIT_TERM		8		// no. of term the ship is in the market to upload/download cargo
+#define FERRY_WAIT_TERM			30		// no. of term a ferry stays in a harbor to let units board, see OU_FERRY.CPP
+#define FERRY_LOAD_INTERVAL		10		// a ferry in a harbor lets waiting units board every this many terms
 
 //---------- Define constant ------------//
 
 enum { SHIP_MENU_UNIT,
 		 SHIP_MENU_GOODS,
+	  };
+
+//------- values of UnitMarine::auto_mode -------//
+
+enum { SHIP_MODE_MANUAL = 0,		// "C": the ship is moved by its player only
+		 SHIP_MODE_AUTO = 1,			// "T": sails along its stops, trading. A units-only ship (transport) sailing along its stops is a ferry
+		 SHIP_MODE_FERRY = 2,		// "F": sails along its stops, trading and ferrying units. For ships carrying both goods and units
 	  };
 
 //-------------- define extra_move_in_beach ------------//
@@ -66,6 +75,7 @@ public:
 #pragma pack()
 
 struct UnitMarineCrc;
+class FirmHarbor;
 
 //------- Define class UnitMarine -------//
 
@@ -95,7 +105,7 @@ public:
 	short			stop_x_loc;						// the x location the unit entering the stop
 	short			stop_y_loc;						// the y location the unit entering the stop
 
-	char			auto_mode;						// indicate whether auto mode is on/off, 1 - on, 0 - off
+	char			auto_mode;						// SHIP_MODE_MANUAL, SHIP_MODE_AUTO or SHIP_MODE_FERRY
 	short			cur_firm_recno;				// the recno of current firm the ship entered
 	short			carry_goods_capacity;
 
@@ -155,6 +165,15 @@ public:
 	short wave_height(int =0);
 
 	int	can_unload_unit();
+
+	//------- ferry functions, see OU_FERRY.CPP -------//
+
+	int	is_ferry();
+	void	ferry_unload_units(FirmHarbor* harborPtr);
+	void	ferry_load_units(FirmHarbor* harborPtr);
+	int	has_menu_switch();
+	const char* auto_mode_str();
+	int	next_auto_mode();
 
 	void  load_unit(int unitRecno);
 	void 	unload_unit(int unitSeqId, char remoteAction);

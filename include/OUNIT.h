@@ -335,6 +335,7 @@ public:
 	char        force_move_flag;
 
 	short			home_camp_firm_recno;
+	short			ferry_harbor_recno;			// the harbor where this unit waits for a ferry, see OU_FERRY.CPP
 
 	char			aggressive_mode;
 
@@ -816,6 +817,8 @@ public:
 	void  assign_to_ship(int shipXLoc, int shipYLoc, int divided, short* selectedArray, int selectedCount, char remoteAction, int shipRecno);
 	// ##### patch end Gilbert 5/8 ######//
 	void  ship_to_beach(int destX, int destY, int divided, short* selectedArray, int selectedCount, char remoteAction);
+	void  wait_for_ferry(int harborRecno, short* selectedArray, int selectedCount, char remoteAction);
+	int   is_ferry_harbor(int harborRecno, int nationRecno);
 	void	add_way_point(int pointX, int pointY, short* selectedArray, int selectedCount, char remoteAction);
 
 	//--------- unit filter function ----------//

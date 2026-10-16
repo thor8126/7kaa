@@ -121,6 +121,7 @@ static int loaded_game_version;
 #define FIRST_VERSION_WITH_AI_WAR_STATE	213
 #define FIRST_VERSION_WITH_AI_STRATEGY		214
 #define FIRST_VERSION_WITH_5_RAW				215		// earlier saved games have 3 raw materials, whose arrays are laid out differently
+#define FIRST_VERSION_WITH_FERRY				216		// earlier saved games have smaller unit records, without Unit::ferry_harbor_recno
 
 bool GameFile::read_file_same_version = true;
 
@@ -211,6 +212,9 @@ int GameFile::read_file(File* filePtr)
 
 	if(load_file_game_version < FIRST_VERSION_WITH_5_RAW)
 		return -1;		// games saved with 3 raw materials can't be loaded, the arrays saved for raw materials are of a different size
+
+	if(load_file_game_version < FIRST_VERSION_WITH_FERRY)
+		return -1;		// unit records saved before ferries were added are of a different size
 
 	read_file_same_version = ( load_file_game_version/100==GAME_VERSION/100 );
 	loaded_game_version = load_file_game_version;

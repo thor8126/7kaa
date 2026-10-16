@@ -788,6 +788,14 @@ int Power::detect_action()
 					//----- if the selected are marine units -----//
 					unit_array.assign(targetFirm->loc_x1, targetFirm->loc_y1, 0, COMMAND_PLAYER, nationSelectedArray, nationSelectedCount);
 				}
+				else if( activeUnit->mobile_type == UNIT_LAND && targetFirm->firm_id == FIRM_HARBOR &&
+							targetFirm->nation_recno == nation_array.player_recno &&
+							nation_divide_order[natCount] == nation_array.player_recno &&
+							unit_array.is_ferry_harbor(targetFirm->firm_recno, nation_array.player_recno) )
+				{
+					//----- land units sent to a harbor served by a ferry wait there to board it, see OU_FERRY.CPP -----//
+					unit_array.wait_for_ferry(targetFirm->firm_recno, nationSelectedArray, nationSelectedCount, COMMAND_PLAYER);
+				}
 				else
 				{
 					//------- if no other action executed, move to the clicked location ------//
@@ -1733,6 +1741,10 @@ int Power::choose_cursor(int scrnX, int scrnY,
 							if( unit_can_assign_firm(selectedObjectRecno, pointingObjectRecno, nation_array.player_recno) )
 							// ###### end Gilbert 22/10 #######//
 								return CURSOR_ASSIGN;
+							if( unitPtr->mobile_type == UNIT_LAND && firmPtr->firm_id == FIRM_HARBOR &&		// a harbor served by a ferry, see OU_FERRY.CPP
+								 firmPtr->nation_recno == nation_array.player_recno &&
+								 unit_array.is_ferry_harbor(pointingObjectRecno, nation_array.player_recno) )
+								return CURSOR_ASSIGN;
 							return CURSOR_UNIT_C;
 						}
 					case SCREEN_OBJECT_ENEMY_UNIT:
@@ -1789,6 +1801,10 @@ int Power::choose_cursor(int scrnX, int scrnY,
 									return CURSOR_ASSIGN;
 								// ##### end Gilbert 22/10 #######//
 							}
+							if( firmPtr->firm_id == FIRM_HARBOR &&		// a harbor served by a ferry, see OU_FERRY.CPP
+								 firmPtr->nation_recno == nation_array.player_recno &&
+								 unit_array.is_ferry_harbor(pointingObjectRecno, nation_array.player_recno) )
+								return CURSOR_ASSIGN;
 							return CURSOR_UNIT_C;
 						}
 					case SCREEN_OBJECT_ENEMY_UNIT:

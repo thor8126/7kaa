@@ -293,8 +293,11 @@ static void visit_unit(Visitor *v, Unit *u)
 	visit<int8_t>(v, &u->aggressive_mode);
 	visit<int8_t>(v, &u->seek_path_fail_count);
 	visit<int8_t>(v, &u->ignore_power_nation);
+	visit<int16_t>(v, &u->ferry_harbor_recno);
 	visit_pointer(v, &u->team_info);
 }
+
+enum { UNIT_RECORD_SIZE = 171 };		// 169 before ferry_harbor_recno was added
 
 //--------- Begin of function Unit::write_file ---------//
 //
@@ -305,7 +308,7 @@ static void visit_unit(Visitor *v, Unit *u)
 //
 int Unit::write_file(File* filePtr)
 {
-	if (!write_with_record_size(filePtr, this, &visit_unit<FileWriterVisitor>, 169))
+	if (!write_with_record_size(filePtr, this, &visit_unit<FileWriterVisitor>, UNIT_RECORD_SIZE))
 		return 0;
 
    //--------------- write memory data ----------------//
@@ -371,7 +374,7 @@ int Unit::read_file(File* filePtr)
 	if (!r.init(filePtr))
 		return 0;
 
-	r.check_record_size(169);
+	r.check_record_size(UNIT_RECORD_SIZE);
 	v.init(&r);
 	visit_unit(&v, this);
 

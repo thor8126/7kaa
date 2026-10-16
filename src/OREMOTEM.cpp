@@ -183,6 +183,7 @@ static MsgProcessFP msg_process_function_array[] =
 	&RemoteMsg::firm_request_builder,
 	&RemoteMsg::market_switch_restock,
 	&RemoteMsg::road_build,
+	&RemoteMsg::units_wait_ferry,
 };
 
 static_assert( sizeof(msg_process_function_array)/sizeof(msg_process_function_array[0]) == REMOTE_MSG_TYPE_COUNT,
@@ -3043,3 +3044,17 @@ void RemoteMsg::road_build()
 		road_res.build_road( shortPtr[1], shortPtr[2], shortPtr[3], shortPtr[4], shortPtr[0], COMMAND_REMOTE );
 }
 // ------- End of function RemoteMsg::road_build ---------//
+
+
+// ------- Begin of function RemoteMsg::units_wait_ferry ---------//
+void RemoteMsg::units_wait_ferry()
+{
+	err_when( id != MSG_UNITS_WAIT_FERRY );
+	// packet structure : <harbor recno> <no. of units> <unit recno ...>
+	short *shortPtr = (short *)data_buf;
+	validate_selected_unit_array(shortPtr+2, shortPtr[1]);
+
+	if( shortPtr[1] > 0 )
+		unit_array.wait_for_ferry( shortPtr[0], shortPtr+2, shortPtr[1], COMMAND_REMOTE );
+}
+// ------- End of function RemoteMsg::units_wait_ferry ---------//

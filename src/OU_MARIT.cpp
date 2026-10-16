@@ -457,6 +457,14 @@ void UnitMarine::ship_in_firm(int autoMode)
 	if(wait_count>0)
 	{
 		wait_count--;
+
+		//------ ferries let units that have just arrived board ------//
+
+		if( wait_count % FERRY_LOAD_INTERVAL == 0 && cur_firm_recno &&
+			 autoMode && is_ferry() && firm_array[cur_firm_recno]->firm_id==FIRM_HARBOR )
+		{
+			ferry_load_units((FirmHarbor*) firm_array[cur_firm_recno]);
+		}
 		return;
 	}
 
@@ -584,10 +592,21 @@ void UnitMarine::ship_on_way()
 		}
 
 		//-------------------------------------------------------//
+		// ferries drop off their units and take on waiting ones
+		//-------------------------------------------------------//
+		int isFerry = is_ferry() && firmPtr->firm_id==FIRM_HARBOR;
+
+		if( isFerry )
+		{
+			ferry_unload_units((FirmHarbor*) firmPtr);
+			ferry_load_units((FirmHarbor*) firmPtr);
+		}
+
+		//-------------------------------------------------------//
 		//-------------------------------------------------------//
 		stop_x_loc = move_to_x_loc; // store entering location
 		stop_y_loc = move_to_y_loc;
-		wait_count = MAX_SHIP_WAIT_TERM;		// set waiting term
+		wait_count = isFerry ? FERRY_WAIT_TERM : MAX_SHIP_WAIT_TERM;		// set waiting term, ferries wait longer for units to board
 
 		reset_path();
 		deinit_sprite(1);	// the ship enters the harbor now. 1-keep it selected if it is currently selected
