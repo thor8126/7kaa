@@ -94,6 +94,19 @@ int Nation::think_capture_new_enemy_town(Town* capturerTown, int useAllCamp)
 		ai_capture_enemy_town_start_attack_date = 0;
 		ai_capture_enemy_town_use_all_camp = useAllCamp;
 
+		//--- remembered to learn from how it ends, see think_capturing_enemy_town() ---//
+
+		AiLearning* learnPtr = ai_war_state.get_learning(nation_recno);
+
+		learnPtr->offensive_nation_recno = targetTown->nation_recno;
+		learnPtr->offensive_x_loc = targetTown->center_x;
+		learnPtr->offensive_y_loc = targetTown->center_y;
+		learnPtr->feint_pending = 0;
+
+		//--- a small force pins down another town of the enemy, see OAI_RAID.CPP ---//
+
+		think_feint(targetTown);
+
 		return 1;
 	}
 
@@ -118,9 +131,17 @@ void Nation::think_capturing_enemy_town()
 	if( !ai_capture_enemy_town_recno )
 		return;
 
+	AiLearning* learnPtr = ai_war_state.get_learning(nation_recno);
+
 	if( town_array.is_deleted(ai_capture_enemy_town_recno) ||
 		 town_array[ai_capture_enemy_town_recno]->nation_recno == nation_recno )		// this town has been captured already
 	{
+		if( learnPtr->offensive_nation_recno )
+		{
+			ai_war_state.offensive_result( nation_recno, learnPtr->offensive_nation_recno, 1, learnPtr->offensive_x_loc, learnPtr->offensive_y_loc,
+				town_array.is_deleted(ai_capture_enemy_town_recno) ? "the town is gone" : "the town is ours" );
+		}
+
 		ai_capture_enemy_town_recno = 0;
 		return;
 	}
@@ -140,7 +161,15 @@ void Nation::think_capturing_enemy_town()
 			ai_capture_enemy_town_start_attack_date = info.game_date;
 
 		if( info.game_date > ai_capture_enemy_town_plan_date + 90 )		// when 3 months have gone and there still hasn't been any attack on the town, there must be something bad happened to our troop, cancel the entire action
+		{
+			if( learnPtr->offensive_nation_recno )
+			{
+				ai_war_state.offensive_result( nation_recno, learnPtr->offensive_nation_recno, 0, learnPtr->offensive_x_loc, learnPtr->offensive_y_loc,
+														 "the troops never reached the town" );
+			}
+
 			ai_capture_enemy_town_recno = 0;
+		}
 
 		return;		// do nothing if the attack hasn't started yet
 	}
@@ -183,7 +212,13 @@ void Nation::think_capturing_enemy_town()
 			return;
 		}
 
-		//---------- reset the vars --------//
+		//---------- learn from how it went, reset the vars --------//
+
+		if( learnPtr->offensive_nation_recno )
+		{
+			ai_war_state.offensive_result( nation_recno, learnPtr->offensive_nation_recno, rc == -1, learnPtr->offensive_x_loc, learnPtr->offensive_y_loc,
+				rc == -1 ? "its defense is broken, the town can be captured" : "the attack was beaten back" );
+		}
 
 		ai_capture_enemy_town_recno = 0;
 		ai_capture_enemy_town_start_attack_date = 0;
@@ -278,35 +313,36 @@ int Nation::attack_enemy_town_defense(Town* targetTown, int useAllCamp)
 //
 // <Town*> capturerTown - our town to capture enemy towns.
 //
-// Motives for attacking another nation:
-//
-// 1. Capture towns
-// 2. Conquer land
-// 3. Defeat enemies
+// The enemy town to go after: the one whose loss hurts the enemy most and
+// that is worth most to us, weighed against its defense and distance,
+// with the towns this nation lost to the enemy and the places where it
+// won before (see AiMemory), and the opportunity the enemy offers now.
+// Among the best ones, the choice is weighted (see AiWarState::weighted_pick()).
 //
 Town* Nation::think_capture_enemy_town_target(Town* capturerTown)
 {
-	int   townRecno, curRating;
-	Town* targetTown, *bestTown=NULL;
-	Firm* firmPtr;
-	int   ourMilitary = military_rank_rating();
-	Nation* ownNation = nation_array[nation_recno];
-	int   bestRating = -1000;
-	int  	hasWar;
-	int   neededCombatLevel=0;
+	enum { MAX_CANDIDATE = 40 };
 
-	for( townRecno=town_array.size() ; townRecno>0 ; townRecno-- )
+	Town* candidateArray[MAX_CANDIDATE];
+	int   ratingArray[MAX_CANDIDATE];
+	int   candidateCount = 0;
+	int   ourMilitary = military_rank_rating();
+	int   hasWar;
+	int   opportunityArray[MAX_NATION+1];
+
+	for( int i=0 ; i<=MAX_NATION ; i++ )
+		opportunityArray[i] = -1;		// worked out when first needed
+
+	for( int townRecno=town_array.size() ; townRecno>0 ; townRecno-- )
 	{
 		if( town_array.is_deleted(townRecno) )
 			continue;
 
-		targetTown = town_array[townRecno];
+		Town* targetTown = town_array[townRecno];
+		int   targetNationRecno = targetTown->nation_recno;
 
-		if( targetTown->nation_recno == 0 ||
-			 targetTown->nation_recno == nation_recno )
-		{
+		if( targetNationRecno == 0 || targetNationRecno == nation_recno )
 			continue;
-		}
 
 		if( targetTown->region_id != capturerTown->region_id )
 			continue;
@@ -321,7 +357,7 @@ Town* Nation::think_capture_enemy_town_target(Town* capturerTown)
 
 		//--------- only attack enemies -----------//
 
-		NationRelation* nationRelation = get_relation(targetTown->nation_recno);
+		NationRelation* nationRelation = get_relation(targetNationRecno);
 
 		int rc=0;
 
@@ -332,7 +368,7 @@ Town* Nation::think_capture_enemy_town_target(Town* capturerTown)
 			rc = 1;
 
 		else if( nationRelation->status <= NATION_NEUTRAL &&
-			 targetTown->nation_recno == nation_array.max_overall_nation_recno &&		// if this is our biggest enemy
+			 targetNationRecno == nation_array.max_overall_nation_recno &&		// if this is our biggest enemy
 			 nationRelation->ai_relation_level < 30 )
 		{
 			rc = 1;
@@ -344,29 +380,23 @@ Town* Nation::think_capture_enemy_town_target(Town* capturerTown)
 		//--- attacking a nation it is not at war with starts a war: not in a truce, when weary or not expanding, see OAI_WAR.CPP ---//
 
 		if( nationRelation->status != NATION_HOSTILE &&
-			 !ai_war_state.can_declare_war(nation_recno, targetTown->nation_recno) )
+			 !ai_war_state.can_declare_war(nation_recno, targetNationRecno) )
 		{
 			AiWarState::log( "OFFENSIVE   nation %d: won't attack town %d of nation %d, they are not at war and a new war isn't allowed now (truce, weariness or posture)",
-								  nation_recno, targetTown->town_recno, targetTown->nation_recno );
+								  nation_recno, targetTown->town_recno, targetNationRecno );
 			continue;
 		}
-
-		//----- if this town does not have any linked camps, capture this town immediately -----//
-
-		if( targetTown->has_linked_camp(targetTown->nation_recno, 0) )		//0-count both camps with or without overseers
-			return targetTown;
 
 		//--- if the enemy is very powerful overall (as far as we know), don't attack it yet ---//
 
-		if( intel_military_rank_rating(targetTown->nation_recno) >
-			 ourMilitary * (80+pref_military_courage/2) / 100 )
-		{
+		int theirMilitary = intel_military_rank_rating(targetNationRecno);
+
+		if( theirMilitary > ourMilitary * (80+pref_military_courage/2) / 100 )
 			continue;
-		}
 
 		//------ only attack if we have enough money to support the war ----//
 
-		if( !ai_should_spend_war( nation_array[targetTown->nation_recno]->military_rank_rating() ) )
+		if( !ai_should_spend_war( theirMilitary ) )
 			continue;
 
 		//-------------------------------------------------------//
@@ -376,81 +406,141 @@ Town* Nation::think_capture_enemy_town_target(Town* capturerTown)
 		if( townCombatLevel == -1 )      // do not attack this town because a battle is already going on
 			continue;
 
-		//------- calculate the rating --------------//
+		if( !targetTown->ai_town && game.game_mode == GAME_TUTORIAL )		// next attack the player in a tutorial game
+			continue;
 
-		curRating = world.distance_rating(capturerTown->center_x, capturerTown->center_y,
-						targetTown->center_x, targetTown->center_y);
+		//------- what taking it gives us and costs them -------//
 
-		curRating -= townCombatLevel/10;
+		int distanceRating = world.distance_rating(capturerTown->center_x, capturerTown->center_y,
+															    targetTown->center_x, targetTown->center_y);
 
-		curRating -= targetTown->average_loyalty();
+		int defenseRating = -townCombatLevel/10;
+		int loyaltyRating = -targetTown->average_loyalty();
+		int popRating		= targetTown->population;
 
-		curRating += targetTown->population;		// put a preference on capturing villages with large population
+		int targetNationPop = nation_array[targetNationRecno]->total_population;
+		int shareRating = targetNationPop > 0 ? targetTown->population * 50 / targetNationPop : 0;		// a large part of their kingdom
 
-		//----- the power of between the nation also affect the rating ----//
+		int undefendedRating = targetTown->has_linked_camp(targetNationRecno, 0) ? 0 : 100;		// no fort of theirs next to it: an easy capture
 
-		curRating += 2 * (ourMilitary - nation_array[targetTown->nation_recno]->military_rank_rating());
+		int powerRating = 2 * (ourMilitary - theirMilitary);
 
-		//-- AI Aggressive is set above Low, than the AI will try to capture the player's town first ---//
+		//--- the buildings linked to it, which it would cut off from them ---//
 
-		if( !targetTown->ai_town )
-		{
-			if( game.game_mode == GAME_TUTORIAL )		// next attack the player in a tutorial game
-			{
-				continue;
-			}
-			else
-			{
-				switch( config.ai_aggressiveness )
-				{
-					case OPTION_MODERATE:
-						curRating += 100;
-						break;
-
-					case OPTION_HIGH:
-						curRating += 300;
-						break;
-
-					case OPTION_VERY_HIGH:
-						curRating += 500;
-						break;
-				}
-			}
-		}
-
-		//--- if there are mines linked to this town, increase its rating ---//
+		int econRating = 0;
 
 		for( int i=targetTown->linked_firm_count-1 ; i>=0 ; i-- )
 		{
-			firmPtr = firm_array[ targetTown->linked_firm_array[i] ];
+			Firm* firmPtr = firm_array[ targetTown->linked_firm_array[i] ];
 
-			if( firmPtr->nation_recno != targetTown->nation_recno )
+			if( firmPtr->nation_recno != targetNationRecno )
 				continue;
 
-			if( firmPtr->firm_id == FIRM_MINE )
-			{
-				//--- if this mine's raw materials is one that we don't have --//
+			int firmValue = 0;
 
-				if( raw_count_array[ ((FirmMine*)firmPtr)->raw_id-1 ]==0 )
-					curRating += 150 * (int) ((FirmMine*)firmPtr)->reserve_qty / MAX_RAW_RESERVE_QTY;
+			switch( firmPtr->firm_id )
+			{
+				case FIRM_MINE:
+					firmValue = 40;
+
+					if( raw_count_array[ ((FirmMine*)firmPtr)->raw_id-1 ]==0 )		// a raw material we don't have
+						firmValue += 150 * (int) ((FirmMine*)firmPtr)->reserve_qty / MAX_RAW_RESERVE_QTY;
+
+					if( ai_style() == AI_STYLE_BUILDER )
+						firmValue = firmValue*3/2;
+					break;
+
+				case FIRM_FACTORY:		firmValue = 25; break;
+				case FIRM_RESEARCH:		firmValue = 30; break;
+				case FIRM_HARBOR:			firmValue = 20; break;
+				case FIRM_INN:				firmValue = 15; break;
+				case FIRM_CAMP:			firmValue = 10; break;
+
+				case FIRM_MARKET:
+					firmValue = 20 + ((FirmMarket*)firmPtr)->stock_value_index()/4;
+
+					if( ai_style() == AI_STYLE_MERCHANT )
+						firmValue = firmValue*3/2;
+					break;
+
+				case FIRM_WAR_FACTORY:
+					firmValue = 40;
+
+					if( ai_style() == AI_STYLE_WARLORD )
+						firmValue = firmValue*3/2;
+					break;
+			}
+
+			econRating += firmValue;
+		}
+
+		//--- AI aggressiveness above low: the player's towns first ---//
+
+		int humanRating = 0;
+
+		if( !targetTown->ai_town )
+		{
+			switch( config.ai_aggressiveness )
+			{
+				case OPTION_MODERATE:  humanRating = 100; break;
+				case OPTION_HIGH:		  humanRating = 300; break;
+				case OPTION_VERY_HIGH: humanRating = 500; break;
 			}
 		}
 
-		//--- more linked towns increase the attractiveness rating ---//
+		//--- memories: a town it lost to them, a place where it won before, a grudge ---//
 
-		curRating += targetTown->linked_firm_count*5;
+		int memoryRating = 0;
+		AiMemory* memPtr = ai_war_state.get_memory(nation_recno, targetNationRecno);
 
-		//-------- compare with the current best rating ---------//
-
-		if( curRating > bestRating )
+		if( memPtr )
 		{
-			bestRating    = curRating;
-			bestTown      = targetTown;
-			neededCombatLevel = townCombatLevel;
+			if( memPtr->lost_town_x >= 0 &&
+				 misc.points_distance(memPtr->lost_town_x, memPtr->lost_town_y, targetTown->center_x, targetTown->center_y) <= 5 )
+			{
+				memoryRating += 80;		// taking back what it lost
+			}
+
+			if( memPtr->weak_spot_x >= 0 &&
+				 misc.points_distance(memPtr->weak_spot_x, memPtr->weak_spot_y, targetTown->center_x, targetTown->center_y) <= 15 )
+			{
+				memoryRating += 30;		// where it won before
+			}
+
+			memoryRating += (int) memPtr->grudge / 4;
+		}
+
+		//--- the opportunity the enemy offers now ---//
+
+		if( opportunityArray[targetNationRecno] < 0 )
+			opportunityArray[targetNationRecno] = opportunity_rating(targetNationRecno);
+
+		int opportunityRating = opportunityArray[targetNationRecno];
+
+		int curRating = distanceRating + defenseRating + loyaltyRating + popRating + shareRating + undefendedRating +
+							 powerRating + econRating + humanRating + memoryRating + opportunityRating;
+
+		AiWarState::log( "TARGET      nation %d rates town %d of nation %d: %d = distance %d + defense %d + loyalty %d + population %d + share %d + undefended %d + power %d + economy %d + human %d + memory %d + opportunity %d",
+							  nation_recno, targetTown->town_recno, targetNationRecno, curRating, distanceRating, defenseRating, loyaltyRating,
+							  popRating, shareRating, undefendedRating, powerRating, econRating, humanRating, memoryRating, opportunityRating );
+
+		if( candidateCount < MAX_CANDIDATE )
+		{
+			candidateArray[candidateCount] = targetTown;
+			ratingArray[candidateCount] = curRating;
+			candidateCount++;
 		}
 	}
 
-	return bestTown;
+	int pick = AiWarState::weighted_pick(ratingArray, candidateCount, 85);
+
+	if( pick < 0 )
+		return NULL;
+
+	AiWarState::log( "TARGET      nation %d chooses town %d of nation %d (rating %d, of %d towns considered)",
+						  nation_recno, candidateArray[pick]->town_recno, candidateArray[pick]->nation_recno, ratingArray[pick], candidateCount );
+
+	return candidateArray[pick];
 }
 //-------- End of function Nation::think_capture_enemy_town_target ------//
 

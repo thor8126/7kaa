@@ -50,6 +50,19 @@ enum { AI_STRATEGY_ECONOMY=0,		// raw materials nearby: mines, factories and tra
 		 AI_STRATEGY_NAVAL,			// small home island: harbors and ships
 		 AI_STRATEGY_COUNT };
 
+//------ the lasting style of an AI nation, chosen at the start of a game, see Nation::init_style() ------//
+
+enum { AI_STYLE_WARLORD=0,			// fights often, accepts worse odds, raids and feints
+		 AI_STYLE_MERCHANT,			// trade and treaties first, a war only for a good reason
+		 AI_STYLE_BUILDER,			// economy, research and defenses first
+		 AI_STYLE_SCHEMER,			// buys time with peace pacts and breaks them when strong enough
+		 AI_STYLE_OPPORTUNIST,		// strikes when an enemy is weak or busy elsewhere
+		 AI_STYLE_COUNT };
+
+#define MAX_GRUDGE						100
+#define MAX_ODDS_EXTRA_PERCENT		60		// the most a nation adds to the odds it wants after failed offensives
+#define MIN_ODDS_EXTRA_PERCENT		-20
+
 #define MAX_WAR_WEARINESS				100
 #define WEARINESS_BLOCK_OFFENSIVE	70		// no new offensives against an enemy at or above this weariness
 #define WEARINESS_FORCE_PEACE			75		// willing to cease fire even during an attack mission
@@ -72,6 +85,35 @@ struct WarRecord
 	int16_t	firms_lost;
 	float		weariness;				// 0 to MAX_WAR_WEARINESS, persists and decays in peace time
 };
+
+//------ what a nation remembers of another one, kept after their wars ------//
+
+struct AiMemory
+{
+	float		grudge;							// 0 to MAX_GRUDGE: the harm the other nation did to it, fades over the years (revenge)
+	int16_t	lost_town_x, lost_town_y;		// where it last lost a town to the other nation, -1 if never (it comes back for it)
+	int16_t	weak_spot_x, weak_spot_y;		// where its last offensive on the other nation won, -1 if never
+};
+
+//------ what a nation learns from its offensives and tactics ------//
+
+struct AiLearning
+{
+	int16_t	offensives_won;
+	int16_t	offensives_lost;
+	int16_t	odds_extra_percent;			// added to the odds it wants before attacking: up after a defeat, down after a victory
+	int16_t	feints_tried;
+	int16_t	feints_paid_off;				// the main attack the feint covered won
+	int16_t	feint_pending;					// 1 while the current offensive is covered by a feint
+	int16_t	raids_tried;
+	int16_t	raids_paid_off;				// the raided building was destroyed
+	int16_t	raid_target_firm_recno;		// the building of the last raid, to see if it paid off, 0 if none
+	int32_t	raid_date;
+	int16_t	scheme_nation_recno;			// a schemer's planned victim, kept at peace by a pact for now, 0 if none
+	int32_t	scheme_date;
+	int16_t	offensive_nation_recno;		// the target of the current offensive, see Nation::think_capture_new_enemy_town()
+	int16_t	offensive_x_loc, offensive_y_loc;
+};
 #pragma pack()
 
 //------- Define class AiWarState -------//
@@ -85,6 +127,15 @@ public:
 	char			strategy[MAX_NATION];
 	int32_t		strategy_date[MAX_NATION];		// the date the strategy was last evaluated, 0 if never
 
+	char			style[MAX_NATION];				// AI_STYLE_???
+	float			recent_losses[MAX_NATION];		// the war value a nation lost lately to anyone, fades in weeks (it just lost a battle)
+	AiMemory		memory[MAX_NATION][MAX_NATION];	// [nation-1][other nation-1]
+	AiLearning	learning[MAX_NATION];
+
+	//------ not saved ------//
+
+	short			current_opportunity[MAX_NATION];	// the opportunity a nation sees for its current offensive, see Nation::think_war_offensive()
+
 public:
 	void			init();
 	void			reset_pair(int nationRecno, int withNationRecno);
@@ -94,20 +145,28 @@ public:
 	float			weariness(int nationRecno, int withNationRecno);
 	int			get_posture(int nationRecno);
 	int			get_strategy(int nationRecno);
+	int			get_style(int nationRecno);
+	void			set_style(int nationRecno, int styleId);
+	static const char* style_name(int styleId);
+	AiMemory*	get_memory(int nationRecno, int withNationRecno);
+	AiLearning*	get_learning(int nationRecno);
+	int			attack_odds_percent(int nationRecno);
 
 	//------ event notifications ------//
 
 	void			status_changed(int nationRecno, int withNationRecno, int oldStatus, int newStatus);
 	void			unit_killed(int attackerNationRecno, Unit* targetUnit);
 	void			firm_destroyed(int attackerNationRecno, int victimNationRecno);
-	void			town_captured(int fromNationRecno, int toNationRecno);
+	void			town_captured(int fromNationRecno, int toNationRecno, int townXLoc, int townYLoc);
+	void			offensive_result(int nationRecno, int targetNationRecno, int won, int xLoc, int yLoc, const char* reasonStr);
 	void			peace_refused(int nationRecno, int refusingNationRecno);
 	void			next_day();
 
 	//------ AI decision helpers ------//
 
 	int			can_start_offensive(int nationRecno, int targetNationRecno);
-	int			can_declare_war(int nationRecno, int targetNationRecno);
+	int			can_declare_war(int nationRecno, int targetNationRecno, int ignorePeacePact=0);
+	static int	weighted_pick(const int* ratingArray, int count, int closePercent);
 	int			cease_war_rating(int nationRecno, int withNationRecno);
 
 	int			write_file(File* filePtr);

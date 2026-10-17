@@ -169,6 +169,7 @@ struct AttackCamp
 //--------- Define class Nation ---------//
 
 class  Firm;
+class  FirmCamp;
 class  Town;
 class  Spy;
 struct TalkMsg;
@@ -315,6 +316,8 @@ public:
 	void 			deinit_all_ai_info();
 
 	void			init_personalty();
+	void			init_style();
+	int			ai_style();
 
 	void			process_ai();							// entry point to start ai
 	void			process_ai_main();
@@ -588,6 +591,11 @@ public:
 	int			co_belligerent_military(int enemyNationRecno);
 	int			total_co_belligerent_military();
 	int			war_target_rating(int nationRecno);
+	int			opportunity_rating(int targetNationRecno, char* reasonStr=NULL, int reasonLen=0);
+	void			think_opportunity();
+	int			is_frontline_town(Town* townPtr);
+	int			think_feint(Town* mainTargetTown);		// see OAI_RAID.CPP
+	int			send_raid_party(FirmCamp* firmCamp, int partySize, int targetXLoc, int targetYLoc, int targetUnitRecno);
 
 	void 			think_deal_with_all_enemy();
 	void 			think_deal_with_one_enemy(int enemyNationRecno);

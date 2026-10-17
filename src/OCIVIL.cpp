@@ -139,7 +139,6 @@ static int  field_loc(Town* townPtr, int fieldId, int& xLoc, int& yLoc);
 static int  valid_field_count(Town* townPtr);
 static int  active_field_count(Town* townPtr);
 static int  find_work_loc(Town* townPtr, Unit* unitPtr, int& xLoc, int& yLoc);
-static int  is_frontline_town(Nation* nationPtr, Town* townPtr);
 static int  watchtower_effect_id();
 static char* field_bitmap(int growthStage);
 
@@ -1283,48 +1282,6 @@ int CivilTech::can_build_walls(Town* townPtr, int checkCash)
 //----------- End of function CivilTech::can_build_walls -----------//
 
 
-//--------- Begin of static function is_frontline_town ---------//
-//
-// return : <int> 1 if a village or building of a kingdom at war with the
-//          given nation is near the village
-//
-static int is_frontline_town(Nation* nationPtr, Town* townPtr)
-{
-	enum { FRONTLINE_DISTANCE = 25 };
-
-	for( int i=town_array.size() ; i>0 ; i-- )
-	{
-		if( town_array.is_deleted(i) )
-			continue;
-
-		Town* otherTown = town_array[i];
-
-		if( otherTown->nation_recno && otherTown->nation_recno != nationPtr->nation_recno &&
-			 nationPtr->get_relation_status(otherTown->nation_recno) == NATION_HOSTILE &&
-			 misc.points_distance(otherTown->center_x, otherTown->center_y, townPtr->center_x, townPtr->center_y) <= FRONTLINE_DISTANCE )
-		{
-			return 1;
-		}
-	}
-
-	for( int i=firm_array.size() ; i>0 ; i-- )
-	{
-		if( firm_array.is_deleted(i) )
-			continue;
-
-		Firm* firmPtr = firm_array[i];
-
-		if( firmPtr->nation_recno && firmPtr->nation_recno != nationPtr->nation_recno &&
-			 nationPtr->get_relation_status(firmPtr->nation_recno) == NATION_HOSTILE &&
-			 misc.points_distance(firmPtr->center_x, firmPtr->center_y, townPtr->center_x, townPtr->center_y) <= FRONTLINE_DISTANCE )
-		{
-			return 1;
-		}
-	}
-
-	return 0;
-}
-//----------- End of static function is_frontline_town -----------//
 
 
 //--------- Begin of function CivilTech::build_walls ---------//
@@ -2413,7 +2370,7 @@ void CivilTech::ai_think(Nation* nationPtr)
 			}
 		}
 
-		if( bestTown && bestRating >= 50 )
+		if( bestTown && bestRating >= (nationPtr->ai_style() == AI_STYLE_BUILDER ? 40 : 50) )		// a builder fortifies sooner
 			build_watchtower(bestTown);
 	}
 
@@ -2446,7 +2403,7 @@ void CivilTech::ai_think(Nation* nationPtr)
 			if( townPtr->has_watchtower )		// the walls keep the enemies under its arrows
 				curRating += 10;
 
-			if( isAtWar && is_frontline_town(nationPtr, townPtr) )		// enemy villages or buildings nearby
+			if( isAtWar && nationPtr->is_frontline_town(townPtr) )		// enemy villages or buildings nearby
 				curRating += 30;
 
 			curRating += townPtr->population / 5;		// a bigger village is worth more
@@ -2458,7 +2415,9 @@ void CivilTech::ai_think(Nation* nationPtr)
 			}
 		}
 
-		if( bestTown && bestRating >= 60 )
+		int neededRating = nationPtr->ai_style() == AI_STYLE_BUILDER ? 45 : nationPtr->ai_style() == AI_STYLE_WARLORD ? 70 : 60;
+
+		if( bestTown && bestRating >= neededRating )
 		{
 			AiWarState::log( "WALL        nation %d decides to wall town %d (rating %d, population %d, at war %d)",
 								  nationRecno, bestTown->town_recno, bestRating, bestTown->population, isAtWar );
@@ -2467,8 +2426,8 @@ void CivilTech::ai_think(Nation* nationPtr)
 		}
 		else if( bestTown )
 		{
-			AiWarState::log( "WALL        nation %d: no village needs walls now (best town %d, rating %d < 60)",
-								  nationRecno, bestTown->town_recno, bestRating );
+			AiWarState::log( "WALL        nation %d: no village needs walls now (best town %d, rating %d < %d)",
+								  nationRecno, bestTown->town_recno, bestRating, neededRating );
 		}
 	}
 

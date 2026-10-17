@@ -110,6 +110,23 @@ void AiWarState::init()
 	memset( posture_date, 0, sizeof(posture_date) );
 	memset( strategy, AI_STRATEGY_ECONOMY, sizeof(strategy) );
 	memset( strategy_date, 0, sizeof(strategy_date) );
+
+	memset( style, AI_STYLE_OPPORTUNIST, sizeof(style) );
+	memset( recent_losses, 0, sizeof(recent_losses) );
+	memset( learning, 0, sizeof(learning) );
+	memset( current_opportunity, 0, sizeof(current_opportunity) );
+
+	for( int i=0 ; i<MAX_NATION ; i++ )
+	{
+		for( int j=0 ; j<MAX_NATION ; j++ )
+		{
+			AiMemory* memPtr = &memory[i][j];
+
+			memPtr->grudge = 0.0f;
+			memPtr->lost_town_x = memPtr->lost_town_y = -1;
+			memPtr->weak_spot_x = memPtr->weak_spot_y = -1;
+		}
+	}
 }
 //-------- End of function AiWarState::init --------//
 
@@ -147,8 +164,241 @@ void AiWarState::reset_nation(int nationRecno)
 
 	strategy[nationRecno-1] = AI_STRATEGY_ECONOMY;
 	strategy_date[nationRecno-1] = 0;		// evaluated on the nation's first day
+
+	//--- a new nation in a reused recno starts with no memories, Nation::init_style() gives it a style ---//
+
+	recent_losses[nationRecno-1] = 0.0f;
+	current_opportunity[nationRecno-1] = 0;
+	memset( &learning[nationRecno-1], 0, sizeof(AiLearning) );
+
+	for( int i=0 ; i<MAX_NATION ; i++ )
+	{
+		AiMemory* memArray[2] = { &memory[nationRecno-1][i], &memory[i][nationRecno-1] };
+
+		for( int k=0 ; k<2 ; k++ )
+		{
+			memArray[k]->grudge = 0.0f;
+			memArray[k]->lost_town_x = memArray[k]->lost_town_y = -1;
+			memArray[k]->weak_spot_x = memArray[k]->weak_spot_y = -1;
+		}
+
+		if( learning[i].scheme_nation_recno == nationRecno )
+			learning[i].scheme_nation_recno = 0;
+	}
 }
 //-------- End of function AiWarState::reset_nation --------//
+
+
+//------- Begin of function AiWarState::get_style -------//
+//
+int AiWarState::get_style(int nationRecno)
+{
+	if( nationRecno < 1 || nationRecno > MAX_NATION )
+		return AI_STYLE_OPPORTUNIST;
+
+	return style[nationRecno-1];
+}
+//-------- End of function AiWarState::get_style --------//
+
+
+//------- Begin of function AiWarState::set_style -------//
+//
+void AiWarState::set_style(int nationRecno, int styleId)
+{
+	if( nationRecno >= 1 && nationRecno <= MAX_NATION && styleId >= 0 && styleId < AI_STYLE_COUNT )
+		style[nationRecno-1] = styleId;
+}
+//-------- End of function AiWarState::set_style --------//
+
+
+//------- Begin of function AiWarState::style_name -------//
+//
+const char* AiWarState::style_name(int styleId)
+{
+	static const char* nameArray[AI_STYLE_COUNT] = { "warlord", "merchant", "builder", "schemer", "opportunist" };
+
+	return styleId >= 0 && styleId < AI_STYLE_COUNT ? nameArray[styleId] : "?";
+}
+//-------- End of function AiWarState::style_name --------//
+
+
+//------- Begin of function AiWarState::get_memory -------//
+//
+// return : <AiMemory*> what nationRecno remembers of withNationRecno, NULL if either recno is invalid
+//
+AiMemory* AiWarState::get_memory(int nationRecno, int withNationRecno)
+{
+	if( nationRecno < 1 || nationRecno > MAX_NATION ||
+		 withNationRecno < 1 || withNationRecno > MAX_NATION ||
+		 nationRecno == withNationRecno )
+	{
+		return NULL;
+	}
+
+	return &memory[nationRecno-1][withNationRecno-1];
+}
+//-------- End of function AiWarState::get_memory --------//
+
+
+//------- Begin of function AiWarState::get_learning -------//
+//
+AiLearning* AiWarState::get_learning(int nationRecno)
+{
+	if( nationRecno < 1 || nationRecno > MAX_NATION )
+		return NULL;
+
+	return &learning[nationRecno-1];
+}
+//-------- End of function AiWarState::get_learning --------//
+
+
+//------- Begin of function AiWarState::attack_odds_percent -------//
+//
+// The extra odds, in percent of the target's strength, the nation wants
+// before an offensive (see Nation::ai_attack_target()): what it learnt
+// from earlier offensives, its style, less when it sees an opportunity.
+//
+int AiWarState::attack_odds_percent(int nationRecno)
+{
+	AiLearning* learnPtr = get_learning(nationRecno);
+
+	if( !learnPtr )
+		return 0;
+
+	int oddsPercent = learnPtr->odds_extra_percent;
+
+	switch( get_style(nationRecno) )
+	{
+		case AI_STYLE_WARLORD:		oddsPercent -= 10; break;
+		case AI_STYLE_MERCHANT:		oddsPercent += 10; break;
+		case AI_STYLE_BUILDER:		oddsPercent += 10; break;
+	}
+
+	oddsPercent -= MIN( 20, current_opportunity[nationRecno-1]/3 );
+
+	return oddsPercent;
+}
+//-------- End of function AiWarState::attack_odds_percent --------//
+
+
+//------- Begin of function AiWarState::weighted_pick -------//
+//
+// Choose among options by their ratings: only the ones close to the best
+// (within closePercent of its value, at least 10 points) are considered,
+// and the better one is more likely chosen, so the choice is never a poor
+// one but not always the same either.
+//
+// return : <int> the index of the option chosen, -1 if none (count 0)
+//
+int AiWarState::weighted_pick(const int* ratingArray, int count, int closePercent)
+{
+	if( count <= 0 )
+		return -1;
+
+	int i, bestRating = ratingArray[0];
+
+	for( i=1 ; i<count ; i++ )
+	{
+		if( ratingArray[i] > bestRating )
+			bestRating = ratingArray[i];
+	}
+
+	int margin = MAX( 10, abs(bestRating) * (100-closePercent) / 100 );
+	int threshold = bestRating - margin;
+
+	int totalWeight = 0;
+
+	for( i=0 ; i<count ; i++ )
+	{
+		if( ratingArray[i] > threshold )
+		{
+			int w = ratingArray[i] - threshold;
+			totalWeight += w * w;
+		}
+	}
+
+	//--- scale the weights down to the range of Misc::random() ---//
+
+	int scale = totalWeight / 0x7000 + 1;
+	int pickWeight = misc.random( MAX(1, totalWeight/scale) );
+
+	for( i=0 ; i<count ; i++ )
+	{
+		if( ratingArray[i] > threshold )
+		{
+			int w = ratingArray[i] - threshold;
+
+			pickWeight -= w * w / scale;
+
+			if( pickWeight < 0 )
+				return i;
+		}
+	}
+
+	for( i=0 ; i<count ; i++ )		// rounding: the best one
+	{
+		if( ratingArray[i] == bestRating )
+			return i;
+	}
+
+	return 0;
+}
+//-------- End of function AiWarState::weighted_pick --------//
+
+
+//------- Begin of function AiWarState::offensive_result -------//
+//
+// Called when an offensive of an AI nation on a town ends, see
+// Nation::think_capturing_enemy_town(). It learns from it: a defeat makes
+// it want better odds next time, a victory lets it take a little more
+// risk, and it remembers where it won. A feint that covered a winning
+// offensive paid off.
+//
+void AiWarState::offensive_result(int nationRecno, int targetNationRecno, int won, int xLoc, int yLoc, const char* reasonStr)
+{
+	AiLearning* learnPtr = get_learning(nationRecno);
+
+	if( !learnPtr )
+		return;
+
+	int oldOdds = learnPtr->odds_extra_percent;
+
+	if( won )
+	{
+		learnPtr->offensives_won++;
+		learnPtr->odds_extra_percent = MAX( MIN_ODDS_EXTRA_PERCENT, learnPtr->odds_extra_percent-5 );
+
+		AiMemory* memPtr = get_memory(nationRecno, targetNationRecno);
+
+		if( memPtr )
+		{
+			memPtr->weak_spot_x = xLoc;
+			memPtr->weak_spot_y = yLoc;
+		}
+	}
+	else
+	{
+		learnPtr->offensives_lost++;
+		learnPtr->odds_extra_percent = MIN( MAX_ODDS_EXTRA_PERCENT, learnPtr->odds_extra_percent+15 );
+	}
+
+	if( learnPtr->feint_pending )
+	{
+		if( won )
+			learnPtr->feints_paid_off++;
+
+		learnPtr->feint_pending = 0;
+	}
+
+	learnPtr->offensive_nation_recno = 0;
+	current_opportunity[nationRecno-1] = 0;
+
+	log( "LEARN       nation %d: its offensive on nation %d at %d,%d %s (%s); won %d, lost %d, extra odds wanted %d%% -> %d%%, feints paid off %d of %d",
+		  nationRecno, targetNationRecno, xLoc, yLoc, won ? "won" : "failed", reasonStr,
+		  learnPtr->offensives_won, learnPtr->offensives_lost, oldOdds, learnPtr->odds_extra_percent,
+		  learnPtr->feints_paid_off, learnPtr->feints_tried );
+}
+//-------- End of function AiWarState::offensive_result --------//
 
 
 //------- Begin of function AiWarState::get_record -------//
@@ -352,6 +602,14 @@ void AiWarState::unit_killed(int attackerNationRecno, Unit* targetUnit)
 
 	add_weariness( victimNationRecno, attackerNationRecno, warValue * lossMultiplier );
 	add_weariness( attackerNationRecno, victimNationRecno, -warValue * KILL_WEARINESS_MULTIPLIER );
+
+	//--- memories: a grudge against the killer, and a recent loss others may take advantage of ---//
+
+	AiMemory* memPtr = get_memory(victimNationRecno, attackerNationRecno);
+
+	memPtr->grudge = MIN( (float) MAX_GRUDGE, memPtr->grudge + warValue );
+
+	recent_losses[victimNationRecno-1] += warValue;
 }
 //-------- End of function AiWarState::unit_killed --------//
 
@@ -369,6 +627,10 @@ void AiWarState::firm_destroyed(int attackerNationRecno, int victimNationRecno)
 	victimRecord->last_combat_date = info.game_date;
 
 	add_weariness( victimNationRecno, attackerNationRecno, FIRM_LOST_WEARINESS );
+
+	AiMemory* memPtr = get_memory(victimNationRecno, attackerNationRecno);
+
+	memPtr->grudge = MIN( (float) MAX_GRUDGE, memPtr->grudge + 4.0f );
 }
 //-------- End of function AiWarState::firm_destroyed --------//
 
@@ -377,12 +639,26 @@ void AiWarState::firm_destroyed(int attackerNationRecno, int victimNationRecno)
 //
 // Called by Town::surrender() before the town changes nation.
 //
-void AiWarState::town_captured(int fromNationRecno, int toNationRecno)
+void AiWarState::town_captured(int fromNationRecno, int toNationRecno, int townXLoc, int townYLoc)
 {
 	WarRecord* loserRecord  = get_record(fromNationRecno, toNationRecno);
 	WarRecord* winnerRecord = get_record(toNationRecno, fromNationRecno);
 
-	if( !loserRecord || !winnerRecord || !loserRecord->start_date )		// only count towns taken in a war
+	if( !loserRecord || !winnerRecord )
+		return;
+
+	//--- the loser remembers where it lost the town and who took it, even outside a war ---//
+
+	AiMemory* memPtr = get_memory(fromNationRecno, toNationRecno);
+
+	memPtr->grudge = MIN( (float) MAX_GRUDGE, memPtr->grudge + 20.0f );
+	memPtr->lost_town_x = townXLoc;
+	memPtr->lost_town_y = townYLoc;
+
+	log( "MEMORY      nation %d remembers losing a town at %d,%d to nation %d (grudge %.0f)",
+		  fromNationRecno, townXLoc, townYLoc, toNationRecno, memPtr->grudge );
+
+	if( !loserRecord->start_date )		// only count towns taken in a war
 		return;
 
 	loserRecord->towns_lost++;
@@ -435,6 +711,16 @@ void AiWarState::peace_refused(int nationRecno, int refusingNationRecno)
 void AiWarState::next_day()
 {
 	int nationCount = nation_array.size();
+
+	//--- grudges fade over the years (half in about a year), recent losses in weeks ---//
+
+	for( int a=0 ; a<MAX_NATION ; a++ )
+	{
+		recent_losses[a] *= 0.93f;
+
+		for( int b=0 ; b<MAX_NATION ; b++ )
+			memory[a][b].grudge *= 0.998f;
+	}
 
 	for( int i=1 ; i<=nationCount ; i++ )
 	{
@@ -491,6 +777,24 @@ void AiWarState::next_day()
 			log( "SUMMARY     nation %d: towns %d, population %d (largest town %d), cash %.0f, yearly profit %.0f, mines %d, military rank %d",
 				  i, nationPtr->ai_town_count, nationPtr->total_population, largestTownPop,
 				  nationPtr->cash, nationPtr->profit_365days(), nationPtr->ai_mine_count, nationPtr->military_rank_rating() );
+
+			if( nationPtr->is_ai() )
+			{
+				AiLearning* learnPtr = &learning[i-1];
+				char grudgeStr[200] = "";
+				int  len = 0;
+
+				for( int j=1 ; j<=nationCount ; j++ )
+				{
+					if( j!=i && !nation_array.is_deleted(j) && memory[i-1][j-1].grudge >= 1.0f && len < 180 )
+						len += snprintf( grudgeStr+len, sizeof(grudgeStr)-len, " %d:%.0f", j, memory[i-1][j-1].grudge );
+				}
+
+				log( "SUMMARY     nation %d is a %s: offensives won %d, lost %d, extra odds %d%%, feints %d/%d, raids %d/%d, scheme on %d, grudges%s",
+					  i, style_name(style[i-1]), learnPtr->offensives_won, learnPtr->offensives_lost, learnPtr->odds_extra_percent,
+					  learnPtr->feints_paid_off, learnPtr->feints_tried, learnPtr->raids_paid_off, learnPtr->raids_tried,
+					  learnPtr->scheme_nation_recno, grudgeStr[0] ? grudgeStr : " none" );
+			}
 		}
 
 		//------ update the posture of AI nations once a month ------//
@@ -825,16 +1129,16 @@ int AiWarState::can_start_offensive(int nationRecno, int targetNationRecno)
 //
 // Whether an AI nation should start a new war with a nation it is not at war with.
 //
-int AiWarState::can_declare_war(int nationRecno, int targetNationRecno)
+int AiWarState::can_declare_war(int nationRecno, int targetNationRecno, int ignorePeacePact)
 {
 	WarRecord* warRecord = get_record(nationRecno, targetNationRecno);
 
 	if( !warRecord )
 		return 1;
 
-	//--- a peace pact is kept, see OTALKMSG.H ---//
+	//--- a peace pact is kept, see OTALKMSG.H, except by a schemer ready to break it, see Nation::scheme_ready_to_strike() ---//
 
-	if( nation_array[nationRecno]->get_relation(targetNationRecno)->has_peace_pact() )
+	if( !ignorePeacePact && nation_array[nationRecno]->get_relation(targetNationRecno)->has_peace_pact() )
 		return 0;
 
 	//--- no new wars in the opening years: kingdoms build up first, sooner when a rival is close by ---//
@@ -913,6 +1217,18 @@ int AiWarState::write_file(File* filePtr)
 	if( !filePtr->file_write( strategy_date, sizeof(strategy_date) ) )
 		return 0;
 
+	if( !filePtr->file_write( style, sizeof(style) ) )
+		return 0;
+
+	if( !filePtr->file_write( recent_losses, sizeof(recent_losses) ) )
+		return 0;
+
+	if( !filePtr->file_write( memory, sizeof(memory) ) )
+		return 0;
+
+	if( !filePtr->file_write( learning, sizeof(learning) ) )
+		return 0;
+
 	return 1;
 }
 //-------- End of function AiWarState::write_file --------//
@@ -947,6 +1263,22 @@ int AiWarState::read_file(File* filePtr, int hasStrategy)
 		memset( strategy_date, 0, sizeof(strategy_date) );		// evaluated again as the game goes on
 	}
 
+	//--- styles, memories and learning: saved games before version 226 can't be loaded, see GameFile::read_file_header() ---//
+
+	if( !filePtr->file_read( style, sizeof(style) ) )
+		return 0;
+
+	if( !filePtr->file_read( recent_losses, sizeof(recent_losses) ) )
+		return 0;
+
+	if( !filePtr->file_read( memory, sizeof(memory) ) )
+		return 0;
+
+	if( !filePtr->file_read( learning, sizeof(learning) ) )
+		return 0;
+
+	memset( current_opportunity, 0, sizeof(current_opportunity) );
+
 	//------ validate the values read -------//
 
 	for( int i=0 ; i<MAX_NATION ; i++ )
@@ -956,6 +1288,23 @@ int AiWarState::read_file(File* filePtr, int hasStrategy)
 
 		if( strategy[i] < 0 || strategy[i] >= AI_STRATEGY_COUNT )
 			strategy[i] = AI_STRATEGY_ECONOMY;
+
+		if( style[i] < 0 || style[i] >= AI_STYLE_COUNT )
+			style[i] = AI_STYLE_OPPORTUNIST;
+
+		if( !(recent_losses[i] >= 0.0f && recent_losses[i] < 10000.0f) )
+			recent_losses[i] = 0.0f;
+
+		if( learning[i].scheme_nation_recno < 0 || learning[i].scheme_nation_recno > MAX_NATION )
+			learning[i].scheme_nation_recno = 0;
+
+		learning[i].odds_extra_percent = MAX( MIN_ODDS_EXTRA_PERCENT, MIN( MAX_ODDS_EXTRA_PERCENT, learning[i].odds_extra_percent ) );
+
+		for( int j=0 ; j<MAX_NATION ; j++ )
+		{
+			if( !(memory[i][j].grudge >= 0.0f && memory[i][j].grudge <= (float) MAX_GRUDGE) )
+				memory[i][j].grudge = 0.0f;
+		}
 
 		for( int j=0 ; j<MAX_NATION ; j++ )
 		{

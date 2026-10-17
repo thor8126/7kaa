@@ -701,6 +701,66 @@ int Nation::think_propose_peace_pact()
 {
 	int ourMilitary = military_rank_rating();
 
+	//------ a schemer buys time: a pact with the rival it wants to fight but can't beat yet ------//
+
+	if( ai_style() == AI_STYLE_SCHEMER )
+	{
+		AiLearning* learnPtr = ai_war_state.get_learning(nation_recno);
+
+		if( learnPtr->scheme_nation_recno &&
+			 ( nation_array.is_deleted(learnPtr->scheme_nation_recno) ||
+				( !get_relation(learnPtr->scheme_nation_recno)->has_peace_pact() && info.game_date > learnPtr->scheme_date + 365 ) ) )
+		{
+			AiWarState::log( "SCHEME      nation %d gives up its scheme on %d (no pact for a year)", nation_recno, learnPtr->scheme_nation_recno );
+			learnPtr->scheme_nation_recno = 0;
+		}
+
+		if( !learnPtr->scheme_nation_recno )
+		{
+			int bestNationRecno = 0, bestRating = 0;
+
+			for( int i=1 ; i<=nation_array.size() ; i++ )
+			{
+				if( nation_array.is_deleted(i) || i==nation_recno )
+					continue;
+
+				NationRelation* nationRelation = get_relation(i);
+
+				if( !nationRelation->has_contact || nationRelation->has_peace_pact() || nationRelation->status == NATION_HOSTILE ||
+					 !talk_res.can_send_msg(i, nation_recno, TALK_PROPOSE_PEACE_PACT) ||
+					 !ai_knows_nation(i) || !ai_can_reach_nation(i) )
+				{
+					continue;
+				}
+
+				int theirMilitary = intel_military_rank_rating(i);
+
+				if( theirMilitary*100 < ourMilitary*90 )		// it can beat this one already, no time to buy
+					continue;
+
+				int curRating = 50 + theirMilitary - ourMilitary;		// the bigger the rival, the more time it needs
+
+				if( curRating > bestRating )
+				{
+					bestRating = curRating;
+					bestNationRecno = i;
+				}
+			}
+
+			if( bestNationRecno && should_diplomacy_retry(TALK_PROPOSE_PEACE_PACT, bestNationRecno) )
+			{
+				learnPtr->scheme_nation_recno = bestNationRecno;
+				learnPtr->scheme_date = info.game_date;
+
+				AiWarState::log( "SCHEME      nation %d proposes a peace pact to %d to buy time (its military %d, ours %d), it plans to break it when strong",
+									  nation_recno, bestNationRecno, intel_military_rank_rating(bestNationRecno), ourMilitary );
+
+				talk_res.ai_send_talk_msg(bestNationRecno, nation_recno, TALK_PROPOSE_PEACE_PACT);
+				return 1;
+			}
+		}
+	}
+
 	for( int i=1 ; i<=nation_array.size() ; i++ )
 	{
 		if( nation_array.is_deleted(i) || i==nation_recno )
@@ -742,6 +802,46 @@ int Nation::think_propose_peace_pact()
 //------ End of function Nation::think_propose_peace_pact ------//
 
 
+#define learnPtr_scheme_target(i)	( ai_style() == AI_STYLE_SCHEMER && ai_war_state.get_learning(nation_recno)->scheme_nation_recno == (i) )
+
+//----- Begin of static function scheme_ready_to_strike -----//
+//
+// A schemer breaks the peace pact with its planned victim when it is
+// strong enough and its reputation can bear the cost of breaking it
+// (see NationBase::break_peace_pact()).
+//
+static int scheme_ready_to_strike(Nation* nationPtr, int targetNationRecno)
+{
+	int nationRecno = nationPtr->nation_recno;
+	AiLearning* learnPtr = ai_war_state.get_learning(nationRecno);
+
+	if( nationPtr->ai_style() != AI_STYLE_SCHEMER || learnPtr->scheme_nation_recno != targetNationRecno ||
+		 !nationPtr->get_relation(targetNationRecno)->has_peace_pact() )
+	{
+		return 0;
+	}
+
+	if( !ai_war_state.can_declare_war(nationRecno, targetNationRecno, 1) )		// 1-everything but the pact
+		return 0;
+
+	int ourMilitary   = nationPtr->military_rank_rating();
+	int theirMilitary = nationPtr->intel_military_rank_rating(targetNationRecno);
+	int neededMilitary = theirMilitary * (130 + learnPtr->odds_extra_percent) / 100;
+
+	if( nationPtr->reputation < 30 || ourMilitary < neededMilitary )
+	{
+		AiWarState::log( "SCHEME      nation %d bides its time against %d (military %d, needs %d; reputation %.0f, needs 30)",
+							  nationRecno, targetNationRecno, ourMilitary, neededMilitary, nationPtr->reputation );
+		return 0;
+	}
+
+	AiWarState::log( "SCHEME      nation %d is strong enough to break its pact with %d (military %d, theirs as it knows %d)",
+						  nationRecno, targetNationRecno, ourMilitary, theirMilitary );
+	return 1;
+}
+//------ End of static function scheme_ready_to_strike ------//
+
+
 //----- Begin of function Nation::think_declare_war -----//
 //
 // Choose a kingdom to declare war on, rated by Nation::war_target_rating()
@@ -770,6 +870,15 @@ int Nation::think_declare_war()
 	int bestRating=0, bestTargetNation=0;
 	int neededRating = 40 + pref_peacefulness/5;		// 40 to 60
 
+	switch( ai_style() )
+	{
+		case AI_STYLE_WARLORD:	neededRating -= 10; break;
+		case AI_STYLE_MERCHANT:	neededRating += 10; break;
+		case AI_STYLE_BUILDER:	neededRating += 10; break;
+	}
+
+	int candidateArray[MAX_NATION], ratingArray[MAX_NATION], candidateCount=0;
+
 	for( i=1 ; i<=nation_array.size() ; i++ )
 	{
 		if( nation_array.is_deleted(i) || i==nation_recno )
@@ -783,22 +892,37 @@ int Nation::think_declare_war()
 		if( nationRelation->status >= NATION_FRIENDLY )		// a treaty is ended first, see think_end_treaty()
 			continue;
 
-		if( !ai_war_state.can_declare_war(nation_recno, i) )		// in a truce, still weary from the last war, or not in an expanding posture
+		if( !ai_war_state.can_declare_war(nation_recno, i) &&		// in a truce, still weary from the last war, or not in an expanding posture
+			 !scheme_ready_to_strike(this, i) )						// a schemer breaks its peace pact
+		{
 			continue;
+		}
 
 		if( !ai_knows_nation(i) || !ai_can_reach_nation(i) )		// only a war it can fight, see OAI_INTEL.CPP and OAI_OFFN.CPP
 			continue;
 
 		int curRating = war_target_rating(i);		// it logs the rating, 0 for a hopeless war
 
-		if( curRating >= neededRating && curRating > bestRating )
+		if( learnPtr_scheme_target(i) )		// the planned victim of a schemer
+			curRating += 30;
+
+		if( curRating >= neededRating && candidateCount < MAX_NATION )
 		{
-			bestRating = curRating;
-			bestTargetNation = i;
+			candidateArray[candidateCount] = i;
+			ratingArray[candidateCount] = curRating;
+			candidateCount++;
 		}
 	}
 
-	//------------------------------------------//
+	//------ choose among the best, see AiWarState::weighted_pick() ------//
+
+	int pick = AiWarState::weighted_pick(ratingArray, candidateCount, 80);
+
+	if( pick >= 0 )
+	{
+		bestTargetNation = candidateArray[pick];
+		bestRating = ratingArray[pick];
+	}
 
 	if( !bestTargetNation )
 		return 0;
@@ -817,7 +941,14 @@ int Nation::think_declare_war()
 		return 0;
 	}
 
-	AiWarState::log( "WAR TARGET  nation %d declares war on %d (rating %d, needs %d)", nation_recno, bestTargetNation, bestRating, neededRating );
+	AiWarState::log( "WAR TARGET  nation %d (%s) declares war on %d (rating %d, needs %d, of %d candidates)%s", nation_recno,
+						  AiWarState::style_name(ai_style()), bestTargetNation, bestRating, neededRating, candidateCount,
+						  get_relation(bestTargetNation)->has_peace_pact() ? ", breaking its peace pact" : "" );
+
+	AiLearning* learnPtr = ai_war_state.get_learning(nation_recno);
+
+	if( learnPtr->scheme_nation_recno == bestTargetNation )		// the scheme comes to its end
+		learnPtr->scheme_nation_recno = 0;
 
 	talk_res.ai_send_talk_msg(bestTargetNation, nation_recno, TALK_DECLARE_WAR);
 	return 1;

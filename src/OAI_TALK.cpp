@@ -342,7 +342,27 @@ int Nation::consider_peace_pact(int withNationRecno)
 	if( curPosture == AI_POSTURE_CONSOLIDATE || curPosture == AI_POSTURE_RECOVER )
 		rating += 20;
 
+	//--- by style: a schemer welcomes time to build up, it may break the pact later (see OAI_DIPL.CPP) ---//
+
+	AiLearning* learnPtr = ai_war_state.get_learning(nation_recno);
+
+	switch( ai_style() )
+	{
+		case AI_STYLE_SCHEMER:		rating += 15; break;
+		case AI_STYLE_MERCHANT:		rating += 10; break;
+		case AI_STYLE_BUILDER:		rating += 10; break;
+		case AI_STYLE_WARLORD:		rating -= 15; break;
+	}
+
 	int acceptFlag = rating > 10;
+
+	if( acceptFlag && ai_style() == AI_STYLE_SCHEMER && !learnPtr->scheme_nation_recno && theirMilitary*100 >= ourMilitary*80 )
+	{
+		learnPtr->scheme_nation_recno = withNationRecno;		// a rival: the pact only buys time
+		learnPtr->scheme_date = info.game_date;
+
+		AiWarState::log( "SCHEME      nation %d accepts a peace pact with %d only to buy time", nation_recno, withNationRecno );
+	}
 
 	AiWarState::log( "TREATY      nation %d %s a peace pact with %d (rating %d: relation %d, their military %d, ours %d, posture %d)",
 						  nation_recno, acceptFlag ? "accepts" : "turns down", withNationRecno, rating,

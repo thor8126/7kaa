@@ -374,18 +374,239 @@ int Nation::war_target_rating(int nationRecno)
 
 	int tradeRating = -trade_rating(nationRecno)/2;
 
-	int totalRating = grudgeRating + nearRating + oddsRating + leaderRating + humanRating + threatRating + tradeRating;
+	//------ its style, the grudge it holds and the chance it sees now, see OAIWAR.H ------//
 
-	AiWarState::log( "WAR TARGET  nation %d rates %d%s: %d = grudge %d (relation %d, wars on us %d) + near %d (distance %d) + odds %d (our side %d = own %d + co-belligerents %d + partners %d, theirs %d) + leader %d + human %d + common threat %d + trade %d",
+	int styleRating = 0;
+
+	switch( ai_style() )
+	{
+		case AI_STYLE_WARLORD:		styleRating = 15;  break;
+		case AI_STYLE_MERCHANT:		styleRating = -15; tradeRating *= 2; break;
+		case AI_STYLE_BUILDER:		styleRating = -10; break;
+		case AI_STYLE_SCHEMER:		styleRating = 5;   break;
+		case AI_STYLE_OPPORTUNIST:	styleRating = 5;   break;
+	}
+
+	AiMemory* memPtr = ai_war_state.get_memory(nation_recno, nationRecno);
+
+	int revengeRating = memPtr ? (int) memPtr->grudge * (100-pref_forgiveness) / 300 : 0;		// 0 to 33
+
+	char opportunityStr[120];
+	int  opportunity = opportunity_rating(nationRecno, opportunityStr, sizeof(opportunityStr));
+	int  opportunityWeight = ai_style()==AI_STYLE_OPPORTUNIST ? 150 : ai_style()==AI_STYLE_WARLORD ? 100 : ai_style()==AI_STYLE_SCHEMER ? 80 : 40;
+	int  opportunityRating = opportunity * opportunityWeight / 100;
+
+	int totalRating = grudgeRating + nearRating + oddsRating + leaderRating + humanRating + threatRating + tradeRating +
+							styleRating + revengeRating + opportunityRating;
+
+	AiWarState::log( "WAR TARGET  nation %d rates %d%s: %d = grudge %d (relation %d, wars on us %d) + near %d (distance %d) + odds %d (our side %d = own %d + co-belligerents %d + partners %d, theirs %d) + leader %d + human %d + common threat %d + trade %d + %s %d + revenge %d (grudge %.0f) + opportunity %d (%s)",
 						  nation_recno, nationRecno, isHuman ? " (human)" : "", totalRating,
 						  grudgeRating, nationRelation->ai_relation_level, nationRelation->started_war_on_us_count,
 						  nearRating, minDistance < 0x7FFF ? minDistance : -1,
 						  oddsRating, ourSideMilitary, ownMilitary, coBelligerentMilitary, partnerMilitary, theirMilitary,
-						  leaderRating, humanRating, threatRating, tradeRating );
+						  leaderRating, humanRating, threatRating, tradeRating,
+						  AiWarState::style_name(ai_style()), styleRating, revengeRating, memPtr ? memPtr->grudge : 0.0f,
+						  opportunityRating, opportunityStr );
 
 	return totalRating;
 }
 //----------- End of function Nation::war_target_rating -----------//
+
+
+//--------- Begin of function Nation::opportunity_rating ---------//
+//
+// How good a moment it is to strike the given nation, from what this
+// nation can know: it is busy fighting another kingdom (wars are public),
+// it has just lost troops, forts of it that this nation sees now are
+// nearly empty, its soldiers are seen away from home.
+//
+// [char*] reasonStr - a description of the rating for the event log
+//
+// return : <int> 0 for no opportunity, 30 and more for a good one
+//
+int Nation::opportunity_rating(int targetNationRecno, char* reasonStr, int reasonLen)
+{
+	if( nation_array.is_deleted(targetNationRecno) || targetNationRecno == nation_recno )
+		return 0;
+
+	//------ busy fighting another kingdom ------//
+
+	int busyRating = 0, busyWithNation = 0;
+
+	for( int i=nation_array.size() ; i>0 ; i-- )
+	{
+		if( nation_array.is_deleted(i) || i==nation_recno || i==targetNationRecno )
+			continue;
+
+		if( nation_array[targetNationRecno]->get_relation_status(i) != NATION_HOSTILE )
+			continue;
+
+		WarRecord* warRecord = ai_war_state.get_record(targetNationRecno, i);
+
+		if( warRecord && warRecord->start_date && info.game_date - warRecord->last_combat_date <= 30 )
+		{
+			int curRating = 25 + (warRecord->losses > warRecord->kills ? 10 : 0);		// more if it is losing
+
+			if( curRating > busyRating )
+			{
+				busyRating = curRating;
+				busyWithNation = i;
+			}
+		}
+	}
+
+	//------ it has just lost troops ------//
+
+	float recentLosses = ai_war_state.recent_losses[targetNationRecno-1];
+
+	int lossRating = recentLosses >= 30.0f ? 30 : recentLosses >= 15.0f ? 20 : recentLosses >= 8.0f ? 10 : 0;
+
+	//------ its forts this nation sees now that are nearly empty ------//
+
+	int emptyFortCount = 0;
+
+	for( int i=firm_array.size() ; i>0 ; i-- )
+	{
+		if( firm_array.is_deleted(i) )
+			continue;
+
+		Firm* firmPtr = firm_array[i];
+
+		if( firmPtr->nation_recno != targetNationRecno || firmPtr->firm_id != FIRM_CAMP || firmPtr->under_construction )
+			continue;
+
+		if( firmPtr->worker_count <= 2 && ai_sees_loc(firmPtr->center_x, firmPtr->center_y) )
+			emptyFortCount++;
+	}
+
+	int fortRating = MIN( 24, emptyFortCount*8 );
+
+	//------ its soldiers seen away from its land ------//
+
+	int awayCount = 0;
+
+	for( int i=unit_array.size() ; i>0 ; i-- )
+	{
+		if( unit_array.is_deleted(i) )
+			continue;
+
+		Unit* unitPtr = unit_array[i];
+
+		if( unitPtr->nation_recno != targetNationRecno || !unitPtr->is_visible() || !unitPtr->race_id ||
+			 (unitPtr->rank_id != RANK_SOLDIER && unitPtr->rank_id != RANK_GENERAL) || unitPtr->is_civilian() )
+		{
+			continue;
+		}
+
+		if( world.get_loc(unitPtr->next_x_loc(), unitPtr->next_y_loc())->power_nation_recno == targetNationRecno )
+			continue;
+
+		if( ai_sees_unit(unitPtr) )
+			awayCount++;
+	}
+
+	int awayRating = awayCount >= 8 ? 20 : awayCount >= 4 ? 10 : 0;
+
+	int totalRating = busyRating + lossRating + fortRating + awayRating;
+
+	if( reasonStr )
+	{
+		snprintf( reasonStr, reasonLen, "busy %d (war with %d), losses %d (%.0f), empty forts %d (%d), soldiers away %d (%d)",
+					 busyRating, busyWithNation, lossRating, recentLosses, fortRating, emptyFortCount, awayRating, awayCount );
+	}
+
+	return totalRating;
+}
+//----------- End of function Nation::opportunity_rating -----------//
+
+
+//--------- Begin of function Nation::is_frontline_town ---------//
+//
+// return : <int> 1 if a village or building of a kingdom at war with this
+//          nation is near the village (see also AI walls, OCIVIL.CPP, and
+//          the forts that can go on an offensive, OAI_ATTK.CPP)
+//
+int Nation::is_frontline_town(Town* townPtr)
+{
+	enum { FRONTLINE_DISTANCE = 25 };
+
+	for( int i=town_array.size() ; i>0 ; i-- )
+	{
+		if( town_array.is_deleted(i) )
+			continue;
+
+		Town* otherTown = town_array[i];
+
+		if( otherTown->nation_recno && otherTown->nation_recno != nation_recno &&
+			 get_relation_status(otherTown->nation_recno) == NATION_HOSTILE &&
+			 misc.points_distance(otherTown->center_x, otherTown->center_y, townPtr->center_x, townPtr->center_y) <= FRONTLINE_DISTANCE )
+		{
+			return 1;
+		}
+	}
+
+	for( int i=firm_array.size() ; i>0 ; i-- )
+	{
+		if( firm_array.is_deleted(i) )
+			continue;
+
+		Firm* firmPtr = firm_array[i];
+
+		if( firmPtr->nation_recno && firmPtr->nation_recno != nation_recno &&
+			 get_relation_status(firmPtr->nation_recno) == NATION_HOSTILE &&
+			 misc.points_distance(firmPtr->center_x, firmPtr->center_y, townPtr->center_x, townPtr->center_y) <= FRONTLINE_DISTANCE )
+		{
+			return 1;
+		}
+	}
+
+	return 0;
+}
+//----------- End of function Nation::is_frontline_town -----------//
+
+
+//--------- Begin of function Nation::think_opportunity ---------//
+//
+// Opportunists and warlords look for a good moment to strike more often
+// than the regular offensive thinking, see Nation::process_ai().
+//
+void Nation::think_opportunity()
+{
+	if( ai_capture_enemy_town_recno || attack_camp_count > 0 )
+		return;
+
+	int bestOpportunity = 0, bestNationRecno = 0;
+	char reasonStr[120] = "", bestReasonStr[120] = "";
+
+	for( int i=nation_array.size() ; i>0 ; i-- )
+	{
+		if( nation_array.is_deleted(i) || i==nation_recno || get_relation_status(i) != NATION_HOSTILE )
+			continue;
+
+		if( !ai_knows_nation(i) || !ai_can_reach_nation(i) )
+			continue;
+
+		int curOpportunity = opportunity_rating(i, reasonStr, sizeof(reasonStr));
+
+		if( curOpportunity > bestOpportunity )
+		{
+			bestOpportunity = curOpportunity;
+			bestNationRecno = i;
+			strcpy( bestReasonStr, reasonStr );
+		}
+	}
+
+	int threshold = ai_style()==AI_STYLE_OPPORTUNIST ? 30 : 40;
+
+	if( !bestNationRecno || bestOpportunity < threshold )
+		return;
+
+	AiWarState::log( "OPPORTUNITY nation %d (%s) sees a chance against nation %d: %d (%s)",
+						  nation_recno, AiWarState::style_name(ai_style()), bestNationRecno, bestOpportunity, bestReasonStr );
+
+	think_war_offensive();
+}
+//----------- End of function Nation::think_opportunity -----------//
 
 
 //--------- Begin of function Nation::think_war_offensive ---------//
@@ -405,7 +626,30 @@ int Nation::think_war_offensive()
 	if( curPosture == AI_POSTURE_DEFEND || curPosture == AI_POSTURE_RECOVER )
 		return 0;
 
-	//------ the own town closest to a known enemy town ------//
+	//------ the enemy that offers the best opportunity now, see opportunity_rating() ------//
+
+	int opportunityNation = 0, opportunity = 0;
+	char opportunityStr[120] = "";
+
+	for( int i=nation_array.size() ; i>0 ; i-- )
+	{
+		if( nation_array.is_deleted(i) || i==nation_recno || get_relation_status(i) != NATION_HOSTILE )
+			continue;
+
+		char curStr[120];
+		int  curOpportunity = opportunity_rating(i, curStr, sizeof(curStr));
+
+		if( curOpportunity > opportunity )
+		{
+			opportunity = curOpportunity;
+			opportunityNation = i;
+			strcpy( opportunityStr, curStr );
+		}
+	}
+
+	ai_war_state.current_opportunity[nation_recno-1] = opportunity;		// it lowers the odds wanted, see AiWarState::attack_odds_percent()
+
+	//------ the own town closest to a known enemy town, nearer counted for the enemy with the best opportunity ------//
 
 	Town* capturerTown = NULL;
 	Town* nearestEnemyTown = NULL;
@@ -438,6 +682,9 @@ int Nation::think_war_offensive()
 			int curDistance = misc.points_distance( ownTown->center_x, ownTown->center_y,
 															 enemyTown->center_x, enemyTown->center_y );
 
+			if( enemyTown->nation_recno == opportunityNation )
+				curDistance -= opportunity/2;
+
 			if( curDistance < minDistance )
 			{
 				minDistance = curDistance;
@@ -459,9 +706,12 @@ int Nation::think_war_offensive()
 	int enemyMilitary = intel_military_rank_rating(nearestEnemyTown->nation_recno);
 	int useAllCamp = military_rank_rating() >= enemyMilitary * 2;
 
-	AiWarState::log( "OFFENSIVE   nation %d considers nation %d from town %d (enemy town %d, distance %d, our military %d, theirs as we know %d, cash %.0f)",
-						  nation_recno, nearestEnemyTown->nation_recno, capturerTown->town_recno, nearestEnemyTown->town_recno,
-						  minDistance, military_rank_rating(), enemyMilitary, cash );
+	if( opportunity >= 40 && nearestEnemyTown->nation_recno == opportunityNation )		// strike hard while it lasts
+		useAllCamp = 1;
+
+	AiWarState::log( "OFFENSIVE   nation %d (%s) considers nation %d from town %d (enemy town %d, distance %d, our military %d, theirs as we know %d, cash %.0f, use all forts %d; best opportunity %d against %d: %s)",
+						  nation_recno, AiWarState::style_name(ai_style()), nearestEnemyTown->nation_recno, capturerTown->town_recno, nearestEnemyTown->town_recno,
+						  minDistance, military_rank_rating(), enemyMilitary, cash, useAllCamp, opportunity, opportunityNation, opportunityStr );
 
 	int oldTargetTownRecno = ai_capture_enemy_town_recno;
 

@@ -102,8 +102,8 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 
 	if( defenseMode )
 		minTargetCombatLevel = targetCombatLevel * (100-pref_military_courage/2) / 100;		// 50% to 100%
-	else
-		minTargetCombatLevel = targetCombatLevel * (125+pref_force_projection/4) / 100;		// 125% to 150%
+	else		// 125% to 150%, more after failed offensives, less for a warlord or when an enemy is weak or busy, see AiWarState::attack_odds_percent()
+		minTargetCombatLevel = targetCombatLevel * MAX( 100, 125 + pref_force_projection/4 + ai_war_state.attack_odds_percent(nation_recno) ) / 100;
 
 	//--- if the AI is already on an attack mission ---//
 
@@ -219,6 +219,8 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 	//--------- locate for camps that are not linked to towns ---------//
 
 	int rc;
+	int skipRegion=0, skipEmpty=0, skipBusy=0, skipKing=0, skipInjured=0, skipLinked=0;		// for the event log
+	int frontlineTownCount=0, interiorTownCount=0, noSpareTownCount=0;
 
 	for( i=0 ; i<ai_camp_count ; i++ )
 	{
@@ -227,22 +229,30 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 		err_when( firmCamp->firm_id != FIRM_CAMP );
 
 		if( firmCamp->region_id != targetRegionId )
+		{
+			skipRegion++;
 			continue;
+		}
 
 		if( !firmCamp->overseer_recno || !firmCamp->worker_count )
+		{
+			skipEmpty++;
 			continue;
+		}
 
-		if( firmCamp->patrol_unit_count > 0 )     // if there are units patrolling out
+		if( firmCamp->patrol_unit_count > 0 ||    // if there are units patrolling out
+			 firmCamp->ai_capture_town_recno ||     // the base is trying to capture an independent town
+			 firmCamp->is_attack_camp )
+		{
+			skipBusy++;
 			continue;
-
-		if( firmCamp->ai_capture_town_recno )     // the base is trying to capture an independent town
-			continue;
-
-		if( firmCamp->is_attack_camp )
-			continue;
+		}
 
 		if( firmCamp->firm_recno == kingFirmRecno )
+		{
+			skipKing++;
 			continue;
+		}
 
 		if( leadAttackCampRecno && firmCamp->firm_recno == leadAttackCampRecno )
 			continue; // don't double count
@@ -254,6 +264,7 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 		if( overseerUnit->hit_points < overseerUnit->max_hit_points &&
 			 overseerUnit->hit_points < 100-ownNation->pref_military_courage/2 )		// 50 to 100
 		{
+			skipInjured++;
 			continue;
 		}
 
@@ -278,6 +289,9 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 		else
 		{
 			rc = firmCamp->linked_town_count==0;		// don't use this camp as it may be in the process of capturing an indepdendent town or an enemy town
+
+			if( !rc )
+				skipLinked++;		// counted with its towns below
 /*
 			for( int j=firmCamp->linked_town_count-1 ; j>=0 ; j-- )
 			{
@@ -313,6 +327,16 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 	Town* townPtr;
 	Firm* firmPtr;
 
+	int protectionPercent = 100;
+
+	switch( ai_style() )
+	{
+		case AI_STYLE_WARLORD:		protectionPercent = 50; break;
+		case AI_STYLE_OPPORTUNIST:	protectionPercent = ai_war_state.current_opportunity[nation_recno-1] >= 20 ? 50 : 80; break;
+		case AI_STYLE_SCHEMER:		protectionPercent = 80; break;
+		case AI_STYLE_BUILDER:		protectionPercent = 125; break;
+	}
+
 	if( !useAllCamp )         // in defense mode, every camp has been already counted
 	{
 		for( i=0 ; i<ai_town_count ; i++ )
@@ -324,7 +348,7 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 
 			err_when( townPtr->nation_recno != nation_recno );
 
-			//----- calculate the protection needed for this town ----//
+			//----- calculate the protection needed for this town: a warlord takes risks, a builder doesn't, see OAIWAR.H ----//
 
 			protectionNeeded = townPtr->protection_needed();
 
@@ -388,7 +412,24 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 				}
 			}
 
+			//--- a town away from the front needs less: its fort can go, the forts of the front stay ---//
+
+			int isFrontline = is_frontline_town(townPtr);
+
+			if( isFrontline )
+				frontlineTownCount++;
+			else
+				interiorTownCount++;
+
+			if( !isFrontline && protectionPercent <= 80 )		// warlords and opportunists send it
+				protectionNeeded = -1;
+			else
+				protectionNeeded = protectionNeeded * protectionPercent / (isFrontline ? 100 : 200);
+
 			//--- see if the current combat level is larger than the protection needed ---//
+
+			if( townCampCount > 0 && totalCombatLevel - townCampArray[0].combat_level <= protectionNeeded && townCampCount == 1 )
+				noSpareTownCount++;
 
 			if( totalCombatLevel > protectionNeeded )
 			{
@@ -444,6 +485,14 @@ int Nation::ai_attack_target(int targetXLoc, int targetYLoc, int targetCombatLev
 
 	if( totalCombatLevel < minTargetCombatLevel )		// if we are not strong enough to attack yet
 	{
+		if( !defenseMode )
+		{
+			AiWarState::log( "ATTACK      nation %d (%s): not strong enough for the target at %d,%d (forts that can go %d: %d, needed %d for a defense of %d, extra odds %d%%; of %d forts: other land %d, empty %d, busy %d, king's %d, injured general %d, guarding towns %d; towns at the front %d, away from it %d, with a single fort to guard them %d)",
+								  nation_recno, AiWarState::style_name(ai_style()), targetXLoc, targetYLoc, attack_camp_count, totalCombatLevel, minTargetCombatLevel, targetCombatLevel,
+								  ai_war_state.attack_odds_percent(nation_recno), ai_camp_count, skipRegion, skipEmpty, skipBusy, skipKing, skipInjured, skipLinked,
+								  frontlineTownCount, interiorTownCount, noSpareTownCount );
+		}
+
 		attack_camp_count=0;
 		return 0;
 	}

@@ -1847,7 +1847,7 @@ void Town::surrender(int toNationRecno)
 	//------ record towns taken in wars ------//
 
 	if( nation_recno && nation_recno != toNationRecno )
-		ai_war_state.town_captured(nation_recno, toNationRecno);
+		ai_war_state.town_captured(nation_recno, toNationRecno, center_x, center_y);
 
 	AiWarState::log( "TOWN        town %d (pop %d) surrenders from nation %d to %d", town_recno, population, nation_recno, toNationRecno );
 

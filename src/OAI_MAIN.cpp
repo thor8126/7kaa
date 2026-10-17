@@ -223,8 +223,90 @@ void Nation::init_personalty()
 	pref_unit_chase_distance  = 15+misc.random(15);
 	pref_repair_concern       = misc.random(101);
 	pref_scout		  = misc.random(101);
+
+	init_style();
 }
 //---------- End of function Nation::init_personalty --------//
+
+
+//--------- Begin of function Nation::init_style --------//
+//
+// Each AI nation gets a style for the whole game (see AI_STYLE_??? in
+// OAIWAR.H), which sets the preferences that matter to it, so that its
+// decisions agree with each other, and which the AI's decisions also use
+// directly.
+//
+void Nation::init_style()
+{
+	int styleId = misc.random(AI_STYLE_COUNT);
+
+	switch( styleId )
+	{
+		case AI_STYLE_WARLORD:
+			pref_military_courage     = 60 + misc.random(41);
+			pref_force_projection     = 60 + misc.random(41);
+			pref_military_development = 60 + misc.random(41);
+			pref_peacefulness         = misc.random(31);
+			pref_use_weapon           = 50 + misc.random(51);
+			pref_forgiveness          = misc.random(41);
+			break;
+
+		case AI_STYLE_MERCHANT:
+			pref_trading_tendency     = 70 + misc.random(31);
+			pref_military_development = misc.random(41);
+			pref_peacefulness         = 50 + misc.random(51);
+			pref_allying_tendency     = 50 + misc.random(51);
+			pref_honesty              = 50 + misc.random(51);
+			pref_cash_reserve         = 40 + misc.random(61);
+			break;
+
+		case AI_STYLE_BUILDER:
+			pref_military_development = misc.random(41);
+			pref_inc_pop_by_capture   = misc.random(41);
+			pref_repair_concern       = 60 + misc.random(41);
+			pref_loyalty_concern      = 50 + misc.random(51);
+			pref_town_harmony         = 50 + misc.random(51);
+			pref_peacefulness         = 40 + misc.random(61);
+			break;
+
+		case AI_STYLE_SCHEMER:
+			pref_honesty              = misc.random(31);
+			pref_allying_tendency     = 60 + misc.random(41);
+			pref_spy                  = 60 + misc.random(41);
+			pref_forgiveness          = misc.random(41);
+			pref_peacefulness         = 30 + misc.random(41);
+			break;
+
+		case AI_STYLE_OPPORTUNIST:
+			pref_military_courage     = 30 + misc.random(51);
+			pref_force_projection     = 40 + misc.random(51);
+			pref_forgiveness          = misc.random(31);
+			pref_peacefulness         = misc.random(51);
+			break;
+	}
+
+	pref_economic_development = 100-pref_military_development;
+	pref_inc_pop_by_growth    = 100-pref_inc_pop_by_capture;
+
+	ai_war_state.set_style(nation_recno, styleId);
+
+	if( is_ai() )
+	{
+		AiWarState::log( "STYLE       nation %d is a %s: courage %d, force projection %d, military %d, peacefulness %d, trading %d, honesty %d, forgiveness %d, allying %d",
+							  nation_recno, AiWarState::style_name(styleId), pref_military_courage, pref_force_projection,
+							  pref_military_development, pref_peacefulness, pref_trading_tendency, pref_honesty, pref_forgiveness, pref_allying_tendency );
+	}
+}
+//---------- End of function Nation::init_style --------//
+
+
+//--------- Begin of function Nation::ai_style --------//
+//
+int Nation::ai_style()
+{
+	return ai_war_state.get_style(nation_recno);
+}
+//---------- End of function Nation::ai_style --------//
 
 
 //--------- Begin of function Nation::process_ai --------//
@@ -329,10 +411,34 @@ void Nation::process_ai()
 	if( info.game_date%20 == (nation_recno*3)%20 )
 		think_war_offensive();
 
+	//----- opportunists and warlords strike when an enemy is weak or busy, schemers less often, see OAI_OFFN.CPP -----//
+
+	switch( ai_style() )
+	{
+		case AI_STYLE_OPPORTUNIST:
+		case AI_STYLE_WARLORD:
+			if( info.game_date%5 == nation_recno%5 )
+				think_opportunity();
+			break;
+
+		case AI_STYLE_SCHEMER:
+			if( info.game_date%10 == nation_recno%10 )
+				think_opportunity();
+			break;
+	}
+
 	//----- think about raiding the economy of enemies every month, see OAI_RAID.CPP -----//
 
 	if( info.game_date%30 == (nation_recno*7)%30 )
 		think_raid();
+
+	//----- warlords and opportunists raid twice a month -----//
+
+	if( (ai_style() == AI_STYLE_WARLORD || ai_style() == AI_STYLE_OPPORTUNIST) &&
+		 info.game_date%30 == (nation_recno*7+15)%30 )
+	{
+		think_raid();
+	}
 
 	//----- think about building roads twice a year -----//
 

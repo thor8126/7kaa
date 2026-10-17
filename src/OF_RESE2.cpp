@@ -111,6 +111,9 @@ void FirmResearch::think_new_research()
 	int		 isAtWar   = nationPtr->total_enemy_count() > 0;
 	String	 ratingStr;
 
+	enum { MAX_TECH_CANDIDATE = 50 };
+	int		 techIdArray[MAX_TECH_CANDIDATE], ratingArray[MAX_TECH_CANDIDATE], candidateCount=0;
+
 	for( int techId=tech_res.tech_count ; techId>0 ; techId-- )
 	{
 		techInfo = tech_res[techId];
@@ -119,8 +122,6 @@ void FirmResearch::think_new_research()
 			continue;
 
 		curRating = 100 + techInfo->is_nation_researching(nation_recno)*20;		// keep researching what other towers research
-
-		curRating += misc.random(20);
 
 		if( techInfo->civil_id )
 		{
@@ -170,6 +171,38 @@ void FirmResearch::think_new_research()
 					curRating += strategy == AI_STRATEGY_NAVAL ? 50 : 0;
 					break;
 			}
+
+			//--- the nation's style, see OAIWAR.H ---//
+
+			switch( nationPtr->ai_style() )
+			{
+				case AI_STYLE_BUILDER:
+					if( techInfo->civil_id == CIVIL_AGRICULTURE || techInfo->civil_id == CIVIL_INDUSTRY ||
+						 techInfo->civil_id == CIVIL_ENGINEERING || techInfo->civil_id == CIVIL_ADMINISTRATION )
+					{
+						curRating += 20;
+					}
+					break;
+
+				case AI_STYLE_MERCHANT:
+					if( techInfo->civil_id == CIVIL_COMMERCE )
+						curRating += 25;
+					else if( techInfo->civil_id == CIVIL_NAVIGATION )
+						curRating += 10;
+					break;
+
+				case AI_STYLE_WARLORD:
+					if( techInfo->civil_id == CIVIL_MILITARY_DRILL )
+						curRating += 20;
+					else if( techInfo->civil_id == CIVIL_MEDICINE )
+						curRating += 10;
+					break;
+
+				case AI_STYLE_SCHEMER:
+					if( techInfo->civil_id == CIVIL_ADMINISTRATION )
+						curRating += 10;
+					break;
+			}
 		}
 		else	//--- weapons and ships ---//
 		{
@@ -179,6 +212,13 @@ void FirmResearch::think_new_research()
 
 			if( techInfo->class_id == TECH_SHIP )		// useless without harbors
 				curRating += nationPtr->ai_harbor_count > 0 || strategy == AI_STRATEGY_NAVAL ? 20 : -100;
+
+			switch( nationPtr->ai_style() )
+			{
+				case AI_STYLE_WARLORD:		curRating += 20; break;
+				case AI_STYLE_OPPORTUNIST:	curRating += 10; break;
+				case AI_STYLE_MERCHANT:		curRating -= 10; break;
+			}
 		}
 
 		ratingStr += techInfo->tech_des();
@@ -186,20 +226,31 @@ void FirmResearch::think_new_research()
 		ratingStr += curRating;
 		ratingStr += ", ";
 
-		if( curRating > bestRating )
+		if( candidateCount < MAX_TECH_CANDIDATE )
 		{
-			bestTechId = techId;
-			bestRating = curRating;
+			techIdArray[candidateCount] = techId;
+			ratingArray[candidateCount] = curRating;
+			candidateCount++;
 		}
+	}
+
+	//------ choose among the best, see AiWarState::weighted_pick() ------//
+
+	int pick = AiWarState::weighted_pick(ratingArray, candidateCount, 85);
+
+	if( pick >= 0 )
+	{
+		bestTechId = techIdArray[pick];
+		bestRating = ratingArray[pick];
 	}
 
 	//------------------------------------//
 
 	if( bestTechId )
 	{
-		AiWarState::log( "RESEARCH    nation %d tower %d researches %s %d (strategy %d, at war %d; %s)",
-							  nation_recno, firm_recno, tech_res[bestTechId]->tech_des(),
-							  tech_res[bestTechId]->get_nation_tech_level(nation_recno)+1, strategy, isAtWar, (char*) ratingStr );
+		AiWarState::log( "RESEARCH    nation %d (%s) tower %d researches %s %d (rating %d, strategy %d, at war %d; %s)",
+							  nation_recno, AiWarState::style_name(nationPtr->ai_style()), firm_recno, tech_res[bestTechId]->tech_des(),
+							  tech_res[bestTechId]->get_nation_tech_level(nation_recno)+1, bestRating, strategy, isAtWar, (char*) ratingStr );
 
 		start_research( bestTechId, COMMAND_AI );
 	}

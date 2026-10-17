@@ -131,6 +131,7 @@ static int loaded_game_version;
 #define FIRST_VERSION_WITH_NEW_TREATIES	223		// earlier saved games have smaller nation relation and talk records, without road treaties and peace pacts
 #define FIRST_VERSION_WITH_HARVEST			224		// earlier saved games have smaller town records, without Town::harvest_food
 #define FIRST_VERSION_WITH_TOWN_WALLS		225		// earlier saved games have smaller town records, without Town::wall_built
+#define FIRST_VERSION_WITH_AI_MIND			226		// earlier saved games don't have the AI's styles, memories and learning (AiWarState)
 
 bool GameFile::read_file_same_version = true;
 
@@ -251,6 +252,9 @@ int GameFile::read_file(File* filePtr)
 
 	if(load_file_game_version < FIRST_VERSION_WITH_TOWN_WALLS)
 		return -1;		// town records saved before walled villages were recorded are of a different size
+
+	if(load_file_game_version < FIRST_VERSION_WITH_AI_MIND)
+		return -1;		// the AI war state saved before the AI's styles, memories and learning is of a different size
 
 	read_file_same_version = ( load_file_game_version/100==GAME_VERSION/100 );
 	loaded_game_version = load_file_game_version;
