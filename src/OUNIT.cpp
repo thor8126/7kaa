@@ -1114,6 +1114,14 @@ void Unit::update_loyalty()
 	if( unit_mode == UNIT_MODE_CONSTRUCT )		// constructor worker will not change their loyalty when they are in a building
 		return;
 
+	//--- a farmer is a peasant of its village at work: it is as loyal as the village's people, see OCIVIL.CPP ---//
+
+	if( farm_town_recno && !town_array.is_deleted(farm_town_recno) )
+	{
+		loyalty = target_loyalty = (int) town_array[farm_town_recno]->race_loyalty_array[race_id-1];
+		return;
+	}
+
 	// The following never really worked that well, since it created a dead give away due to the constant loyalty.
 	//----- if this unit is a spy, set its fake loyalty ------//
 
@@ -1299,6 +1307,9 @@ int Unit::think_betray()
    err_when( unit_array.is_deleted(unitRecno) );
 
 	if( spy_recno )			// spies do not betray here, spy has its own functions for betrayal
+		return 0;
+
+	if( farm_town_recno )	// a farmer is as loyal as its village (see update_loyalty()), the village rebels instead
 		return 0;
 
 	//----- if the unit is in training or is constructing a building, do not rebel -------//

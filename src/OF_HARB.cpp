@@ -80,7 +80,7 @@ enum { HARBOR_MENU_MAIN,
 
 static VBrowseIF 		browse_ship;
 static Button3D		button_build, button_sail;
-static Button			button_repeat_ship;		// keep building the same ship
+static Button3D		button_repeat_ship;		// keep building the same ship
 static Button3D		button_cancel_build;
 static ButtonGroup	button_mode(2);
 // ###### begin Gilbert 20/9 #######//
@@ -340,8 +340,8 @@ void FirmHarbor::disp_main_menu(int refreshFlag)
 	{
 		button_build.paint( SHIP_DET_X1, SHIP_DET_Y2+4, 'A', "MAKESHIP" );
 		button_sail.paint ( SHIP_DET_X1+BUTTON_ACTION_WIDTH, SHIP_DET_Y2+4, 'A', "SAILOUT" );
-		button_repeat_ship.paint_text( SHIP_DET_X1+BUTTON_ACTION_WIDTH*2+4, SHIP_DET_Y2+16, SHIP_DET_X1+BUTTON_ACTION_WIDTH*3+20, SHIP_DET_Y2+34,
-			_("Repeat"), 1, repeat_build );
+		button_repeat_ship.paint( SHIP_DET_X1+BUTTON_ACTION_WIDTH*2, SHIP_DET_Y2+4, 'A', "REPEAT", 0, repeat_build );		// 0-a switch, pushed while it's on
+		button_repeat_ship.set_help_code("");		// its help is given by detect_main_menu()
 	}
 
 	if( ship_count > 0 )
@@ -389,6 +389,9 @@ int FirmHarbor::detect_main_menu()
 	}
 
 	//-------- detect the repeat button ---------//
+
+	help.set_custom_help( button_repeat_ship.x1, button_repeat_ship.y1, button_repeat_ship.x2, button_repeat_ship.y2, _("Repeat"),
+		repeat_build ? _("On: the harbor keeps building the same ship. Click to stop it.") : _("Keep building the same ship.") );
 
 	if( button_repeat_ship.detect() )
 	{

@@ -25,14 +25,17 @@
 // CIVIL_??? in OTECHRES.H). Each one brings a new mechanic:
 //
 // Agriculture    - In the farming season, some of the peasants of a village
-//                  walk out to fields next to it and farm them: a farmer
-//                  produces FARMER_FOOD_YEAR_PRODUCTION food a year, four
-//                  times as much as a peasant in the village. The fields are
-//                  drawn while they are farmed. Farmers are people on the
-//                  map, enemies can kill them; they go home at the end of the
-//                  season and when the village is attacked. Level II: more
-//                  farmers and a longer season. The player can stop the
-//                  farming of a village with its Farming button.
+//                  walk out to fields next to it and work them, moving from
+//                  one part of the fields to another: a farmer grows
+//                  FARMER_FOOD_YEAR_PRODUCTION food a year, eight times as
+//                  much as a peasant in the village, which the village
+//                  brings in as its harvest at the end of the season. The
+//                  fields are drawn while they are farmed. Farmers are
+//                  people on the map, enemies can kill them; they are as
+//                  loyal as their village and never betray. They go home at
+//                  the end of the season and when the village is attacked.
+//                  Level II: more farmers and a longer season. The player
+//                  can stop the farming of a village with its Fields button.
 // Medicine       - A soldier or general falling inside its own kingdom's
 //                  territory may be carried back to the nearest fort instead
 //                  of dying (1 in 4, 1 in 2 at level II). Soldiers in forts
@@ -83,11 +86,12 @@
 
 //------- Define constants -------//
 
-#define FARMER_FOOD_YEAR_PRODUCTION		120		// a peasant in the village produces PEASANT_FOOD_YEAR_PRODUCTION (30)
+#define FARMER_FOOD_YEAR_PRODUCTION		240		// a peasant in the village produces PEASANT_FOOD_YEAR_PRODUCTION (30)
 #define FARM_FIELD_CANDIDATE_COUNT		10			// places for 2x2 fields around a village
 #define FARM_FIELD_RELEASE_DISTANCE		12			// a farmer ordered farther than this from its village is no longer a farmer
 #define FARMER_ATTACK_RECALL_DAYS		15			// farmers stay home this long after the village was attacked
-#define FARMER_WANDER_DAYS					12			// a farmer moves to another part of its field this often
+#define FARMER_WORK_MOVE_DAYS				3			// a farmer moves to another part of the fields this often
+#define FARMER_RECALL_SLACK				2			// farmers are called home when there are more than this many too many
 #define FARMER_LOST_DISTANCE				50			// a farmer this far from its village is lost and no longer a farmer
 
 #define MEDIC_SAVE_PERCENT_PER_LEVEL	25
@@ -118,12 +122,15 @@ CivilTech civil_tech;
 
 static float toll_paid_array[MAX_NATION];		// tolls received in the current month, for the log
 static int	 medic_saved_array[MAX_NATION];		// soldiers carried back in the current month, for the log
+static int	 work_move_array[MAX_NATION];			// farmers that moved to another part of the fields in the current month, for the log
+static int	 work_stuck_array[MAX_NATION];		// farmers that found no free spot to move to
 
 //------- Define static functions -------//
 
 static int  field_loc(Town* townPtr, int fieldId, int& xLoc, int& yLoc);
 static int  valid_field_count(Town* townPtr);
 static int  active_field_count(Town* townPtr);
+static int  find_work_loc(Town* townPtr, Unit* unitPtr, int& xLoc, int& yLoc);
 static int  watchtower_effect_id();
 static char* field_bitmap(int growthStage);
 
@@ -138,6 +145,8 @@ void CivilTech::reset()
 
 	memset( toll_paid_array, 0, sizeof(toll_paid_array) );
 	memset( medic_saved_array, 0, sizeof(medic_saved_array) );
+	memset( work_move_array, 0, sizeof(work_move_array) );
+	memset( work_stuck_array, 0, sizeof(work_stuck_array) );
 }
 //----------- End of function CivilTech::reset -----------//
 
@@ -164,15 +173,17 @@ void CivilTech::next_day()
 
 		for( int i=0 ; i<MAX_NATION ; i++ )
 		{
-			if( toll_paid_array[i] > 0 || medic_saved_array[i] > 0 )
+			if( toll_paid_array[i] > 0 || medic_saved_array[i] > 0 || work_move_array[i] > 0 || work_stuck_array[i] > 0 )
 			{
-				AiWarState::log( "CIVIL       nation %d last month: tolls received %.0f, soldiers carried back by medics %d",
-									  i+1, toll_paid_array[i], medic_saved_array[i] );
+				AiWarState::log( "CIVIL       nation %d last month: tolls received %.0f, soldiers carried back by medics %d, farmer work moves %d (no free spot %d)",
+									  i+1, toll_paid_array[i], medic_saved_array[i], work_move_array[i], work_stuck_array[i] );
 			}
 		}
 
 		memset( toll_paid_array, 0, sizeof(toll_paid_array) );
 		memset( medic_saved_array, 0, sizeof(medic_saved_array) );
+		memset( work_move_array, 0, sizeof(work_move_array) );
+		memset( work_stuck_array, 0, sizeof(work_stuck_array) );
 	}
 
 	//------ the AI uses the civil technologies once a month ------//
@@ -373,6 +384,11 @@ void CivilTech::process_farming()
 			isReturning = 1;
 		}
 
+		//--- as loyal as the people of its village, see Unit::update_loyalty() ---//
+
+		if( unitPtr->race_id )
+			unitPtr->loyalty = unitPtr->target_loyalty = (int) townPtr->race_loyalty_array[unitPtr->race_id-1];
+
 		//------ farm -------//
 
 		if( isReturning )
@@ -383,26 +399,36 @@ void CivilTech::process_farming()
 
 		workingCountArray[townRecno]++;
 
-		nation_array[unitPtr->nation_recno]->add_food( (float) FARMER_FOOD_YEAR_PRODUCTION / 365 );
+		townPtr->harvest_food += (float) FARMER_FOOD_YEAR_PRODUCTION * edict_food_multiplier(townPtr) / 365;		// brought in at the end of the season
 
-		//--- move to another part of its field now and then ---//
+		//--- work on another part of the fields every few days (a farmer that stopped next to a busy spot is still on ACTION_MOVE) ---//
 
-		if( unitPtr->action_mode2 == ACTION_STOP && unitPtr->cur_action == SPRITE_IDLE &&
-			 info.game_date % FARMER_WANDER_DAYS == i % FARMER_WANDER_DAYS )
+		if( (unitPtr->action_mode2 == ACTION_STOP || unitPtr->action_mode2 == ACTION_MOVE) && unitPtr->cur_action == SPRITE_IDLE &&
+			 info.game_date % FARMER_WORK_MOVE_DAYS == i % FARMER_WORK_MOVE_DAYS )
 		{
-			int xLoc = unitPtr->next_x_loc() + misc.random(3) - 1;
-			int yLoc = unitPtr->next_y_loc() + misc.random(3) - 1;
+			int xLoc, yLoc;
 
-			if( xLoc >= 0 && yLoc >= 0 && xLoc < MAX_WORLD_X_LOC && yLoc < MAX_WORLD_Y_LOC &&
-				 world.get_loc(xLoc, yLoc)->can_move(UNIT_LAND) &&
-				 world.get_loc(xLoc, yLoc)->power_nation_recno == townPtr->nation_recno )
+			if( find_work_loc(townPtr, unitPtr, xLoc, yLoc) )
 			{
 				unitPtr->move_to(xLoc, yLoc);
+				work_move_array[unitPtr->nation_recno-1]++;
 			}
+			else
+				work_stuck_array[unitPtr->nation_recno-1]++;
 		}
 	}
 
 	//------- the villages -------//
+
+	float harvestFoodArray[MAX_NATION];		// the harvests brought in today, by nation
+	float bestHarvestArray[MAX_NATION];
+	short harvestTownCountArray[MAX_NATION];
+	short bestHarvestTownArray[MAX_NATION];
+
+	memset( harvestFoodArray, 0, sizeof(harvestFoodArray) );
+	memset( bestHarvestArray, 0, sizeof(bestHarvestArray) );
+	memset( harvestTownCountArray, 0, sizeof(harvestTownCountArray) );
+	memset( bestHarvestTownArray, 0, sizeof(bestHarvestTownArray) );
 
 	for( i=townCount ; i>0 ; i-- )
 	{
@@ -412,6 +438,26 @@ void CivilTech::process_farming()
 		Town* townPtr = town_array[i];
 
 		townPtr->farmer_count = workingCountArray[i] + returningCountArray[i];
+
+		//------ the end of the season: the harvest is brought in ------//
+
+		if( townPtr->harvest_food > 0 && townPtr->nation_recno && !is_farm_season(townPtr->nation_recno) )
+		{
+			int n = townPtr->nation_recno - 1;
+
+			harvestFoodArray[n] += townPtr->harvest_food;
+			harvestTownCountArray[n]++;
+
+			if( townPtr->harvest_food > bestHarvestArray[n] )
+			{
+				bestHarvestArray[n] = townPtr->harvest_food;
+				bestHarvestTownArray[n] = i;
+			}
+
+			AiWarState::log( "FARM        nation %d: town %d brings in its harvest: %.0f food", townPtr->nation_recno, i, townPtr->harvest_food );
+
+			townPtr->harvest_food = 0;
+		}
 
 		if( !townPtr->nation_recno || ( !townPtr->farmer_count && !tech_res.civil_level(townPtr->nation_recno, CIVIL_AGRICULTURE) ) )
 			continue;
@@ -424,10 +470,27 @@ void CivilTech::process_farming()
 			if( info.game_date%2 == i%2 )		// one more farmer every other day
 				send_farmer(townPtr);
 		}
-		else if( workingCount > wantedCount )
+		else if( workingCount > wantedCount &&
+					( wantedCount==0 || workingCount > wantedCount + FARMER_RECALL_SLACK ) )		// not for every small change in the no. of peasants
 		{
 			recall_farmers(townPtr, workingCount - wantedCount);
 		}
+	}
+
+	//------- the harvests -------//
+
+	for( i=0 ; i<MAX_NATION ; i++ )
+	{
+		if( !harvestTownCountArray[i] || nation_array.is_deleted(i+1) )
+			continue;
+
+		nation_array[i+1]->add_food( harvestFoodArray[i] );
+
+		AiWarState::log( "FARM        nation %d: the harvest is in: %.0f food from %d villages (food now %.0f)",
+							  i+1, harvestFoodArray[i], harvestTownCountArray[i], nation_array[i+1]->food );
+
+		if( i+1 == nation_array.player_recno )
+			news_array.harvest_in( bestHarvestTownArray[i], (int) harvestFoodArray[i], harvestTownCountArray[i] );
 	}
 }
 //----------- End of function CivilTech::process_farming -----------//
@@ -655,6 +718,73 @@ static int active_field_count(Town* townPtr)
 	return MIN( valid_field_count(townPtr), (townPtr->farmer_count+1)/2 );
 }
 //----------- End of static function active_field_count -----------//
+
+
+//--------- Begin of static function find_work_loc ---------//
+//
+// Another location of the fields being farmed for a farmer to work on:
+// in the field nearest to it, or now and then in another one.
+//
+static int find_work_loc(Town* townPtr, Unit* unitPtr, int& xLoc, int& yLoc)
+{
+	int fieldCount = active_field_count(townPtr);
+
+	if( !fieldCount )
+		return 0;
+
+	//----- the field nearest to the farmer -----//
+
+	int fieldNo = 0, minDistance = 0x7FFF, activeNo = 0;
+
+	for( int i=0 ; i<FARM_FIELD_CANDIDATE_COUNT && activeNo<fieldCount ; i++ )
+	{
+		if( !field_loc(townPtr, i, xLoc, yLoc) )
+			continue;
+
+		int curDistance = misc.points_distance( xLoc, yLoc, unitPtr->next_x_loc(), unitPtr->next_y_loc() );
+
+		if( curDistance < minDistance )
+		{
+			minDistance = curDistance;
+			fieldNo = activeNo;
+		}
+
+		activeNo++;
+	}
+
+	if( fieldCount > 1 && misc.random(4)==0 )		// one time in four, another field
+		fieldNo = misc.random(fieldCount);
+
+	for( int i=0 ; i<FARM_FIELD_CANDIDATE_COUNT ; i++ )
+	{
+		if( !field_loc(townPtr, i, xLoc, yLoc) )
+			continue;
+
+		if( fieldNo-- > 0 )
+			continue;
+
+		int startNo = misc.random(4);
+
+		for( int j=0 ; j<4 ; j++ )
+		{
+			int x = xLoc + (startNo+j)%2;
+			int y = yLoc + (startNo+j)/2%2;
+
+			if( (x != unitPtr->next_x_loc() || y != unitPtr->next_y_loc()) &&
+				 world.get_loc(x, y)->can_move(UNIT_LAND) )
+			{
+				xLoc = x;
+				yLoc = y;
+				return 1;
+			}
+		}
+
+		return 0;		// the field is full
+	}
+
+	return 0;
+}
+//----------- End of static function find_work_loc -----------//
 
 
 //--------- Begin of function CivilTech::find_field_loc ---------//

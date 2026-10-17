@@ -41,6 +41,7 @@
 #include <OBULLET.h>
 #include <OREBEL.h>
 #include <OREMOTE.h>
+#include <OMISC.h>
 #include <OSPY.h>
 #include <OINFO.h>
 #include <OGAME.h>
@@ -75,28 +76,19 @@
 
 static int		  report_disp_frame_no;
 static Button3D  button_menu;
-static Button    button_army;		// select the whole army (also Ctrl+A), drawn over the zoom view
+//---- small buttons drawn over the top right corner of the zoom view, one below another ----//
 
-#define ARMY_BUTTON_X1	(ZOOM_X2-62)
-#define ARMY_BUTTON_Y1	(ZOOM_Y1+4)
-#define ARMY_BUTTON_X2	(ZOOM_X2-4)
-#define ARMY_BUTTON_Y2	(ZOOM_Y1+22)
+static Button3D  button_army;		// select the whole army (also Ctrl+A)
+static Button3D  button_road;		// build roads
+static Button3D  button_defend;		// call to arms while the player is under attack, see OCALLARM.CPP
+static Button3D  button_idle;		// look at the next idle unit (also Ctrl+I)
+static int       idle_button_count;	// no. of idle units shown beside the button, 0 if the button is hidden
 
-static Button    button_road;		// build roads, below the army button
-
-#define ROAD_BUTTON_Y1	(ZOOM_Y1+26)
-#define ROAD_BUTTON_Y2	(ZOOM_Y1+44)
-
-static Button    button_defend;		// call to arms, below the road button while the player is under attack, see OCALLARM.CPP
-
-#define DEFEND_BUTTON_Y1	(ZOOM_Y1+48)
-#define DEFEND_BUTTON_Y2	(ZOOM_Y1+66)
-
-static Button    button_idle;		// look at the next idle unit (also Ctrl+I), below the road or defend button
-static int       idle_button_count;	// no. of idle units shown on the button, 0 if the button is hidden
-
-#define IDLE_BUTTON_Y1		(call_to_arms.is_active() ? ZOOM_Y1+70 : ZOOM_Y1+48)
-#define IDLE_BUTTON_Y2		(IDLE_BUTTON_Y1+18)
+#define MAP_BUTTON_X1		(ZOOM_X2-29)		// the buttons are 25x26
+#define ARMY_BUTTON_Y1		(ZOOM_Y1+4)
+#define ROAD_BUTTON_Y1		(ZOOM_Y1+32)
+#define DEFEND_BUTTON_Y1	(ZOOM_Y1+60)
+#define IDLE_BUTTON_Y1		(call_to_arms.is_active() ? ZOOM_Y1+88 : ZOOM_Y1+60)
 
 static int is_army_button_shown();
 
@@ -433,6 +425,29 @@ int Sys::detect_button()
 		in_game_menu.enter(!remote.is_enable());
 		// ##### end Gilbert 5/11 #######//
 		return 0;
+	}
+
+	//------ the help of the map buttons ------//
+
+	if( is_army_button_shown() )
+	{
+		help.set_custom_help( button_army.x1, button_army.y1, button_army.x2, button_army.y2,
+			_("Army (Ctrl+A)"), _("Select your whole army.") );
+
+		help.set_custom_help( button_road.x1, button_road.y1, button_road.x2, button_road.y2,
+			_("Build Roads"), _("Build roads on the map. Click it again to stop.") );
+
+		if( call_to_arms.is_active() )
+		{
+			help.set_custom_help( button_defend.x1, button_defend.y1, button_defend.x2, button_defend.y2,
+				_("Call to Arms"), _("Send your soldiers nearby to defend the place under attack.") );
+		}
+
+		if( idle_button_count > 0 )
+		{
+			help.set_custom_help( button_idle.x1, button_idle.y1, button_idle.x2, button_idle.y2,
+				_("Idle Units (Ctrl+I)"), _("Look at the next idle unit. The number of idle units is beside it.") );
+		}
 	}
 
 	//--------- detect army button -------//
@@ -795,21 +810,41 @@ void Sys::update_view()
 		if( is_army_button_shown() )
 		{
 			vga.use_back();
-			button_army.paint_text( ARMY_BUTTON_X1, ARMY_BUTTON_Y1, ARMY_BUTTON_X2, ARMY_BUTTON_Y2, _("Army") );
-			button_road.paint_text( ARMY_BUTTON_X1, ROAD_BUTTON_Y1, ARMY_BUTTON_X2, ROAD_BUTTON_Y2, _("Road"), 1,
-				power.command_id == COMMAND_BUILD_ROAD );
+
+			//--- the zoom view is drawn every frame, a button being clicked is drawn pushed ---//
+
+			button_army.paint( MAP_BUTTON_X1, ARMY_BUTTON_Y1, "MARMY-U", "MARMY-D", 1, button_army.button_wait != 0 );
+			button_army.set_help_code("");		// their help is given by Sys::detect_button()
+
+			button_road.paint( MAP_BUTTON_X1, ROAD_BUTTON_Y1, "MROAD-U", "MROAD-D", 1,
+				power.command_id == COMMAND_BUILD_ROAD || button_road.button_wait != 0 );
+			button_road.set_help_code("");
 
 			if( call_to_arms.is_active() )
-				button_defend.paint_text( ARMY_BUTTON_X1, DEFEND_BUTTON_Y1, ARMY_BUTTON_X2, DEFEND_BUTTON_Y2, _("Defend") );
+			{
+				button_defend.paint( MAP_BUTTON_X1, DEFEND_BUTTON_Y1, "MDEF-U", "MDEF-D", 1, button_defend.button_wait != 0 );
+				button_defend.set_help_code("");
+			}
 
 			if( sys.frame_count % 10 == 0 || !idle_button_count )		// counting the idle units every frame is not needed
 				idle_button_count = group_select.idle_unit_count();
 
 			if( idle_button_count > 0 )
 			{
-				String str(_("Idle "));
-				str += idle_button_count;
-				button_idle.paint_text( ARMY_BUTTON_X1, IDLE_BUTTON_Y1, ARMY_BUTTON_X2, IDLE_BUTTON_Y2, str );
+				button_idle.paint( MAP_BUTTON_X1, IDLE_BUTTON_Y1, "MIDLE-U", "MIDLE-D", 1, button_idle.button_wait != 0 );
+				button_idle.set_help_code("");
+
+				//--- the no. of idle units in a white box at its left, like the auto tax level on a village's tax button ---//
+
+				char* str  = misc.format(idle_button_count);
+				int boxX2 = MAP_BUTTON_X1 - 2;
+				int boxX1 = boxX2 - font_mid.text_width(str) - 7;
+				int boxY1 = IDLE_BUTTON_Y1 + 6;
+				int boxY2 = boxY1 + 14;
+
+				vga_back.bar( boxX1, boxY1, boxX2, boxY2, V_WHITE );
+				vga_back.rect( boxX1, boxY1, boxX2, boxY2, 1, V_BLACK );
+				font_mid.center_put( boxX1, boxY1, boxX2, boxY2, str );
 			}
 			vga.use_front();
 		}

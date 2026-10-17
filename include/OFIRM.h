@@ -293,7 +293,7 @@ public:
 	int		has_rally_point()		{ return rally_x_loc >= 0; }
 	void		set_rally_point(int xLoc, int yLoc, char remoteAction);
 	void		send_to_rally_point(short* unitArray, int unitCount);
-	void		disp_rally_point(int dispY1, int refreshFlag, int rightMargin=0);
+	void		disp_rally_point(int dispY1, int refreshFlag);
 	int		detect_rally_point();
 
 	void		setup_link();

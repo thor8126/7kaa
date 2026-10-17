@@ -128,8 +128,9 @@ void FirmResearch::think_new_research()
 
 			switch( techInfo->civil_id )
 			{
-				case CIVIL_AGRICULTURE:			// more food, earlier on
-					curRating += nationPtr->ai_has_enough_food() ? 10 : 50;
+				case CIVIL_AGRICULTURE:			// a harvest from every village every year (food sells in markets), and it leads to Medicine
+					curRating += nationPtr->ai_has_enough_food() ? 30 : 70;
+					curRating += MIN( 30, nationPtr->ai_town_count * 5 );
 					curRating += strategy == AI_STRATEGY_ECONOMY || strategy == AI_STRATEGY_EXPAND ? 20 : 0;
 					break;
 

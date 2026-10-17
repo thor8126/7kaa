@@ -39,12 +39,14 @@
 #include <OFONT.h>
 #include <OBUTTON.h>
 #include <OREMOTE.h>
+#include <OBUTT3D.h>
+#include <OHELP.h>
 #include <OSE.h>
 #include "gettext.h"
 
 //------- Define static vars -------//
 
-static Button button_clear_rally;
+static Button3D button_clear_rally;
 
 //--------- Begin of function Firm::can_set_rally_point ---------//
 //
@@ -131,25 +133,25 @@ void Firm::send_to_rally_point(short* unitArray, int unitCount)
 // <int> dispY1      - the top y coordinate of the line
 // <int> refreshFlag - refresh flag
 //
-//
-// [int] rightMargin - room to leave at the right for another button
-//                     (default: 0)
-//
-void Firm::disp_rally_point(int dispY1, int refreshFlag, int rightMargin)
+void Firm::disp_rally_point(int dispY1, int refreshFlag)
 {
 	if( refreshFlag != INFO_REPAINT )
 		return;
 
-	vga_util.d3_panel_up( INFO_X1, dispY1, INFO_X2, dispY1+24 );
+	vga_util.d3_panel_up( INFO_X1, dispY1, INFO_X2, dispY1+27 );
 
 	if( has_rally_point() )
 	{
-		font_san.put( INFO_X1+6, dispY1+6, rightMargin ? _("Rally set") : _("Rally point set") );
-		button_clear_rally.paint_text( INFO_X2-60-rightMargin, dispY1+3, INFO_X2-4-rightMargin, dispY1+21, _("Clear") );
+		font_san.put( INFO_X1+6, dispY1+7, _("Rally point set") );
+
+		button_clear_rally.paint( INFO_X2-28, dispY1+1, "V_X-U", "V_X-D" );		// like the cancel button of a unit being built
+		button_clear_rally.set_help_code("");		// its help is given by detect_rally_point()
 	}
 	else
 	{
-		font_san.put( INFO_X1+6, dispY1+6, rightMargin ? _("Rally: right-click") : _("Right-click map: rally point") );
+		button_clear_rally.reset();
+
+		font_san.put( INFO_X1+6, dispY1+7, _("Right-click map: rally point") );
 	}
 }
 //----------- End of function Firm::disp_rally_point -----------//
@@ -161,7 +163,13 @@ void Firm::disp_rally_point(int dispY1, int refreshFlag, int rightMargin)
 //
 int Firm::detect_rally_point()
 {
-	if( !has_rally_point() || !button_clear_rally.detect() )
+	if( !has_rally_point() || !button_clear_rally.init_flag )
+		return 0;
+
+	help.set_custom_help( button_clear_rally.x1, button_clear_rally.y1, button_clear_rally.x2, button_clear_rally.y2,
+		_("Clear the Rally Point"), _("New units will stay next to the building.") );
+
+	if( !button_clear_rally.detect() )
 		return 0;
 
 	se_ctrl.immediate_sound("TURN_OFF");

@@ -741,9 +741,10 @@ void Town::set_nation(int newNationRecno)
 	is_base_town = 0;
 	town_defender_count = 0; 	// reset defender count
 
-	edict_id = 0;					// the edict and farming settings of the old nation, see OCIVIL.CPP
+	edict_id = 0;					// the edict, farming settings and harvest of the old nation, see OCIVIL.CPP
 	edict_end_date = 0;
 	farming_off = 0;
+	harvest_food = 0;
 
 	//----- set power region of the new nation ------//
 

@@ -55,7 +55,7 @@
 //----------- Define static vars -------------//
 
 static Button3D button_patrol, button_reward, button_defense;
-static Button   button_auto_recruit;		// Military Drill, see OCIVIL.CPP
+static Button3D button_auto_recruit;		// Military Drill: the Draft switch, see OCIVIL.CPP
 
 //--------- Declare static functions ---------//
 
@@ -397,19 +397,20 @@ void FirmCamp::put_info(int refreshFlag)
 
 		x=INFO_X1+BUTTON_ACTION_WIDTH*2;
 
-		//--- Military Drill: the Auto-recruit switch next to the rally point, see OCIVIL.CPP ---//
+		//--- Military Drill: the Draft switch, in the slot of the spy button when there are no spies of the player, see OCIVIL.CPP ---//
 
-		int hasAutoRecruit = !remote.is_enable() && tech_res.civil_level(nation_recno, CIVIL_MILITARY_DRILL);
-
-		disp_rally_point( INFO_Y1+288, refreshFlag, hasAutoRecruit ? 76 : 0 );		// see OFIRMRAL.CPP
-
-		if( hasAutoRecruit )
+		if( !remote.is_enable() && tech_res.civil_level(nation_recno, CIVIL_MILITARY_DRILL) && player_spy_count==0 )
 		{
-			if( refreshFlag == INFO_REPAINT )
-				button_auto_recruit.paint_text( INFO_X2-76, INFO_Y1+291, INFO_X2-4, INFO_Y1+309, auto_recruit_off ? _("Draft: Off") : _("Draft: On") );
+			if( refreshFlag == INFO_REPAINT || !button_auto_recruit.init_flag )
+			{
+				button_auto_recruit.paint( x, INFO_Y1+242, 'A', "RECRUIT", 0, !auto_recruit_off );		// 0-a switch, pushed while it's on
+				button_auto_recruit.set_help_code("");		// its help is given by detect_info()
+			}
 		}
 		else
 			button_auto_recruit.reset();
+
+		disp_rally_point( INFO_Y1+288, refreshFlag );		// see OFIRMRAL.CPP
 	}
 	else
 		x=INFO_X1;
@@ -469,11 +470,18 @@ int FirmCamp::detect_info()
 	if( detect_rally_point() )		// see OFIRMRAL.CPP
 		return 1;
 
-	//------ Military Drill: the Auto-recruit switch, see OCIVIL.CPP ------//
+	//------ Military Drill: the Draft switch, see OCIVIL.CPP ------//
+
+	if( button_auto_recruit.init_flag )
+	{
+		help.set_custom_help( button_auto_recruit.x1, button_auto_recruit.y1, button_auto_recruit.x2, button_auto_recruit.y2, _("Draft"),
+			auto_recruit_off ? _("Off. Click to let the fort recruit from its linked villages by itself.")
+								  : _("On: the fort recruits from its linked villages by itself. Click to stop it.") );
+	}
 
 	if( button_auto_recruit.init_flag && button_auto_recruit.detect() )
 	{
-		auto_recruit_off = !auto_recruit_off;
+		auto_recruit_off = !button_auto_recruit.pushed_flag;		// the switch is pushed while it's on
 		se_ctrl.immediate_sound( auto_recruit_off ? "TURN_OFF" : "TURN_ON" );
 
 		AiWarState::log( "RECRUIT     the player turns auto-recruiting of fort %d %s", firm_recno, auto_recruit_off ? "off" : "on" );

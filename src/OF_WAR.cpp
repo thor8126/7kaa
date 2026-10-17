@@ -38,6 +38,7 @@
 #include <OF_WAR.h>
 #include <OBUTTON.h>
 #include <OREMOTE.h>
+#include <OHELP.h>
 #include <OIMGRES.h>
 #include <OSE.h>
 #include <OSERES.h>
@@ -79,7 +80,7 @@ static ButtonCustom button_queue_weapon[MAX_WEAPON_TYPE];
 static int queue_weapon_selected = -1;
 // ###### end Gilbert 10/9 #######//
 static ButtonCustom button_cancel;
-static Button	button_repeat;			// keep building the same weapon
+static Button3D	button_repeat;			// keep building the same weapon
 static Button3D	button_vacate_firm;
 
 
@@ -183,7 +184,10 @@ void FirmWar::disp_main_menu(int refreshFlag)
 		x += (BUTTON_ACTION_WIDTH * 2);
 
 		if( refreshFlag == INFO_REPAINT )
-			button_repeat.paint_text( INFO_X1+BUTTON_ACTION_WIDTH*3, INFO_Y1+247, INFO_X2-4, INFO_Y1+265, _("Repeat"), 1, repeat_build );
+		{
+			button_repeat.paint( INFO_X2-BUTTON_ACTION_WIDTH, INFO_Y1+235, 'A', "REPEAT", 0, repeat_build );		// 0-a switch, pushed while it's on
+			button_repeat.set_help_code("");		// its help is given by detect_main_menu()
+		}
 
 		disp_rally_point( INFO_Y1+281, refreshFlag );
 	}
@@ -221,6 +225,9 @@ int FirmWar::detect_main_menu()
 
 	if( detect_rally_point() )		// see OFIRMRAL.CPP
 		return 1;
+
+	help.set_custom_help( button_repeat.x1, button_repeat.y1, button_repeat.x2, button_repeat.y2, _("Repeat"),
+		repeat_build ? _("On: the factory keeps building the same weapon. Click to stop it.") : _("Keep building the same weapon.") );
 
 	if( button_repeat.detect() )
 	{

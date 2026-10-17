@@ -94,6 +94,7 @@ static NewsInfo news_info_array[] =
 	{ &News::battle_report, 1 },
 	{ &News::mine_dug_deeper, 0 },
 	{ &News::edict_ended, 0 },
+	{ &News::harvest_in, 0 },
 };
 
 //------- Define static variables --------//
@@ -1838,6 +1839,27 @@ void News::edict_ended()
 	snprintf(str, MAX_STR_LEN+1, _("The %s edict of %s has ended."), CivilTech::edict_name(short_para2), town_res.get_name(short_para1));
 }
 //------- End of function News::edict_ended -----//
+
+
+//------ Begin of function News::harvest_in -----//
+//
+// short_para1 - the food brought in
+// short_para2 - no. of villages that farmed
+//
+void News::harvest_in()
+{
+	if( short_para2 > 1 )
+	{
+		// TRANSLATORS: The harvest is in: <Number> food from <Number> villages.
+		snprintf(str, MAX_STR_LEN+1, _("The harvest is in: %s food from %d villages."), misc.format(short_para1), short_para2);
+	}
+	else
+	{
+		// TRANSLATORS: The harvest is in: <Number> food.
+		snprintf(str, MAX_STR_LEN+1, _("The harvest is in: %s food."), misc.format(short_para1));
+	}
+}
+//------- End of function News::harvest_in -----//
 
 
 //------ Begin of function News::nation_name1 -----//

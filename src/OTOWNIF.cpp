@@ -100,17 +100,17 @@ static ButtonCustom button_queue_skill[MAX_TRAINABLE_SKILL];
 
 //------ the buttons of the civil technologies, see OCIVIL.CPP ------//
 
-enum { CIVIL_BUTTON_FARM=1, CIVIL_BUTTON_TOWER, CIVIL_BUTTON_EDICT };
+#define EDICT_ROW_HEIGHT	62
 
-static ButtonCustom button_civil_farm, button_civil_tower, button_civil_edict;
+static Button3D     button_civil_farm, button_civil_tower, button_civil_edict;
 static ButtonCustom button_edict_array[EDICT_TYPE_COUNT];
 static ButtonCustom button_edict_cancel;
 
 static void disp_civil_buttons(Town* townPtr, int refreshFlag);
 static int  detect_civil_buttons(Town* townPtr);
+static void disp_civil_badge(Button3D* buttonPtr, const char* str);
 static void disp_edict_menu(Town* townPtr, int refreshFlag);
 static int  detect_edict_menu(Town* townPtr);
-static void i_disp_civil_button(ButtonCustom *button, int repaintBody);
 static void i_disp_edict_button(ButtonCustom *button, int repaintBody);
 static int        queue_train_selected;
 static short      browse_race_recno=1, browse_race_town_recno=0;		// the town which the browse_race displays its info
@@ -712,12 +712,18 @@ int Town::detect_main_menu()
 
 //--------- Begin of static function disp_civil_buttons ---------//
 //
-// The Farming, Tower and Edict buttons of a village of the player, in the
-// second row of buttons, for the civil technologies it has researched
+// The Fields, Watchtower and Edict buttons of a village of the player, in
+// the second row of buttons, for the civil technologies it has researched
 // (see OCIVIL.CPP). Not in multiplayer games.
+//
+// Like the tax and grant buttons with their auto levels, they show a
+// number on them: the farmers out (or "Off" when the player has stopped
+// the farming) and the days left of the village's edict.
 //
 static void disp_civil_buttons(Town* townPtr, int refreshFlag)
 {
+	static int lastFarmState, lastTowerState, lastEdictState;		// what the buttons show, they are repainted when it changes
+
 	if( remote.is_enable() || townPtr->nation_recno != nation_array.player_recno || townPtr->rebel_recno )
 	{
 		button_civil_farm.reset();
@@ -729,104 +735,145 @@ static void disp_civil_buttons(Town* townPtr, int refreshFlag)
 	int y = BUTTON_Y1 + BUTTON_ACTION_HEIGHT;
 	int x = BUTTON_X1 + BUTTON_ACTION_WIDTH;		// the first slot of the row is kept for the spy button
 
-	ButtonCustom* buttonArray[3] = { &button_civil_farm, &button_civil_tower, &button_civil_edict };
-	int civilIdArray[3] = { CIVIL_AGRICULTURE, CIVIL_ENGINEERING, CIVIL_ADMINISTRATION };
+	//------ Agriculture: the fields ------//
 
-	for( int i=0 ; i<3 ; i++, x+=BUTTON_ACTION_WIDTH )
+	if( tech_res.civil_level(townPtr->nation_recno, CIVIL_AGRICULTURE) )
 	{
-		if( !tech_res.civil_level(townPtr->nation_recno, civilIdArray[i]) )
-		{
-			buttonArray[i]->reset();
-			continue;
-		}
+		int farmState = townPtr->farming_off ? -1 : townPtr->farmer_count;
 
-		buttonArray[i]->paint( x, y, x+BUTTON_ACTION_WIDTH-3, y+BUTTON_ACTION_HEIGHT-3,
-									  i_disp_civil_button, ButtonCustomPara(townPtr, i+1) );
+		if( refreshFlag == INFO_REPAINT || !button_civil_farm.init_flag || farmState != lastFarmState )
+		{
+			button_civil_farm.paint( x, y, 'A', "U_FARM" );
+			button_civil_farm.set_help_code("");		// its help is given by detect_civil_buttons()
+
+			if( townPtr->farming_off )
+				disp_civil_badge( &button_civil_farm, _("Off") );
+
+			else if( townPtr->farmer_count > 0 )
+				disp_civil_badge( &button_civil_farm, misc.format(townPtr->farmer_count) );
+
+			lastFarmState = farmState;
+		}
 	}
+	else
+		button_civil_farm.reset();
+
+	x += BUTTON_ACTION_WIDTH;
+
+	//------ Engineering: the watchtower ------//
+
+	if( tech_res.civil_level(townPtr->nation_recno, CIVIL_ENGINEERING) )
+	{
+		int towerState = townPtr->has_watchtower ? 2 : civil_tech.can_build_watchtower(townPtr) ? 1 : 0;
+
+		if( refreshFlag == INFO_REPAINT || !button_civil_tower.init_flag || towerState != lastTowerState )
+		{
+			button_civil_tower.create( x, y, 'A', "TOWER" );
+			button_civil_tower.set_help_code("");
+			button_civil_tower.enable_flag = (towerState == 1);		// darkened when it has been built or can't be afforded
+			button_civil_tower.paint();
+
+			lastTowerState = towerState;
+		}
+	}
+	else
+		button_civil_tower.reset();
+
+	x += BUTTON_ACTION_WIDTH;
+
+	//------ Administration: edicts ------//
+
+	if( tech_res.civil_level(townPtr->nation_recno, CIVIL_ADMINISTRATION) )
+	{
+		int edictState = civil_tech.active_edict(townPtr) ? townPtr->edict_end_date - info.game_date : 0;
+
+		if( refreshFlag == INFO_REPAINT || !button_civil_edict.init_flag || edictState != lastEdictState )
+		{
+			button_civil_edict.paint( x, y, 'A', "EDICT" );
+			button_civil_edict.set_help_code("");
+
+			if( edictState > 0 )
+				disp_civil_badge( &button_civil_edict, misc.format(edictState) );
+
+			lastEdictState = edictState;
+		}
+	}
+	else
+		button_civil_edict.reset();
 }
 //----------- End of static function disp_civil_buttons -----------//
 
 
-//--------- Begin of static function i_disp_civil_button ---------//
+//--------- Begin of static function disp_civil_badge ---------//
 //
-static void i_disp_civil_button(ButtonCustom *button, int repaintBody)
+// A number or word on a button, in a white box at its bottom right, in the
+// manner of the auto tax and grant levels (see Town::disp_auto_loyalty()).
+//
+static void disp_civil_badge(Button3D* buttonPtr, const char* str)
 {
-	int x1 = button->x1, y1 = button->y1, x2 = button->x2, y2 = button->y2;
+	int boxWidth = font_mid.text_width(str) + 7;
 
-	if( button->pushed_flag )
-	{
-		vga_util.d3_panel2_down(x1, y1, x2, y2);
-		x1++;
-		y1++;
-	}
-	else
-	{
-		vga_util.d3_panel2_up(x1, y1, x2, y2);
-		x2--;
-		y2--;
-	}
+	if( boxWidth < 16 )
+		boxWidth = 16;
 
-	Town* townPtr = (Town*) button->custom_para.ptr;
-	const char* titleStr = "";
-	String		statusStr;
+	int x2 = buttonPtr->x1 + 40;
+	int y2 = buttonPtr->y1 + 33;
+	int x1 = x2 - boxWidth;
+	int y1 = y2 - 14;
 
-	switch( button->custom_para.value )
-	{
-		case CIVIL_BUTTON_FARM:
-			titleStr = _("Fields");
+	vga_front.bar( x1, y1, x2, y2, V_WHITE );
+	vga_front.rect( x1, y1, x2, y2, 1, V_BLACK );
 
-			if( townPtr->farming_off )
-				statusStr = _("Off");
-			else if( townPtr->farmer_count > 0 )
-			{
-				statusStr  = misc.format(townPtr->farmer_count);
-				statusStr += " ";
-				statusStr += _("out");
-			}
-			else
-				statusStr = _("On");
-			break;
-
-		case CIVIL_BUTTON_TOWER:
-			titleStr = _("Tower");
-
-			if( townPtr->has_watchtower )
-				statusStr = _("Built");
-			else
-			{
-				statusStr  = "$";
-				statusStr += misc.format(WATCHTOWER_COST);
-			}
-			break;
-
-		case CIVIL_BUTTON_EDICT:
-		{
-			titleStr = _("Edict");
-
-			int edictId = civil_tech.active_edict(townPtr);
-
-			if( edictId )
-			{
-				statusStr  = misc.format(townPtr->edict_end_date - info.game_date);
-				statusStr += " ";
-				statusStr += _("days");
-			}
-			else
-				statusStr = _("None");
-			break;
-		}
-	}
-
-	font_san.center_put( x1, y1+3, x2, y1+20, titleStr );
-	font_san.center_put( x1, y1+20, x2, y2-2, statusStr );
+	font_mid.center_put( x1, y1, x2, y2, str );
 }
-//----------- End of static function i_disp_civil_button -----------//
+//----------- End of static function disp_civil_badge -----------//
 
 
 //--------- Begin of static function detect_civil_buttons ---------//
 //
 static int detect_civil_buttons(Town* townPtr)
 {
+	char helpStr[Help::CUSTOM_HELP_DETAIL_LEN+1];
+
+	//------ Agriculture: the fields ------//
+
+	if( button_civil_farm.init_flag )
+	{
+		if( townPtr->farming_off )
+		{
+			snprintf( helpStr, sizeof(helpStr), "%s", _("Farming stopped. Click to send the peasants out to the fields again.") );
+		}
+		else
+		{
+			const char* stateStr = "";
+
+			switch( civil_tech.farming_block_reason(townPtr) )
+			{
+				case FARM_BLOCK_SEASON:
+					stateStr = _("Not the farming season.");
+					break;
+
+				case FARM_BLOCK_DANGER:
+					stateStr = _("The farmers stay home while the village is in danger.");
+					break;
+
+				case FARM_BLOCK_NO_ROOM:
+					stateStr = _("No room for fields: they need open land next to the village.");
+					break;
+			}
+
+			if( stateStr[0] )
+				snprintf( helpStr, sizeof(helpStr), "%s %s", stateStr, _("Click to stop the farming.") );
+			else
+			{
+				snprintf( helpStr, sizeof(helpStr), _("Farmers out: %d. Harvest so far: %d food, brought in at the end of the season. Click to stop the farming."),
+							 townPtr->farmer_count, (int) townPtr->harvest_food );
+			}
+		}
+
+		help.set_custom_help( button_civil_farm.x1, button_civil_farm.y1, button_civil_farm.x2, button_civil_farm.y2, _("Fields"), helpStr );
+	}
+
 	if( button_civil_farm.detect() )
 	{
 		townPtr->farming_off = !townPtr->farming_off;
@@ -834,11 +881,23 @@ static int detect_civil_buttons(Town* townPtr)
 
 		AiWarState::log( "FARM        the player turns the farming of town %d %s", townPtr->town_recno, townPtr->farming_off ? "off" : "on" );
 
-		disp_civil_buttons(townPtr, INFO_UPDATE);
+		disp_civil_buttons(townPtr, INFO_REPAINT);
 		return 1;
 	}
 
-	if( button_civil_tower.detect() )
+	//------ Engineering: the watchtower ------//
+
+	if( button_civil_tower.init_flag )
+	{
+		if( townPtr->has_watchtower )
+			snprintf( helpStr, sizeof(helpStr), "%s", _("Built. It shoots arrows at the enemies near the village.") );
+		else
+			snprintf( helpStr, sizeof(helpStr), _("Shoots arrows at the enemies near the village. Cost: $%d"), WATCHTOWER_COST );
+
+		help.set_custom_help( button_civil_tower.x1, button_civil_tower.y1, button_civil_tower.x2, button_civil_tower.y2, _("Watchtower"), helpStr );
+	}
+
+	if( button_civil_tower.detect() )		// only when it can be built, it's disabled otherwise
 	{
 		if( civil_tech.can_build_watchtower(townPtr) )
 		{
@@ -850,8 +909,25 @@ static int detect_civil_buttons(Town* townPtr)
 			se_ctrl.immediate_sound("TURN_OFF");
 		}
 
-		disp_civil_buttons(townPtr, INFO_UPDATE);
+		disp_civil_buttons(townPtr, INFO_REPAINT);
 		return 1;
+	}
+
+	//------ Administration: edicts ------//
+
+	if( button_civil_edict.init_flag )
+	{
+		int edictId = civil_tech.active_edict(townPtr);
+
+		if( edictId )
+		{
+			snprintf( helpStr, sizeof(helpStr), _("%s: %d days left."), CivilTech::edict_name(edictId),
+						 townPtr->edict_end_date - info.game_date );
+		}
+		else
+			snprintf( helpStr, sizeof(helpStr), "%s", _("Give the village an edict for a year.") );
+
+		help.set_custom_help( button_civil_edict.x1, button_civil_edict.y1, button_civil_edict.x2, button_civil_edict.y2, _("Edicts"), helpStr );
 	}
 
 	if( button_civil_edict.detect() )
@@ -872,7 +948,8 @@ static int detect_civil_buttons(Town* townPtr)
 
 //--------- Begin of static function disp_edict_menu ---------//
 //
-// Choose an edict for the village, see OCIVIL.CPP.
+// Choose an edict for the village, see OCIVIL.CPP. Laid out like the menu
+// of the skills to train.
 //
 static void disp_edict_menu(Town* townPtr, int refreshFlag)
 {
@@ -881,14 +958,7 @@ static void disp_edict_menu(Town* townPtr, int refreshFlag)
 
 	//------- heading: the current edict -------//
 
-	vga_util.d3_panel_up( INFO_X1, INFO_Y1, INFO_X2, INFO_Y1+42 );
-
 	String str;
-
-	str  = _("Edicts of ");
-	str += townPtr->town_name();
-
-	font_san.put( INFO_X1+6, INFO_Y1+5, str, 0, INFO_X2-4 );
 
 	int edictId = civil_tech.active_edict(townPtr);
 
@@ -901,27 +971,24 @@ static void disp_edict_menu(Town* townPtr, int refreshFlag)
 		str += _("days left");
 	}
 	else
-		str = _("An edict lasts a year.");
+		str = _("Edicts (each lasts a year)");
 
-	font_san.put( INFO_X1+6, INFO_Y1+23, str, 0, INFO_X2-4 );
+	font_san.d3_put( INFO_X1, INFO_Y1, INFO_X2, INFO_Y1+18, str );
 
 	//------- the edicts -------//
 
-	int y = INFO_Y1+46;
+	int y = INFO_Y1+24;
 
 	for( int i=0 ; i<EDICT_TYPE_COUNT ; i++ )
 	{
-		button_edict_array[i].paint( INFO_X1, y, INFO_X2, y+56, i_disp_edict_button, ButtonCustomPara(townPtr, i+1) );
+		button_edict_array[i].create( INFO_X1, y, INFO_X2, y+EDICT_ROW_HEIGHT-1, i_disp_edict_button, ButtonCustomPara(townPtr, i+1) );
+		button_edict_array[i].enable_flag = civil_tech.can_issue_edict(townPtr, i+1);		// darkened when it can't be issued
+		button_edict_array[i].paint();
 
-		if( civil_tech.can_issue_edict(townPtr, i+1) )
-			button_edict_array[i].enable();
-		else
-			button_edict_array[i].disable();
-
-		y += 60;
+		y += EDICT_ROW_HEIGHT;
 	}
 
-	button_edict_cancel.paint( INFO_X1, y, INFO_X2, y+BUTTON_ACTION_HEIGHT*3/4,
+	button_edict_cancel.paint( INFO_X1, y, INFO_X2, y+BUTTON_ACTION_HEIGHT*3/4-1,
 		ButtonCustom::disp_text_button_func, ButtonCustomPara((void*)_("Cancel"),0) );
 }
 //----------- End of static function disp_edict_menu -----------//
@@ -929,63 +996,93 @@ static void disp_edict_menu(Town* townPtr, int refreshFlag)
 
 //--------- Begin of static function i_disp_edict_button ---------//
 //
+// An edict: its icon on a button shell, its name, its cost and what it
+// does, like a skill in the training menu (see i_disp_skill_button()).
+//
 static void i_disp_edict_button(ButtonCustom *button, int repaintBody)
 {
 	int x1 = button->x1, y1 = button->y1, x2 = button->x2, y2 = button->y2;
 
-	if( button->pushed_flag )
+	if( !button->pushed_flag )
 	{
-		vga_util.d3_panel2_down(x1, y1, x2, y2);
-		x1++;
-		y1++;
-	}
-	else
-	{
-		vga_util.d3_panel2_up(x1, y1, x2, y2);
+		if( repaintBody )
+		{
+			vga_util.blt_buf(x1, y1, x2, y2, 0);
+			vga_util.d3_panel2_up( x1, y1, x2, y2, 1 );
+		}
 		x2--;
 		y2--;
 	}
+	else
+	{
+		if( repaintBody )
+		{
+			vga_util.blt_buf(x1, y1, x2, y2, 0);
+			vga_util.d3_panel2_down( x1, y1, x2, y2, 1 );
+		}
+		x1++;
+		y1++;
+	}
+
+	if( !repaintBody )
+		return;
 
 	Town* townPtr = (Town*) button->custom_para.ptr;
 	int   edictId = button->custom_para.value;
 	int   level	  = tech_res.civil_level(townPtr->nation_recno, CIVIL_ADMINISTRATION);
 
-	String str;
+	//------ its icon on a button shell ------//
 
-	str = CivilTech::edict_name(edictId);
+	static const char* iconNameArray[EDICT_TYPE_COUNT] = { "GRANT", "U_FARM", "DEFENSE1" };
+
+	char* shellPtr = image_button.get_ptr("BUTUP_A");
+	char* iconPtr  = image_button.get_ptr(iconNameArray[edictId-1]);
+
+	int shellX = x1+2, shellY = y1+(y2-y1-46)/2;
+
+	vga_front.put_bitmap_trans_decompress( shellX, shellY, shellPtr );
+	vga_front.put_bitmap_trans_decompress( shellX + (((short*)shellPtr)[0] - ((short*)iconPtr)[0])/2 - 2,
+														shellY + (((short*)shellPtr)[1] - ((short*)iconPtr)[1])/2 - 3, iconPtr );
+
+	//------ its name and cost ------//
+
+	font_bible.put( x1+56, y1+4, CivilTech::edict_name(edictId), 0, x2-4 );
 
 	int cost = civil_tech.edict_cost(townPtr, edictId);
 
 	if( cost )
 	{
-		str += "  ($";
+		String str;
+
+		str  = "$";
 		str += misc.format(cost);
-		str += ")";
+
+		font_san.put( x2-6-font_san.text_width(str), y1+8, str );
 	}
 
-	font_san.put( x1+6, y1+4, str, 0, x2-4 );
+	//------ what it does ------//
 
 	const char* desStr = "";
 
 	switch( edictId )
 	{
 		case EDICT_FESTIVAL:
-			desStr = level >= 2 ? _("The villagers are much more loyal.") : _("The villagers are more loyal.");
+			desStr = level >= 2 ? _("Villagers grow much more loyal.") : _("Villagers grow more loyal.");
 			break;
 
 		case EDICT_LEVY:
-			desStr = level >= 2 ? _("Peasants make double food, loyalty falls a little.") : _("Peasants make double food, loyalty falls.");
+			desStr = level >= 2 ? _("Double food, loyalty falls a little.") : _("Double food, but loyalty falls.");
 			break;
 
 		case EDICT_MILITIA:
-			desStr = level >= 2 ? _("More and much stronger defenders.") : _("More and stronger defenders, loyalty falls a little.");
+			desStr = level >= 2 ? _("Many more, much stronger defenders.") : _("Stronger defenders, loyalty falls a little.");
 			break;
 	}
 
-	font_san.put_paragraph( x1+6, y1+22, x2-4, y2-2, desStr );
+	font_san.put_paragraph( x1+56, y1+23, x2-4, y2-2, desStr );
 
-	if( !button->enable_flag )		// grey it out
-		vga_util.d3_panel2_down(x2-14, y1+4, x2-4, y1+14);
+	if( !button->enable_flag )		// darkened like a disabled button
+		vga_front.adjust_brightness( x1+1, y1+1, x2-1, y2-1, -5 );
 }
 //----------- End of static function i_disp_edict_button -----------//
 
@@ -996,7 +1093,7 @@ static int detect_edict_menu(Town* townPtr)
 {
 	for( int i=0 ; i<EDICT_TYPE_COUNT ; i++ )
 	{
-		if( button_edict_array[i].detect() )
+		if( button_edict_array[i].detect() )		// only when it can be issued, it's disabled otherwise
 		{
 			if( civil_tech.can_issue_edict(townPtr, i+1) )
 			{

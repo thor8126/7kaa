@@ -1099,6 +1099,33 @@ void NewsArray::edict_ended(int townRecno, int edictId)
 //------- End of function NewsArray::edict_ended -----//
 
 
+//------ Begin of function NewsArray::harvest_in -----//
+//
+// The harvest of the player's villages has been brought in at the end of
+// the farming season, see OCIVIL.CPP.
+//
+// <int> townRecno - the village with the biggest harvest, where the news is
+//
+// short_para1 - the food brought in
+// short_para2 - no. of villages that farmed
+//
+void NewsArray::harvest_in(int townRecno, int foodQty, int townCount)
+{
+	News* newsPtr = add_news( NEWS_HARVEST_IN, NEWS_NORMAL, nation_array.player_recno, 0, 1 );
+
+	if( !newsPtr )
+		return;
+
+	Town* townPtr = town_array[townRecno];
+
+	newsPtr->short_para1 = foodQty < 32767 ? foodQty : 32767;
+	newsPtr->short_para2 = townCount;
+
+	newsPtr->set_loc( townPtr->center_x, townPtr->center_y, NEWS_LOC_TOWN, townRecno );
+}
+//------- End of function NewsArray::harvest_in -----//
+
+
 //------ Begin of function NewsArray::battle_report -----//
 //
 // The losses of a battle the player fought, see OBATREP.CPP.

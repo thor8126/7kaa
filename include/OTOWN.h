@@ -212,6 +212,7 @@ public:
 	char	 has_watchtower;
 	char	 edict_id;					// EDICT_???, see OCIVIL.H
 	int	 edict_end_date;
+	float	 harvest_food;				// food grown by the farmers this season, brought in at its end
 
 	int 	 closest_own_camp();
 
