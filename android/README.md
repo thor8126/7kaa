@@ -48,7 +48,8 @@ briefly marks each touch, as a check that touches land in the right spot.
 | Two-finger tap | Right click at the first finger |
 | Drag with one finger (also after holding still) | Left drag: box-select units, drag sliders |
 | Drag with two fingers | Scroll the map smoothly; let go while moving and it glides on |
-| Pinch (two fingers apart / together) | Zoom the map view in (up to 3×) / back out. Only the map zooms; the top bar and side panel stay as they are. The map cannot be zoomed out beyond the normal view, because the game always draws the same 18×17 squares of it; use the mini-map for the overview. |
+| Pinch (two fingers apart / together) | Zoom the map view in (up to 3×) or out (down to 0.5×: twice as much map across, four times the area). Only the map zooms; the top bar and side panel stay as they are. |
+| Three-finger tap | Map view back to normal size |
 | Tap the mini-map | Jump there (as on the desktop) |
 | Back button | Esc |
 | Placing a building (or picking a target for assign, settle, stops, walls, god powers…) | Touch the map and slide: the outline follows your finger. Lift to place it there; lift off the map to place nothing. Holding still does nothing. Two-finger tap or Esc cancels. |
@@ -60,9 +61,26 @@ On-screen buttons in the black bars:
 - **Shift** (left side, toggle): holds Shift, e.g. to add units to a selection.
 - **Army Ctrl+A** (right side): selects the whole army (same as the Army button
   and Ctrl+A on the desktop).
+- **◀ Prev / Next ▶** (right side): the previous / next unit, building or
+  village of the same kind as the selected one, of your own (the Left/Right
+  arrow keys on the desktop). Long-press them for the previous / next of any
+  nation (Up/Down arrow keys).
+- **Pause** (left side): pause / resume (Space).
 - **Esc** (right side).
 
 A Bluetooth/USB mouse and keyboard also work, exactly as on the desktop.
+
+How zooming works (`app/jni/src/android_view.cpp`): the game itself always
+draws an 18×17-square map view and scrolls it by whole squares. On Android the
+map view shows a window onto the world that moves and zooms smoothly. Where
+that window reaches beyond the game's own view (zoomed out, or by part of a
+square while panning), the extra areas are drawn as additional passes of the
+normal map drawing (terrain, units, buildings, fog and names) and stitched
+around it. Weather and the building outline are only drawn in the game's own
+view. Taps on those extra areas move the game's view there first (the picture
+stays put), so orders and building placement act exactly under the finger.
+Zoomed far out, the phone draws the map up to nine times per frame. If it gets
+slow, zoom in a little.
 
 ## Getting the APK
 
@@ -70,7 +88,7 @@ The latest APK is [`../apk/7kaa-android.apk`](../apk/), also at a fixed link:
 https://github.com/thor8126/7kaa/releases/download/android-latest/7kaa-android.apk
 
 Every push to `master` that changes `android/`, `src/`, `include/` or `data/`
-rebuilds it on GitHub Actions (`.github/workflows/android.yml`, ~15 minutes) and
+rebuilds it on GitHub Actions (`.github/workflows/android.yml`, a few minutes) and
 replaces both copies. Nothing heavy runs on your own PC. The APK commit is
 made by `github-actions[bot]`, so run `git pull` before your next push.
 

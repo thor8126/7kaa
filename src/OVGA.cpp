@@ -837,7 +837,7 @@ void Vga::flip()
       SDL_RenderClear(renderer);
       SDL_RenderCopy(renderer, texture, NULL, NULL);
 #ifdef __ANDROID__
-      android_view_render(renderer, texture);   // zoomed/panned map view
+      android_view_render(renderer, texture, vga_front.surface);   // zoomed/panned map view
 #endif
       SDL_RenderPresent(renderer);
    }

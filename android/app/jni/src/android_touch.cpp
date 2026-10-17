@@ -7,11 +7,12 @@
 //   long press, then lift    -> right click (move / attack orders); the phone
 //                               vibrates when the press is long enough
 //   two-finger tap           -> right click at the first finger
+//   three-finger tap         -> map view back to normal size
 //   one-finger drag          -> left button drag (box select, sliders), also
 //                               after holding still first
 //   two-finger drag          -> pan the map smoothly (it glides on when let
 //                               go while moving)
-//   pinch                    -> zoom the map view in/out (android_view.cpp)
+//   pinch                    -> zoom the map view in or out (android_view.cpp)
 //   Back button              -> Esc
 //   "Right click" on-screen toggle (SevenKaaActivity): taps are right clicks
 //
@@ -21,11 +22,17 @@
 // lifting the finger places it there. Lifting it off the map places nothing.
 // A two-finger tap (right click) or Esc cancels, as on the desktop.
 //
-// Every action happens exactly under the finger: the touch point is mapped
-// straight to 800x600 game coordinates, and there is no cursor to steer (it is
-// not drawn on Android, see MouseCursor in src/OMOUSECR.cpp). The window is
-// never grabbed on Android (Vga::is_input_grabbed), so nothing clamps the
-// position and there is no edge scrolling.
+// Every action happens exactly under the finger: the touch point is mapped to
+// 800x600 game coordinates, then through the map view's zoom/pan
+// (android_view_to_engine). There is no cursor to steer (it is not drawn on
+// Android, see MouseCursor in src/OMOUSECR.cpp). The window is never grabbed
+// on Android (Vga::is_input_grabbed), so nothing clamps the position and
+// there is no edge scrolling.
+//
+// When zoomed out, a touch can land on a part of the map that is outside the
+// game's own 18x17-location view. The touch then asks the view module to move
+// the game's view there (the picture does not move), and the click is sent
+// once that has happened, a frame or two later.
 //
 // Touches that start in the black bars beside the game screen are ignored
 // (that is where the on-screen buttons live).
@@ -44,6 +51,9 @@
 #include "android_glue.h"
 #include "android_view.h"
 
+#define LOG_TAG "7kaa-touch"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+
 enum TouchState
 {
 	TOUCH_IDLE,      // no finger down
@@ -56,21 +66,29 @@ enum TouchState
 
 static const Uint32 LONG_PRESS_MS = 450;
 static const Uint32 TWO_FINGER_TAP_MS = 400;
+static const Uint32 THREE_FINGER_TAP_MS = 600;
+static const Uint32 PENDING_CLICK_MS = 700;   // give up on a deferred click after this
+static const Uint32 CLICK_HOLD_MS = 300;      // keep the game's view still while it handles a click
 
 static TouchState state = TOUCH_IDLE;
 static int fingers_down;
 static SDL_FingerID finger1, finger2;
 static Uint32 down_time;
-static float start_gx, start_gy;      // finger1 start, game pixels (float)
-static int start_lx, start_ly;        // finger1 start, engine (800x600) pixels
+static float start_gx, start_gy;      // finger1 start, display pixels
 static int start_in_view;             // finger1 went down in the map view
 static float f1_gx, f1_gy, f2_gx, f2_gy;  // current finger positions, display pixels
 static float two_last_x, two_last_y, two_last_dist;  // two-finger midpoint/distance
 static float two_total;               // how much the two fingers moved
 static int panned;                    // two-finger gesture moved (no right click)
 static int view_gesture;              // two-finger gesture pans/zooms the map
+static int three_fingers;             // a third finger came down
 static int long_press_armed;          // held still long enough: lift = right click
 static volatile int right_click_mode;   // set from the Java UI thread
+
+static int pend_type;                 // deferred click: 0 none, 1 left, 2 right
+static float pend_gx, pend_gy;
+static Uint32 pend_time;
+static Uint32 hold_until;             // keep the game's view still until then
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_thor8126_sevenkaa_SevenKaaActivity_nativeSetRightClickMode(JNIEnv *, jclass, jboolean on)
@@ -99,20 +117,30 @@ static void finger_game(const SDL_TouchFingerEvent &f, float *gx, float *gy)
 static int clamp_x(float gx) { int i = (int) gx; return i < 0 ? 0 : (i > 799 ? 799 : i); }
 static int clamp_y(float gy) { int i = (int) gy; return i < 0 ? 0 : (i > 599 ? 599 : i); }
 
-// Position the game acts on for a finger of the current one-finger gesture:
-// display coordinates mapped back through the map view's zoom/pan. A drag that
-// started in the map view stays in it.
-static void engine_pos(const SDL_TouchFingerEvent &f, int *x, int *y)
+// Engine position for a display point. Returns 0 if the point is on a part of
+// the map outside the game's current view (zoomed out): the view module has
+// been asked to move the game's view there; try again on a later frame.
+static int engine_point(float gx, float gy, int *x, int *y)
+{
+	float ex = gx, ey = gy;
+	if( android_view_to_engine(&ex, &ey) < 0 )
+	{
+		android_view_request(gx, gy);
+		return 0;
+	}
+	*x = clamp_x(ex);
+	*y = clamp_y(ey);
+	return 1;
+}
+
+// Engine position while dragging a box or aiming: in the map view it stays
+// inside the game's view (a box cannot reach beyond it).
+static void engine_pos_clamped(const SDL_TouchFingerEvent &f, int *x, int *y)
 {
 	float gx, gy;
 	finger_game(f, &gx, &gy);
-	if( start_in_view )
-	{
-		const float x1 = ZOOM_X1, x2 = ZOOM_X2 + 0.9f, y1 = ZOOM_Y1, y2 = ZOOM_Y2 + 0.9f;
-		gx = gx < x1 ? x1 : (gx > x2 ? x2 : gx);
-		gy = gy < y1 ? y1 : (gy > y2 ? y2 : gy);
-	}
-	android_view_to_engine(&gx, &gy);
+	if( start_in_view || android_view_contains(gx, gy) )
+		android_view_to_engine_clamped(&gx, &gy);
 	*x = clamp_x(gx);
 	*y = clamp_y(gy);
 }
@@ -183,6 +211,7 @@ static void release_left()
 {
 	mouse.add_event(LEFT_BUTTON_RELEASE);
 	mouse.reset_boundary();
+	hold_until = SDL_GetTicks() + CLICK_HOLD_MS;
 }
 
 static void click(MouseEventType down, MouseEventType up, int x, int y)
@@ -193,6 +222,29 @@ static void click(MouseEventType down, MouseEventType up, int x, int y)
 		release_left();
 	else
 		mouse.add_event(up);
+	hold_until = SDL_GetTicks() + CLICK_HOLD_MS;
+}
+
+// Click at a display point; if it is outside the game's view (zoomed out),
+// send it once the view has moved there (android_touch_update).
+static void click_at(int right, float gx, float gy)
+{
+	int x, y;
+	if( engine_point(gx, gy, &x, &y) )
+	{
+		if( right )
+			click(RIGHT_BUTTON, RIGHT_BUTTON_RELEASE, x, y);
+		else
+			click(LEFT_BUTTON, LEFT_BUTTON_RELEASE, x, y);
+		park_cursor();
+		return;
+	}
+	pend_type = right ? 2 : 1;
+	pend_gx = gx;
+	pend_gy = gy;
+	pend_time = SDL_GetTicks();
+	LOGI("%s click at (%.0f,%.0f) waits for the game's view to move there",
+		right ? "right" : "left", gx, gy);
 }
 
 // Short vibration so the player feels when a long press became a right click.
@@ -232,27 +284,30 @@ static void finger_down(const SDL_TouchFingerEvent &f)
 			return;
 		state = TOUCH_PENDING;
 		long_press_armed = 0;
+		three_fingers = 0;
 		finger1 = f.fingerId;
 		down_time = SDL_GetTicks();
 		android_view_stop_fling();
 		finger_game(f, &start_gx, &start_gy);
 		f1_gx = start_gx;
 		f1_gy = start_gy;
-		float ex = start_gx, ey = start_gy;
-		start_in_view = android_view_contains(ex, ey);
-		android_view_to_engine(&ex, &ey);
-		start_lx = clamp_x(ex);
-		start_ly = clamp_y(ey);
+		start_in_view = android_view_contains(start_gx, start_gy);
+
 		// a new touch can land anywhere: no button is held, so nothing may
 		// confine the cursor
 		mouse.reset_boundary();
-		move_cursor(start_lx, start_ly);
+
+		// Show the game where the finger is (building outline, highlights).
+		// Off the game's view (zoomed out) this also asks for the view to
+		// move there, so the tap or order at lift time lands right.
+		int x, y;
+		if( engine_point(start_gx, start_gy, &x, &y) )
+			move_cursor(x, y);
 
 		if( start_in_view && power.command_id && !right_click_mode )
 		{
 			state = TOUCH_AIM;
-			__android_log_print(ANDROID_LOG_INFO, "7kaa-touch",
-				"aim start: command %d at (%d,%d)", power.command_id, start_lx, start_ly);
+			LOGI("aim start: command %d at (%.0f,%.0f)", power.command_id, start_gx, start_gy);
 		}
 	}
 	else if( (state == TOUCH_PENDING || state == TOUCH_AIM) && f.fingerId != finger1 )
@@ -265,7 +320,16 @@ static void finger_down(const SDL_TouchFingerEvent &f)
 		panned = 0;
 		view_gesture = android_view_gesture_begin(two_last_x, two_last_y, two_last_dist);
 	}
-	// a third finger, or a second one during a drag, is ignored
+	else if( state == TOUCH_TWO && f.fingerId != finger1 && f.fingerId != finger2 )
+	{
+		// three fingers: a quick tap resets the zoom (at lift), no right click
+		three_fingers = 1;
+		if( view_gesture )
+			android_view_gesture_end();
+		view_gesture = 0;
+		state = TOUCH_IGNORE;
+	}
+	// any other extra finger is ignored
 }
 
 static void finger_motion(const SDL_TouchFingerEvent &f)
@@ -273,13 +337,15 @@ static void finger_motion(const SDL_TouchFingerEvent &f)
 	if( state == TOUCH_PENDING && f.fingerId == finger1 )
 	{
 		finger_game(f, &f1_gx, &f1_gy);
-		if( hypotf(f1_gx - start_gx, f1_gy - start_gy) > MOVE_THRESHOLD )
+		int sx, sy;
+		if( hypotf(f1_gx - start_gx, f1_gy - start_gy) > MOVE_THRESHOLD &&
+			 engine_point(start_gx, start_gy, &sx, &sy) )   // (zoomed out: once the view is there)
 		{
 			// start a left-button drag from where the finger went down
-			move_cursor(start_lx, start_ly);
+			move_cursor(sx, sy);
 			mouse.add_event(LEFT_BUTTON);
 			int x, y;
-			engine_pos(f, &x, &y);
+			engine_pos_clamped(f, &x, &y);
 			move_cursor(x, y);
 			state = TOUCH_DRAG;
 		}
@@ -288,7 +354,11 @@ static void finger_motion(const SDL_TouchFingerEvent &f)
 	{
 		// drag: the box follows; aim: the building outline follows
 		int x, y;
-		engine_pos(f, &x, &y);
+		finger_game(f, &f1_gx, &f1_gy);
+		if( state == TOUCH_AIM && !engine_point(f1_gx, f1_gy, &x, &y) )
+			return;        // the game's view is moving there; follow next time
+		if( state == TOUCH_DRAG )
+			engine_pos_clamped(f, &x, &y);
 		move_cursor(x, y);
 	}
 	else if( state == TOUCH_TWO && (f.fingerId == finger1 || f.fingerId == finger2) )
@@ -321,11 +391,7 @@ static void finger_up(const SDL_TouchFingerEvent &f)
 	case TOUCH_PENDING:
 		if( f.fingerId == finger1 )
 		{
-			if( right_click_mode || long_press_armed )
-				click(RIGHT_BUTTON, RIGHT_BUTTON_RELEASE, start_lx, start_ly);
-			else
-				click(LEFT_BUTTON, LEFT_BUTTON_RELEASE, start_lx, start_ly);
-			park_cursor();
+			click_at(right_click_mode || long_press_armed, start_gx, start_gy);
 			state = TOUCH_IDLE;
 		}
 		break;
@@ -337,16 +403,12 @@ static void finger_up(const SDL_TouchFingerEvent &f)
 			finger_game(f, &gx, &gy);
 			if( android_view_contains(gx, gy) && power.command_id )
 			{
-				int x, y;
-				engine_pos(f, &x, &y);
-				click(LEFT_BUTTON, LEFT_BUTTON_RELEASE, x, y);
-				__android_log_print(ANDROID_LOG_INFO, "7kaa-touch",
-					"aim done: command %d placed at (%d,%d)", power.command_id, x, y);
+				click_at(0, gx, gy);
+				LOGI("aim done: command %d placed at (%.0f,%.0f)", power.command_id, gx, gy);
 			}
 			else
 			{
-				__android_log_print(ANDROID_LOG_INFO, "7kaa-touch",
-					"aim aborted: finger lifted off the map (%.0f,%.0f) or command gone (%d)",
+				LOGI("aim aborted: finger lifted off the map (%.0f,%.0f) or command gone (%d)",
 					gx, gy, power.command_id);
 			}
 			park_cursor();
@@ -358,7 +420,7 @@ static void finger_up(const SDL_TouchFingerEvent &f)
 		if( f.fingerId == finger1 )
 		{
 			int x, y;
-			engine_pos(f, &x, &y);
+			engine_pos_clamped(f, &x, &y);
 			move_cursor(x, y);
 			release_left();
 			park_cursor();
@@ -373,10 +435,7 @@ static void finger_up(const SDL_TouchFingerEvent &f)
 				android_view_gesture_end();
 			view_gesture = 0;
 			if( !panned && SDL_GetTicks() - down_time < TWO_FINGER_TAP_MS + LONG_PRESS_MS )
-			{
-				click(RIGHT_BUTTON, RIGHT_BUTTON_RELEASE, start_lx, start_ly);
-				park_cursor();
-			}
+				click_at(1, start_gx, start_gy);
 			state = TOUCH_IGNORE;
 		}
 		break;
@@ -386,7 +445,12 @@ static void finger_up(const SDL_TouchFingerEvent &f)
 	}
 
 	if( fingers_down == 0 )
+	{
+		if( three_fingers && SDL_GetTicks() - down_time < THREE_FINGER_TAP_MS )
+			android_view_reset_zoom();
+		three_fingers = 0;
 		state = TOUCH_IDLE;
+	}
 }
 
 //------------------------------------------------------------------------
@@ -436,14 +500,44 @@ int android_touch_event(SDL_Event *event)
 
 void android_touch_update()
 {
+	Uint32 now = SDL_GetTicks();
+
 	// Holding still only arms the right click (the phone vibrates); it fires
 	// when the finger is lifted, so holding and then dragging still drags.
-	if( state == TOUCH_PENDING && !long_press_armed &&
-		 SDL_GetTicks() - down_time >= LONG_PRESS_MS )
+	if( state == TOUCH_PENDING && !long_press_armed && now - down_time >= LONG_PRESS_MS )
 	{
 		long_press_armed = 1;
 		haptic_tick();
 	}
+
+	// A click that waited for the game's view to move (zoomed out).
+	if( pend_type && !android_view_busy() )
+	{
+		int x, y;
+		if( engine_point(pend_gx, pend_gy, &x, &y) )
+		{
+			if( pend_type == 2 )
+				click(RIGHT_BUTTON, RIGHT_BUTTON_RELEASE, x, y);
+			else
+				click(LEFT_BUTTON, LEFT_BUTTON_RELEASE, x, y);
+			park_cursor();
+			LOGI("deferred %s click sent at (%d,%d) after %u ms",
+				pend_type == 2 ? "right" : "left", x, y, (unsigned) (now - pend_time));
+			pend_type = 0;
+		}
+		else if( now - pend_time > PENDING_CLICK_MS )
+		{
+			LOGI("deferred click at (%.0f,%.0f) dropped: the view could not move there (map edge?)",
+				pend_gx, pend_gy);
+			pend_type = 0;
+		}
+	}
+
+	// The game's view must stay where it is while a one-finger gesture or a
+	// click works with it.
+	int hold = state == TOUCH_PENDING || state == TOUCH_DRAG || state == TOUCH_AIM ||
+		pend_type || (Sint32) (hold_until - now) > 0;
+	android_view_set_hold(hold);
 
 	android_view_animate();
 }

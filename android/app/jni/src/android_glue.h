@@ -26,8 +26,11 @@ void android_touch_draw_debug(SDL_Surface *surface);
 // Smooth pan / pinch zoom of the map view (android_view.cpp).
 // Called each frame by World::detect: scrolls the engine to follow the view.
 void android_view_world_hook();
+// Called at the start of Sys::disp_zoom: draws the parts of the map the shown
+// window needs beyond the game's own view (zoomed out / while panning).
+void android_view_disp_zoom_begin();
 // Called by Vga::flip() after the frame is copied: draws the zoomed/panned
-// map view over it.
-void android_view_render(SDL_Renderer *renderer, SDL_Texture *texture);
+// map view over it. front = vga_front's surface (8-bit, game palette).
+void android_view_render(SDL_Renderer *renderer, SDL_Texture *texture, SDL_Surface *front);
 
 #endif

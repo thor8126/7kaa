@@ -566,6 +566,32 @@ void ZoomMatrix::draw_frame()
 //----------- End of function ZoomMatrix::draw_frame ------------//
 
 
+#ifdef __ANDROID__
+//---------- Begin of function ZoomMatrix::draw_extra_pass -----------//
+//
+// Android zoom-out (android_view.cpp): draw the map view at the current
+// top_x_loc/top_y_loc as an extra picture: terrain, objects, fog and names.
+// Weather (it keeps state and plays sounds) and the build marker (it follows
+// the mouse in the real view) are left to the normal drawing.
+//
+void ZoomMatrix::draw_extra_pass()
+{
+	draw();
+	disp();
+	draw_objects();
+
+	if(config.blacken_map && config.fog_of_war)
+		blacken_fog_of_war();
+
+	else if( !config.explore_whole_map )
+		blacken_unexplored();
+
+	disp_text();
+}
+//----------- End of function ZoomMatrix::draw_extra_pass ------------//
+#endif
+
+
 //---------- Begin of function ZoomMatrix::draw_weather_effects -----------//
 //
 void ZoomMatrix::draw_weather_effects()

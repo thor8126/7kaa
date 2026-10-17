@@ -70,6 +70,9 @@
 #include <CmdLine.h>
 #include <OCALLARM.h>
 #include <gettext.h>
+#ifdef __ANDROID__
+#include <android_glue.h>
+#endif
 
 
 //---------- define static variables ----------//
@@ -1115,6 +1118,10 @@ void Sys::disp_zoom()
 	//--------- set zoom window ----------//
 
 	ZoomMatrix* zoomMatrix = world.zoom_matrix;
+
+#ifdef __ANDROID__
+	android_view_disp_zoom_begin();    // map beyond the normal view when zoomed out
+#endif
 
 	err_when(zoomMatrix->top_x_loc<0 || zoomMatrix->top_x_loc>=MAX_WORLD_X_LOC);
 	err_when(zoomMatrix->top_y_loc<0 || zoomMatrix->top_y_loc>=MAX_WORLD_Y_LOC);

@@ -23,7 +23,13 @@ import org.libsdl.app.SDLActivity;
  *
  *   left:  [Right click] toggle - while on, every tap is a right click
  *          [Shift]       toggle - held Shift, e.g. to add units to a selection
+ *          [Pause]       pause / resume (Space)
  *   right: [Ctrl+A]      select the whole army
+ *          [< Prev]      previous unit / building / village of the same kind
+ *                        of your own (Left arrow key); long press: of any
+ *                        nation (Up arrow key)
+ *          [Next >]      the next one (Right arrow key); long press: of any
+ *                        nation (Down arrow key)
  *          [Esc]         same as the Back button
  */
 public class SevenKaaActivity extends SDLActivity {
@@ -65,6 +71,28 @@ public class SevenKaaActivity extends SDLActivity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(72), dp(52));
         lp.setMargins(dp(4), dp(6), dp(4), dp(6));
         b.setLayoutParams(lp);
+        return b;
+    }
+
+    /** Press and release a key in the game. */
+    private static void tapKey(int keyCode) {
+        SDLActivity.onNativeKeyDown(keyCode);
+        SDLActivity.onNativeKeyUp(keyCode);
+    }
+
+    private TextView makeKeyButton(String label, final int keyCode, final int longPressKeyCode) {
+        TextView b = makeButton(label);
+        b.setOnClickListener(v -> {
+            tapKey(keyCode);
+            v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+        });
+        if (longPressKeyCode != 0) {
+            b.setOnLongClickListener(v -> {
+                tapKey(longPressKeyCode);
+                v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                return true;
+            });
+        }
         return b;
     }
 
@@ -114,6 +142,8 @@ public class SevenKaaActivity extends SDLActivity {
         });
         left.addView(shift);
 
+        left.addView(makeKeyButton("Pause", KeyEvent.KEYCODE_SPACE, 0));
+
         TextView army = makeButton("Army\nCtrl+A");
         army.setOnClickListener(v -> {
             SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_CTRL_LEFT);
@@ -123,6 +153,9 @@ public class SevenKaaActivity extends SDLActivity {
             v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
         });
         right.addView(army);
+
+        right.addView(makeKeyButton("◀ Prev", KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_UP));
+        right.addView(makeKeyButton("Next ▶", KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_DOWN));
 
         TextView esc = makeButton("Esc");
         esc.setOnClickListener(v -> {

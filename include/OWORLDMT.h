@@ -146,6 +146,9 @@ public:
 	void put_bitmap_remap_clip(int x, int y, char* bitmapPtr, char* colorRemapTable=NULL,int compressedFlag=0);
 	int  detect_bitmap_clip(int x, int y, char* bitmapPtr);
 	bool is_bitmap_clip(int x, int y, char* bitmapPtr);
+#ifdef __ANDROID__
+	void draw_extra_pass();     // Android zoom-out, see android_view.cpp
+#endif
 
 protected:
 	void draw_objects();
