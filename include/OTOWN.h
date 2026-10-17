@@ -213,6 +213,7 @@ public:
 	char	 edict_id;					// EDICT_???, see OCIVIL.H
 	int	 edict_end_date;
 	float	 harvest_food;				// food grown by the farmers this season, brought in at its end
+	char	 wall_built;				// 1 if walls have been built around the village, they stay when it changes hands
 
 	int 	 closest_own_camp();
 

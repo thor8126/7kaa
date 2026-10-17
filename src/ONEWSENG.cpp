@@ -1268,7 +1268,27 @@ void News::tech_researched()
 	//
 	//----------------------------------------------//
 
-	if( tech_res[short_para1]->max_tech_level > 1 )		// if the tech has more than one level
+	TechInfo* techInfo = tech_res[short_para1];
+
+	if( techInfo->civil_id )		// the civil technologies are not in the message arrays, see OCIVIL.CPP
+	{
+		String nameStr;
+
+		nameStr = techInfo->tech_des();
+
+		if( techInfo->max_tech_level > 1 )
+		{
+			nameStr += " ";
+			nameStr += misc.roman_number(short_para2);
+		}
+
+		// TRANSLATORS: Your scientists have finished their <Technology> research: <what it brings>.
+		snprintf(str, MAX_STR_LEN+1, _("Your scientists have finished their %s research: %s."),
+					(const char*) nameStr, techInfo->level_des(short_para2));
+		return;
+	}
+
+	if( techInfo->max_tech_level > 1 )		// if the tech has more than one level
 	{
 		snprintf(str, MAX_STR_LEN+1, _(tech_researched_level_msg[short_para1-1]), misc.roman_number(short_para2));
 	}

@@ -49,6 +49,11 @@ enum { FARM_BLOCK_NO_AGRICULTURE=1, FARM_BLOCK_OFF, FARM_BLOCK_SEASON, FARM_BLOC
 #define EDICT_DAYS					365		// an edict lasts a year
 #define WATCHTOWER_COST				800
 #define WALL_COST						1200		// the walls around a village, Engineering II
+#define WALL_TOWN_MARGIN				4			// the walls go around a village this far out (and one more location)
+#define WALL_FIRM_REACH				6			// the kingdom's buildings this close to a walled village are walled in with it
+#define WALL_FIRM_MARGIN				1			// room left between a building and the walls
+#define WALL_MERGE_DISTANCE			3			// walled areas closer than twice this are joined into one
+#define WALL_JOIN_DISTANCE				10			// two walled villages whose areas are this close share one wall around both
 #define MAX_MEDIC_EVACUATION		50			// fallen soldiers being carried back to forts at the same time
 
 //------- Define class CivilTech -------//
@@ -83,10 +88,11 @@ public:
 
 	int	can_build_watchtower(Town* townPtr, int checkCash=1);
 	void	build_watchtower(Town* townPtr);
-	int	wall_section_count(Town* townPtr, int* avgHitPoints=0, int* ringLength=0);
+	int	wall_section_count(Town* townPtr, int* avgHitPoints=0);
 	int	has_walls(Town* townPtr);
 	int	can_build_walls(Town* townPtr, int checkCash=1);
 	void	build_walls(Town* townPtr);
+	void	rebuild_nation_walls(int nationRecno, int builderTownRecno);
 
 	//------ Industry: deep mines ------//
 

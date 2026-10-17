@@ -1156,7 +1156,7 @@ static void i_disp_defense_button(ButtonCustom *button, int repaintBody)
 		char desStr[100];
 		int  avgHitPoints;
 
-		civil_tech.wall_section_count(townPtr, &avgHitPoints);
+		civil_tech.wall_section_count(townPtr, &avgHitPoints);		// the walls around it
 
 		if( civil_tech.has_walls(townPtr) )
 			snprintf( desStr, sizeof(desStr), _("Built, strength %d%%. Villagers repair them."), avgHitPoints );

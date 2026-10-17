@@ -176,6 +176,11 @@ public:
 				short townRecno, short initHp = 99);
 	void		build_wall(int townRecno, short initHp = 99);
 
+	int		can_build_area(short x1, short y1, short x2, short y2);
+	void		build_west_gate(short x1, short y1, short townRec, short initHp);
+	void		build_east_gate(short x1, short y1, short townRec, short initHp);
+	void		build_north_gate(short x1, short y1, short townRec, short initHp);
+	void		build_south_gate(short x1, short y1, short townRec, short initHp);
 	void		open_west_gate(short x2, short y1, short townRecno);
 	void		open_east_gate(short x1, short y1, short townRecno);
 	void		open_north_gate(short x1, short y2, short townRecno);
@@ -224,11 +229,6 @@ private:
 	void    set_harbor_bit();
 
 	// private function called by build_wall_section
-	int	can_build_area(short x1, short y1, short x2, short y2);
-	void	build_west_gate(short x1, short y1, short townRec, short initHp);
-	void	build_east_gate(short x1, short y1, short townRec, short initHp);
-	void	build_north_gate(short x1, short y1, short townRec, short initHp);
-	void	build_south_gate(short x1, short y1, short townRec, short initHp);
 
 	void	build_west_wall(short x1, short y1, short y2, short townRec, short initHp);
 	void	build_east_wall(short x1, short y1, short y2, short townRec, short initHp);

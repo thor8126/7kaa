@@ -1211,46 +1211,25 @@ void CivilTech::build_watchtower(Town* townPtr)
 //----------- End of function CivilTech::build_watchtower -----------//
 
 
-//--------- Begin of static function wall_ring ---------//
-//
-// The rectangle on which the walls of a village are built, see
-// World::build_wall().
-//
-static void wall_ring(Town* townPtr, int& x1, int& y1, int& x2, int& y2)
-{
-	x1 = townPtr->loc_x1 - WALL_SPACE_LOC;
-	y1 = townPtr->loc_y1 - WALL_SPACE_LOC;
-	x2 = townPtr->loc_x2 + WALL_SPACE_LOC;
-	y2 = townPtr->loc_y2 + WALL_SPACE_LOC;
-}
-//----------- End of static function wall_ring -----------//
-
-
 //--------- Begin of function CivilTech::wall_section_count ---------//
 //
 // [int*] avgHitPoints - the average hit points of the sections (0-100)
-// [int*] ringLength   - the no. of locations around the village where the walls go
 //
 // return : <int> the no. of wall sections around the village
 //
-int CivilTech::wall_section_count(Town* townPtr, int* avgHitPoints, int* ringLength)
+int CivilTech::wall_section_count(Town* townPtr, int* avgHitPoints)
 {
-	int x1, y1, x2, y2;
+	int reach = WALL_TOWN_MARGIN + WALL_FIRM_REACH + 3;
 
-	wall_ring(townPtr, x1, y1, x2, y2);
+	int x1 = MAX( 0, townPtr->loc_x1-reach ), y1 = MAX( 0, townPtr->loc_y1-reach );
+	int x2 = MIN( MAX_WORLD_X_LOC-1, townPtr->loc_x2+reach ), y2 = MIN( MAX_WORLD_Y_LOC-1, townPtr->loc_y2+reach );
 
 	int count=0, hitPointsSum=0;
 
-	for( int y=y1-1 ; y<=y2+1 ; y++ )		// -1 and +1: the gates stick out
+	for( int y=y1 ; y<=y2 ; y++ )
 	{
-		for( int x=x1-1 ; x<=x2+1 ; x++ )
+		for( int x=x1 ; x<=x2 ; x++ )
 		{
-			if( x > x1 && x < x2 && y > y1 && y < y2 )		// inside the ring
-				continue;
-
-			if( x<0 || y<0 || x>=MAX_WORLD_X_LOC || y>=MAX_WORLD_Y_LOC )
-				continue;
-
 			Location* locPtr = world.get_loc(x, y);
 
 			if( locPtr->is_wall() )
@@ -1264,9 +1243,6 @@ int CivilTech::wall_section_count(Town* townPtr, int* avgHitPoints, int* ringLen
 	if( avgHitPoints )
 		*avgHitPoints = count ? hitPointsSum / count : 0;
 
-	if( ringLength )
-		*ringLength = (x2-x1+y2-y1)*2;
-
 	return count;
 }
 //----------- End of function CivilTech::wall_section_count -----------//
@@ -1274,13 +1250,9 @@ int CivilTech::wall_section_count(Town* townPtr, int* avgHitPoints, int* ringLen
 
 //--------- Begin of function CivilTech::has_walls ---------//
 //
-// return : <int> 1 if at least half of the village's walls stand
-//
 int CivilTech::has_walls(Town* townPtr)
 {
-	int ringLength;
-
-	return wall_section_count(townPtr, NULL, &ringLength) >= ringLength/2;
+	return townPtr->wall_built;
 }
 //----------- End of function CivilTech::has_walls -----------//
 
@@ -1289,21 +1261,19 @@ int CivilTech::has_walls(Town* townPtr)
 //
 int CivilTech::can_build_walls(Town* townPtr, int checkCash)
 {
-	if( !townPtr->nation_recno || townPtr->rebel_recno || remote.is_enable() )
+	if( !townPtr->nation_recno || townPtr->rebel_recno || townPtr->wall_built || remote.is_enable() )
 		return 0;
 
 	if( tech_res.civil_level(townPtr->nation_recno, CIVIL_ENGINEERING) < 2 )
 		return 0;
 
-	int x1, y1, x2, y2;
+	int reach = WALL_TOWN_MARGIN + GATE_WIDTH + 2;
 
-	wall_ring(townPtr, x1, y1, x2, y2);
-
-	if( x1-GATE_WIDTH < 0 || y1-GATE_WIDTH < 0 || x2+GATE_WIDTH >= MAX_WORLD_X_LOC || y2+GATE_WIDTH >= MAX_WORLD_Y_LOC )
+	if( townPtr->loc_x1-reach < 0 || townPtr->loc_y1-reach < 0 ||
+		 townPtr->loc_x2+reach >= MAX_WORLD_X_LOC || townPtr->loc_y2+reach >= MAX_WORLD_Y_LOC )
+	{
 		return 0;		// too close to the edge of the map for the walls and their gates
-
-	if( has_walls(townPtr) )
-		return 0;
+	}
 
 	if( checkCash && nation_array[townPtr->nation_recno]->cash < WALL_COST )
 		return 0;
@@ -1359,8 +1329,9 @@ static int is_frontline_town(Nation* nationPtr, Town* townPtr)
 
 //--------- Begin of function CivilTech::build_walls ---------//
 //
-// The walls go up around the village, with a gate on each side where
-// there is room. They start weak and grow stronger, see World::form_world_wall().
+// The village is walled in, together with the kingdom's buildings next to
+// it, and joined to the walls of its other walled villages nearby, see
+// rebuild_nation_walls().
 //
 void CivilTech::build_walls(Town* townPtr)
 {
@@ -1369,35 +1340,476 @@ void CivilTech::build_walls(Town* townPtr)
 
 	nation_array[townPtr->nation_recno]->add_expense( EXPENSE_FIRM, (float) WALL_COST );
 
-	int oldCount = wall_section_count(townPtr);
+	townPtr->wall_built = 1;
 
-	world.build_wall(townPtr->town_recno, 1);		// 1-the hit points they start with
+	rebuild_nation_walls(townPtr->nation_recno, townPtr->town_recno);
+}
+//----------- End of function CivilTech::build_walls -----------//
 
-	//--- the walls start as foundations and rise as they grow stronger (the gates are built at once) ---//
 
-	int x1, y1, x2, y2;
+//--------- Begin of static function wall_area_mark ---------//
+//
+static void wall_area_mark(std::vector<char>& areaArray, int areaX1, int areaY1, int areaWidth, int areaHeight,
+									int x1, int y1, int x2, int y2)
+{
+	x1 = MAX( x1, areaX1 );
+	y1 = MAX( y1, areaY1 );
+	x2 = MIN( x2, areaX1+areaWidth-1 );
+	y2 = MIN( y2, areaY1+areaHeight-1 );
 
-	wall_ring(townPtr, x1, y1, x2, y2);
-
-	for( int y=y1-1 ; y<=y2+1 ; y++ )
+	for( int y=y1 ; y<=y2 ; y++ )
 	{
-		for( int x=x1-1 ; x<=x2+1 ; x++ )
+		for( int x=x1 ; x<=x2 ; x++ )
+			areaArray[(y-areaY1)*areaWidth + (x-areaX1)] = 1;
+	}
+}
+//----------- End of static function wall_area_mark -----------//
+
+
+//--------- Begin of static function wall_area_spread ---------//
+//
+// Grow (growFlag 1) or shrink (0) the area by the given distance, in all
+// directions including the diagonals.
+//
+static void wall_area_spread(std::vector<char>& areaArray, int areaWidth, int areaHeight, int distance, int growFlag)
+{
+	std::vector<char> tmpArray(areaArray.size());
+
+	for( int pass=0 ; pass<2 ; pass++ )		// across, then up and down
+	{
+		for( int y=0 ; y<areaHeight ; y++ )
 		{
-			if( x > x1 && x < x2 && y > y1 && y < y2 )
+			for( int x=0 ; x<areaWidth ; x++ )
+			{
+				int result = growFlag ? 0 : 1;
+
+				for( int d=-distance ; d<=distance ; d++ )
+				{
+					int sx = pass==0 ? x+d : x;
+					int sy = pass==0 ? y : y+d;
+					int v = (sx>=0 && sy>=0 && sx<areaWidth && sy<areaHeight) ? areaArray[sy*areaWidth+sx] : 0;
+
+					if( growFlag ? v : !v )
+					{
+						result = growFlag ? 1 : 0;
+						break;
+					}
+				}
+
+				tmpArray[y*areaWidth+x] = result;
+			}
+		}
+
+		areaArray = tmpArray;
+	}
+}
+//----------- End of static function wall_area_spread -----------//
+
+
+//--------- Begin of static function gate_area_ok ---------//
+//
+// return : <int> 1 if a gate can be built on the area: free land, or walls
+//          already standing there (but not another gate), which the gate replaces
+//
+static int gate_area_ok(int x1, int y1, int x2, int y2, char* failStr, int failStrLen)
+{
+	for( int y=y1 ; y<=y2 ; y++ )
+	{
+		for( int x=x1 ; x<=x2 ; x++ )
+		{
+			Location* locPtr = world.get_loc(x, y);
+
+			if( locPtr->is_wall() ? is_gate_tile(locPtr->wall_id()) : !locPtr->can_build_wall() )
+			{
+				snprintf( failStr, failStrLen, "blocked at %d,%d (flags %04x, cargo %d)", x, y, locPtr->loc_flag, locPtr->cargo_recno );
+				return 0;
+			}
+		}
+	}
+
+	return 1;
+}
+//----------- End of static function gate_area_ok -----------//
+
+
+//--------- Begin of static function is_gate_passage ---------//
+//
+// return : <int> 1 if the location is the way through a gate, between the
+//          gate's pieces, which is never walled up
+//
+static int is_gate_passage(int xLoc, int yLoc)
+{
+	int gateBefore=0, gateAfter=0;
+
+	for( int dir=0 ; dir<2 ; dir++ )		// in the same column, then in the same row
+	{
+		gateBefore = gateAfter = 0;
+
+		for( int d=1 ; d<=2 ; d++ )
+		{
+			int bx = dir==0 ? xLoc : xLoc-d, by = dir==0 ? yLoc-d : yLoc;
+			int ax = dir==0 ? xLoc : xLoc+d, ay = dir==0 ? yLoc+d : yLoc;
+
+			if( bx>=0 && by>=0 && world.get_loc(bx, by)->is_wall() && is_gate_tile(world.get_loc(bx, by)->wall_id()) )
+				gateBefore = 1;
+
+			if( ax<MAX_WORLD_X_LOC && ay<MAX_WORLD_Y_LOC && world.get_loc(ax, ay)->is_wall() && is_gate_tile(world.get_loc(ax, ay)->wall_id()) )
+				gateAfter = 1;
+		}
+
+		if( gateBefore && gateAfter )
+			return 1;
+	}
+
+	return 0;
+}
+//----------- End of static function is_gate_passage -----------//
+
+
+//--------- Begin of function CivilTech::rebuild_nation_walls ---------//
+//
+// The walls of a kingdom go around its walled area: each walled village
+// with a margin, and the kingdom's buildings near it, joined where the
+// areas of its walled villages meet or nearly meet. The walls follow the
+// outer edge of that area only: walls left inside it (where two walled
+// villages have been joined) are taken down. There is a gate on each long
+// straight stretch, and roads go through the walls. The walls that are
+// already up are kept, new sections start as foundations.
+//
+// <int> builderTownRecno - the village whose walls are being built
+//
+void CivilTech::rebuild_nation_walls(int nationRecno, int builderTownRecno)
+{
+	//------ the walled villages of the kingdom ------//
+
+	std::vector<Town*> townArray;
+	int minX=MAX_WORLD_X_LOC, minY=MAX_WORLD_Y_LOC, maxX=0, maxY=0;
+
+	for( int i=town_array.size() ; i>0 ; i-- )
+	{
+		if( town_array.is_deleted(i) )
+			continue;
+
+		Town* townPtr = town_array[i];
+
+		if( townPtr->nation_recno != nationRecno || !townPtr->wall_built )
+			continue;
+
+		townArray.push_back(townPtr);
+
+		minX = MIN( minX, townPtr->loc_x1 );
+		minY = MIN( minY, townPtr->loc_y1 );
+		maxX = MAX( maxX, townPtr->loc_x2 );
+		maxY = MAX( maxY, townPtr->loc_y2 );
+	}
+
+	if( townArray.empty() )
+		return;
+
+	//------ the area around them, on a local grid ------//
+
+	int border = WALL_TOWN_MARGIN + WALL_FIRM_REACH + WALL_MERGE_DISTANCE + 6;
+
+	int areaX1 = MAX( 0, minX-border ), areaY1 = MAX( 0, minY-border );
+	int areaX2 = MIN( MAX_WORLD_X_LOC-1, maxX+border ), areaY2 = MIN( MAX_WORLD_Y_LOC-1, maxY+border );
+	int areaWidth = areaX2-areaX1+1, areaHeight = areaY2-areaY1+1;
+
+	std::vector<char> areaArray(areaWidth*areaHeight, 0);
+
+	int firmCount = 0;
+
+	for( size_t t=0 ; t<townArray.size() ; t++ )
+	{
+		Town* townPtr = townArray[t];
+
+		wall_area_mark( areaArray, areaX1, areaY1, areaWidth, areaHeight,
+							 townPtr->loc_x1-WALL_TOWN_MARGIN, townPtr->loc_y1-WALL_TOWN_MARGIN,
+							 townPtr->loc_x2+WALL_TOWN_MARGIN, townPtr->loc_y2+WALL_TOWN_MARGIN );
+
+		//--- the kingdom's buildings near the village are walled in with it ---//
+
+		for( int i=firm_array.size() ; i>0 ; i-- )
+		{
+			if( firm_array.is_deleted(i) )
 				continue;
 
-			if( world.get_loc(x, y)->is_wall() )
+			Firm* firmPtr = firm_array[i];
+
+			if( firmPtr->nation_recno != nationRecno ||
+				 misc.rects_distance( firmPtr->loc_x1, firmPtr->loc_y1, firmPtr->loc_x2, firmPtr->loc_y2,
+											 townPtr->loc_x1, townPtr->loc_y1, townPtr->loc_x2, townPtr->loc_y2, 1, 1 ) > WALL_FIRM_REACH )		// 1,1-from the edges
+			{
+				continue;
+			}
+
+			wall_area_mark( areaArray, areaX1, areaY1, areaWidth, areaHeight,
+								 firmPtr->loc_x1-WALL_FIRM_MARGIN, firmPtr->loc_y1-WALL_FIRM_MARGIN,
+								 firmPtr->loc_x2+WALL_FIRM_MARGIN, firmPtr->loc_y2+WALL_FIRM_MARGIN );
+			firmCount++;
+		}
+	}
+
+	//--- walled villages near each other are joined into one area ---//
+
+	int joinCount = 0;
+
+	for( size_t t=0 ; t<townArray.size() ; t++ )
+	{
+		for( size_t u=t+1 ; u<townArray.size() ; u++ )
+		{
+			Town* a = townArray[t];
+			Town* b = townArray[u];
+			int m = WALL_TOWN_MARGIN;
+
+			if( misc.rects_distance( a->loc_x1-m, a->loc_y1-m, a->loc_x2+m, a->loc_y2+m,
+											 b->loc_x1-m, b->loc_y1-m, b->loc_x2+m, b->loc_y2+m, 1, 1 ) > WALL_JOIN_DISTANCE )
+			{
+				continue;
+			}
+
+			//--- the rectangle around both: straight walls, the wall pieces have no diagonals ---//
+
+			wall_area_mark( areaArray, areaX1, areaY1, areaWidth, areaHeight,
+								 MIN(a->loc_x1, b->loc_x1)-m, MIN(a->loc_y1, b->loc_y1)-m,
+								 MAX(a->loc_x2, b->loc_x2)+m, MAX(a->loc_y2, b->loc_y2)+m );
+			joinCount++;
+		}
+	}
+
+	//--- join the rest that nearly meet and smooth the outline: grow, then shrink back ---//
+
+	wall_area_spread( areaArray, areaWidth, areaHeight, WALL_MERGE_DISTANCE, 1 );
+	wall_area_spread( areaArray, areaWidth, areaHeight, WALL_MERGE_DISTANCE, 0 );
+
+	#define IN_AREA(x,y)		( (x)>=areaX1 && (y)>=areaY1 && (x)<=areaX2 && (y)<=areaY2 && areaArray[((y)-areaY1)*areaWidth + ((x)-areaX1)] )
+	#define ON_EDGE(x,y)		( !IN_AREA(x,y) && ( IN_AREA((x)-1,(y)-1) || IN_AREA((x),(y)-1) || IN_AREA((x)+1,(y)-1) || \
+										IN_AREA((x)-1,(y)) || IN_AREA((x)+1,(y)) || \
+										IN_AREA((x)-1,(y)+1) || IN_AREA((x),(y)+1) || IN_AREA((x)+1,(y)+1) ) )
+
+	//------ walls inside the area are taken down ------//
+
+	int x, y, removedCount=0;
+
+	for( y=areaY1 ; y<=areaY2 ; y++ )
+	{
+		for( x=areaX1 ; x<=areaX2 ; x++ )
+		{
+			if( IN_AREA(x,y) && world.get_loc(x,y)->is_wall() )
+			{
+				world.get_loc(x,y)->remove_wall(0);		// 0-no time before something else can be built there
+				removedCount++;
+			}
+		}
+	}
+
+	//------ a gate on each long straight stretch ------//
+	//
+	// side 0: west, 1: east, 2: north, 3: south. A stretch is a row of edge
+	// locations facing the same way.
+	//
+	int gateCount = 0;
+
+	for( int side=0 ; side<4 ; side++ )
+	{
+		int vertical = side < 2;		// west and east walls run up and down
+
+		for( int line = vertical ? areaX1 : areaY1 ; line <= (vertical ? areaX2 : areaY2) ; line++ )
+		{
+			int runStart = -1;
+
+			for( int pos = vertical ? areaY1 : areaX1 ; pos <= (vertical ? areaY2 : areaX2)+1 ; pos++ )
+			{
+				int cx = vertical ? line : pos;
+				int cy = vertical ? pos : line;
+				int facing = 0;
+
+				if( pos <= (vertical ? areaY2 : areaX2) && ON_EDGE(cx, cy) )
+				{
+					switch( side )
+					{
+						case 0: facing = IN_AREA(cx+1, cy) && !IN_AREA(cx-1, cy); break;
+						case 1: facing = IN_AREA(cx-1, cy) && !IN_AREA(cx+1, cy); break;
+						case 2: facing = IN_AREA(cx, cy+1) && !IN_AREA(cx, cy-1); break;
+						case 3: facing = IN_AREA(cx, cy-1) && !IN_AREA(cx, cy+1); break;
+					}
+				}
+
+				if( facing )
+				{
+					if( runStart < 0 )
+						runStart = pos;
+					continue;
+				}
+
+				if( runStart < 0 )
+					continue;
+
+				int runEnd = pos-1;
+				int runLen = runEnd - runStart + 1;
+				int rs = runStart;
+
+				runStart = -1;
+
+				if( runLen < GATE_LENGTH+4 )
+					continue;
+
+				//--- no second gate on a stretch that has one ---//
+
+				int hasGate = 0;
+
+				for( int p=rs ; p<=runEnd && !hasGate ; p++ )
+				{
+					for( int d=-1 ; d<=1 ; d++ )
+					{
+						int gx = vertical ? line+d : p;
+						int gy = vertical ? p : line+d;
+
+						if( gx>=0 && gy>=0 && gx<MAX_WORLD_X_LOC && gy<MAX_WORLD_Y_LOC &&
+							 world.get_loc(gx, gy)->is_wall() && is_gate_tile(world.get_loc(gx, gy)->wall_id()) )
+						{
+							hasGate = 1;
+							break;
+						}
+					}
+				}
+
+				if( hasGate )
+					continue;
+
+				int oldGateCount = gateCount;
+				char failStr[80] = "";
+
+				//--- from the middle outward, the first place with room for the gate ---//
+
+				int middle = rs + (runLen-GATE_LENGTH)/2;
+
+				for( int k=0 ; k <= runLen-GATE_LENGTH-2 ; k++ )
+				{
+					int start = middle + ( (k&1) ? -(k+1)/2 : k/2 );
+
+					if( start < rs+1 || start+GATE_LENGTH-1 > runEnd-1 )
+						continue;
+
+					int gx1, gy1, gx2, gy2;
+
+					switch( side )
+					{
+						case 0: gx1 = line-GATE_WIDTH+1; gy1 = start; gx2 = line; gy2 = start+GATE_LENGTH-1; break;
+						case 1: gx1 = line; gy1 = start; gx2 = line+GATE_WIDTH-1; gy2 = start+GATE_LENGTH-1; break;
+						case 2: gx1 = start; gy1 = line-GATE_WIDTH+1; gx2 = start+GATE_LENGTH-1; gy2 = line; break;
+						default: gx1 = start; gy1 = line; gx2 = start+GATE_LENGTH-1; gy2 = line+GATE_WIDTH-1; break;
+					}
+
+					if( gx1 < 0 || gy1 < 0 || gx2 >= MAX_WORLD_X_LOC || gy2 >= MAX_WORLD_Y_LOC ||
+						 !gate_area_ok(gx1, gy1, gx2, gy2, failStr, sizeof(failStr)) )
+					{
+						continue;
+					}
+
+					for( int ry=gy1 ; ry<=gy2 ; ry++ )		// the walls there make way for the gate
+					{
+						for( int rx=gx1 ; rx<=gx2 ; rx++ )
+						{
+							if( world.get_loc(rx, ry)->is_wall() )
+								world.get_loc(rx, ry)->remove_wall(0);
+						}
+					}
+
+					switch( side )
+					{
+						case 0: world.build_west_gate(gx1, gy1, builderTownRecno, 1);  world.open_west_gate(line, start, builderTownRecno);  break;
+						case 1: world.build_east_gate(gx1, gy1, builderTownRecno, 1);  world.open_east_gate(line, start, builderTownRecno);  break;
+						case 2: world.build_north_gate(gx1, gy1, builderTownRecno, 1); world.open_north_gate(start, line, builderTownRecno); break;
+						default: world.build_south_gate(gx1, gy1, builderTownRecno, 1); world.open_south_gate(start, line, builderTownRecno); break;
+					}
+
+					gateCount++;
+					break;
+				}
+
+				AiWarState::log( "WALL        nation %d: %s stretch %s %d from %d to %d: %s",
+									  nationRecno, side==0 ? "west" : side==1 ? "east" : side==2 ? "north" : "south",
+									  vertical ? "at x" : "at y", line, rs, runEnd,
+									  gateCount > oldGateCount ? "a gate built" : failStr[0] ? failStr : "no room for a gate" );
+			}
+		}
+	}
+
+	//------ the walls along the edge ------//
+
+	int newCount=0, keptCount=0, skippedCount=0;
+
+	for( y=areaY1 ; y<=areaY2 ; y++ )
+	{
+		for( x=areaX1 ; x<=areaX2 ; x++ )
+		{
+			if( !ON_EDGE(x,y) )
+				continue;
+
+			Location* locPtr = world.get_loc(x,y);
+
+			if( locPtr->is_wall() )
+			{
+				keptCount++;
+				continue;
+			}
+
+			if( !locPtr->can_build_wall() || is_gate_passage(x, y) )		// roads, buildings, trees, water, the ways through gates
+			{
+				skippedCount++;
+				continue;
+			}
+
+			//--- next to a wall of someone else, which closes the gap: the walls are not doubled ---//
+
+			int nextToOtherWall = 0;
+
+			for( int dy=-1 ; dy<=1 && !nextToOtherWall ; dy++ )
+			{
+				for( int dx=-1 ; dx<=1 ; dx++ )
+				{
+					int nx = x+dx, ny = y+dy;
+
+					if( (dx || dy) && nx>=0 && ny>=0 && nx<MAX_WORLD_X_LOC && ny<MAX_WORLD_Y_LOC &&
+						 world.get_loc(nx, ny)->is_wall() && !is_gate_tile(world.get_loc(nx, ny)->wall_id()) &&
+						 !ON_EDGE(nx, ny) )
+					{
+						nextToOtherWall = 1;
+						break;
+					}
+				}
+			}
+
+			if( nextToOtherWall )
+			{
+				skippedCount++;
+				continue;
+			}
+
+			locPtr->set_wall(EWWALL, builderTownRecno, 1);		// 1-the hit points they start with, they grow stronger, see World::form_world_wall()
+			locPtr->set_fire_src(-50);
+			newCount++;
+		}
+	}
+
+	//------ the shapes of the walls: foundations rising, towers at the corners ------//
+
+	for( y=MAX(0,areaY1-1) ; y<=MIN(MAX_WORLD_Y_LOC-1,areaY2+1) ; y++ )
+	{
+		for( x=MAX(0,areaX1-1) ; x<=MIN(MAX_WORLD_X_LOC-1,areaX2+1) ; x++ )
+		{
+			if( world.get_loc(x,y)->is_wall() )
 				world.form_wall(x, y, 0);
 		}
 	}
 
-	int ringLength;
-	int newCount = wall_section_count(townPtr, NULL, &ringLength);
+	#undef IN_AREA
+	#undef ON_EDGE
 
-	AiWarState::log( "WALL        nation %d builds walls around town %d: %d sections (%d before, ring of %d locations)",
-						  townPtr->nation_recno, townPtr->town_recno, newCount, oldCount, ringLength );
+	AiWarState::log( "WALL        nation %d walls its area of %d villages (%d joined pairs) and %d buildings (town %d): %d new sections, %d kept, %d inner taken down, %d gates, %d edge places left open (roads, buildings, trees, gates, other walls)",
+						  nationRecno, (int) townArray.size(), joinCount, firmCount, builderTownRecno, newCount, keptCount, removedCount, gateCount, skippedCount );
 }
-//----------- End of function CivilTech::build_walls -----------//
+//----------- End of function CivilTech::rebuild_nation_walls -----------//
 
 
 //--------- Begin of function CivilTech::process_watchtowers ---------//

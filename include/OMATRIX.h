@@ -212,8 +212,8 @@ public:
 	// ---------- wall ------------//
 	int	is_wall()			{ return (loc_flag & LOCATE_BLOCK_MASK) == LOCATE_IS_WALL; }
 	int	can_build_wall()
-			{ return !cargo_recno && (loc_flag & LOCATE_WALK_LAND) &&
-			!(loc_flag & (LOCATE_BLOCK_MASK | LOCATE_SITE_MASK)) && !has_site() && !has_road(); }
+			{ return !cargo_recno && (loc_flag & LOCATE_WALK_LAND) && !(loc_flag & LOCATE_BLOCK_MASK) &&
+			( !(loc_flag & LOCATE_SITE_MASK) || has_dirt() ) && !has_road(); }		// a wall replaces a patch of dirt
 	void	set_wall(int wallId, int townRecno, int hitPoints);
 	void	set_wall_creating();
 	void	set_wall_destructing();

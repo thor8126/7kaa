@@ -130,6 +130,7 @@ static int loaded_game_version;
 #define FIRST_VERSION_WITH_CIVIL_TECH		222		// earlier saved games have fewer and smaller technology records, without the civil technologies
 #define FIRST_VERSION_WITH_NEW_TREATIES	223		// earlier saved games have smaller nation relation and talk records, without road treaties and peace pacts
 #define FIRST_VERSION_WITH_HARVEST			224		// earlier saved games have smaller town records, without Town::harvest_food
+#define FIRST_VERSION_WITH_TOWN_WALLS		225		// earlier saved games have smaller town records, without Town::wall_built
 
 bool GameFile::read_file_same_version = true;
 
@@ -247,6 +248,9 @@ int GameFile::read_file(File* filePtr)
 
 	if(load_file_game_version < FIRST_VERSION_WITH_HARVEST)
 		return -1;		// town records saved before the harvest was added are of a different size
+
+	if(load_file_game_version < FIRST_VERSION_WITH_TOWN_WALLS)
+		return -1;		// town records saved before walled villages were recorded are of a different size
 
 	read_file_same_version = ( load_file_game_version/100==GAME_VERSION/100 );
 	loaded_game_version = load_file_game_version;
