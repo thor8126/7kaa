@@ -51,6 +51,7 @@ briefly marks each touch, as a check that touches land in the right spot.
 | Pinch (two fingers apart / together) | Zoom the map view in (up to 3×) / back out. Only the map zooms; the top bar and side panel stay as they are. The map cannot be zoomed out beyond the normal view, because the game always draws the same 18×17 squares of it; use the mini-map for the overview. |
 | Tap the mini-map | Jump there (as on the desktop) |
 | Back button | Esc |
+| Placing a building (or picking a target for assign, settle, stops, walls, god powers…) | Touch the map and slide: the outline follows your finger. Lift to place it there; lift off the map to place nothing. Holding still does nothing. Two-finger tap or Esc cancels. |
 
 On-screen buttons in the black bars:
 

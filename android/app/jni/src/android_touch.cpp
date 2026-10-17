@@ -15,6 +15,12 @@
 //   Back button              -> Esc
 //   "Right click" on-screen toggle (SevenKaaActivity): taps are right clicks
 //
+// Placing a building (or any command waiting for a target on the map:
+// assign, settle, caravan stop, wall, god power...): touching the map aims
+// instead. The outline follows the finger, holding still does nothing, and
+// lifting the finger places it there. Lifting it off the map places nothing.
+// A two-finger tap (right click) or Esc cancels, as on the desktop.
+//
 // Every action happens exactly under the finger: the touch point is mapped
 // straight to 800x600 game coordinates, and there is no cursor to steer (it is
 // not drawn on Android, see MouseCursor in src/OMOUSECR.cpp). The window is
@@ -30,7 +36,10 @@
 #include <jni.h>
 #include <math.h>
 
+#include <android/log.h>
+
 #include <OMOUSE.h>
+#include <OPOWER.h>
 #include <OWORLDMT.h>
 #include "android_glue.h"
 #include "android_view.h"
@@ -41,6 +50,7 @@ enum TouchState
 	TOUCH_PENDING,   // one finger down, not yet a tap, drag or long press
 	TOUCH_DRAG,      // one finger dragging with the left button held
 	TOUCH_TWO,       // two fingers: tap = right click, move = pan/zoom
+	TOUCH_AIM,       // one finger aiming a command (building placement...)
 	TOUCH_IGNORE,    // gesture finished, wait until all fingers are up
 };
 
@@ -237,8 +247,15 @@ static void finger_down(const SDL_TouchFingerEvent &f)
 		// confine the cursor
 		mouse.reset_boundary();
 		move_cursor(start_lx, start_ly);
+
+		if( start_in_view && power.command_id && !right_click_mode )
+		{
+			state = TOUCH_AIM;
+			__android_log_print(ANDROID_LOG_INFO, "7kaa-touch",
+				"aim start: command %d at (%d,%d)", power.command_id, start_lx, start_ly);
+		}
 	}
-	else if( state == TOUCH_PENDING && f.fingerId != finger1 )
+	else if( (state == TOUCH_PENDING || state == TOUCH_AIM) && f.fingerId != finger1 )
 	{
 		state = TOUCH_TWO;
 		finger2 = f.fingerId;
@@ -267,8 +284,9 @@ static void finger_motion(const SDL_TouchFingerEvent &f)
 			state = TOUCH_DRAG;
 		}
 	}
-	else if( state == TOUCH_DRAG && f.fingerId == finger1 )
+	else if( (state == TOUCH_DRAG || state == TOUCH_AIM) && f.fingerId == finger1 )
 	{
+		// drag: the box follows; aim: the building outline follows
 		int x, y;
 		engine_pos(f, &x, &y);
 		move_cursor(x, y);
@@ -307,6 +325,30 @@ static void finger_up(const SDL_TouchFingerEvent &f)
 				click(RIGHT_BUTTON, RIGHT_BUTTON_RELEASE, start_lx, start_ly);
 			else
 				click(LEFT_BUTTON, LEFT_BUTTON_RELEASE, start_lx, start_ly);
+			park_cursor();
+			state = TOUCH_IDLE;
+		}
+		break;
+
+	case TOUCH_AIM:
+		if( f.fingerId == finger1 )
+		{
+			float gx, gy;
+			finger_game(f, &gx, &gy);
+			if( android_view_contains(gx, gy) && power.command_id )
+			{
+				int x, y;
+				engine_pos(f, &x, &y);
+				click(LEFT_BUTTON, LEFT_BUTTON_RELEASE, x, y);
+				__android_log_print(ANDROID_LOG_INFO, "7kaa-touch",
+					"aim done: command %d placed at (%d,%d)", power.command_id, x, y);
+			}
+			else
+			{
+				__android_log_print(ANDROID_LOG_INFO, "7kaa-touch",
+					"aim aborted: finger lifted off the map (%.0f,%.0f) or command gone (%d)",
+					gx, gy, power.command_id);
+			}
 			park_cursor();
 			state = TOUCH_IDLE;
 		}
