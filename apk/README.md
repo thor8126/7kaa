@@ -17,7 +17,10 @@ https://github.com/thor8126/7kaa/releases/download/android-latest/7kaa-android.a
 - **From a PC over USB** (USB debugging on):
   `adb install -r 7kaa-android.apk`
 
-Installing a newer build over an older one keeps your saved games.
+Installing a newer build over an older one keeps your saved games. (If the
+phone says *App not installed* when updating from a build made before
+2026-10-17, uninstall the old app once; from then on updates install over each
+other.)
 
 It needs a 64-bit ARM phone (practically every phone from the last ~8 years)
 running Android 7.0 or newer. The first start unpacks the game data, which

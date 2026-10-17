@@ -139,8 +139,13 @@ android {
         applicationId 'com.thor8126.sevenkaa'
         minSdk 24
         targetSdk 35
-        versionCode 1
-        versionName '2.15.6-android1'
+        // Every GitHub Actions build gets a higher version, so Android installs
+        // it as an update; the name shows which commit it came from (Settings >
+        // Apps > Seven Kingdoms). Local builds are version 1.
+        def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '0') as int
+        def sha = (System.getenv('GITHUB_SHA') ?: 'local').take(7)
+        versionCode 100 + runNumber
+        versionName "2.15.6-android.${runNumber} (${sha})"
 
         externalNativeBuild {
             cmake {
@@ -156,8 +161,25 @@ android {
         }
     }
 
+    // One fixed debug key, kept in the repository. Android only installs an
+    // update over an existing app if both are signed with the same key; the
+    // default debug key is created fresh on every GitHub Actions machine, so
+    // each build would refuse to install over the previous one (and
+    // uninstalling deletes the saved games). This key is for test builds only,
+    // not for publishing.
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storeType 'pkcs12'
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
     buildTypes {
         debug {
+            signingConfig signingConfigs.debug
             externalNativeBuild {
                 cmake {
                     // The game is far too slow unoptimized.

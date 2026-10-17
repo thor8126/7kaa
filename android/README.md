@@ -116,7 +116,12 @@ Options in `gradle.properties` (or `-P` on the command line):
 
 Easiest: open the fixed link above in the phone's browser, open the downloaded
 `7kaa-android.apk`, and allow installing unknown apps when asked. Installing a
-newer build over an older one keeps your saves.
+newer build over an older one keeps your saves. The installed build's version
+(GitHub run number and commit) is shown under Settings → Apps → Seven Kingdoms.
+
+All builds are signed with the fixed debug key `app/debug.keystore`. APKs
+built before that (version 1) were each signed with a random key, so the first
+update from one of those needs the old app uninstalled once.
 
 Over USB instead:
 
