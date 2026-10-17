@@ -87,6 +87,7 @@ sevenkaa_am_sources(MP_SOURCES     "${SRC}/enet/Makefile.am"            "libmult
 set(ANDROID_SOURCES
 	src/android_data.cpp
 	src/android_glob.cpp
+	src/android_view.cpp
 	src/android_touch.cpp
 )
 

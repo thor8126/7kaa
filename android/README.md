@@ -47,7 +47,8 @@ briefly marks each touch, as a check that touches land in the right spot.
 | Long press, then lift (hold ~0.5 s until the phone vibrates) | Right click: move / attack / order the selected units |
 | Two-finger tap | Right click at the first finger |
 | Drag with one finger (also after holding still) | Left drag: box-select units, drag sliders |
-| Drag with two fingers | Scroll the map |
+| Drag with two fingers | Scroll the map smoothly; let go while moving and it glides on |
+| Pinch (two fingers apart / together) | Zoom the map view in (up to 3×) / back out. Only the map zooms; the top bar and side panel stay as they are. The map cannot be zoomed out beyond the normal view, because the game always draws the same 18×17 squares of it; use the mini-map for the overview. |
 | Tap the mini-map | Jump there (as on the desktop) |
 | Back button | Esc |
 

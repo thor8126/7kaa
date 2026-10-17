@@ -9,7 +9,9 @@
 //   two-finger tap           -> right click at the first finger
 //   one-finger drag          -> left button drag (box select, sliders), also
 //                               after holding still first
-//   two-finger drag          -> pan the map
+//   two-finger drag          -> pan the map smoothly (it glides on when let
+//                               go while moving)
+//   pinch                    -> zoom the map view in/out (android_view.cpp)
 //   Back button              -> Esc
 //   "Right click" on-screen toggle (SevenKaaActivity): taps are right clicks
 //
@@ -29,32 +31,34 @@
 #include <math.h>
 
 #include <OMOUSE.h>
+#include <OWORLDMT.h>
 #include "android_glue.h"
+#include "android_view.h"
 
 enum TouchState
 {
 	TOUCH_IDLE,      // no finger down
 	TOUCH_PENDING,   // one finger down, not yet a tap, drag or long press
 	TOUCH_DRAG,      // one finger dragging with the left button held
-	TOUCH_TWO,       // two fingers: tap = right click, move = pan
+	TOUCH_TWO,       // two fingers: tap = right click, move = pan/zoom
 	TOUCH_IGNORE,    // gesture finished, wait until all fingers are up
 };
 
 static const Uint32 LONG_PRESS_MS = 450;
 static const Uint32 TWO_FINGER_TAP_MS = 400;
-static const int    MAP_LOC_PIXELS = 32;      // size of a map location on screen
 
 static TouchState state = TOUCH_IDLE;
 static int fingers_down;
 static SDL_FingerID finger1, finger2;
 static Uint32 down_time;
 static float start_gx, start_gy;      // finger1 start, game pixels (float)
-static int start_lx, start_ly;        // finger1 start, game (800x600) pixels
-static float f1_gx, f1_gy, f2_gx, f2_gy;  // current finger positions, game pixels
-static float pan_last_x, pan_last_y;  // centroid, game pixels
-static float pan_acc_x, pan_acc_y;
-static float pan_total;
-static int panned;
+static int start_lx, start_ly;        // finger1 start, engine (800x600) pixels
+static int start_in_view;             // finger1 went down in the map view
+static float f1_gx, f1_gy, f2_gx, f2_gy;  // current finger positions, display pixels
+static float two_last_x, two_last_y, two_last_dist;  // two-finger midpoint/distance
+static float two_total;               // how much the two fingers moved
+static int panned;                    // two-finger gesture moved (no right click)
+static int view_gesture;              // two-finger gesture pans/zooms the map
 static int long_press_armed;          // held still long enough: lift = right click
 static volatile int right_click_mode;   // set from the Java UI thread
 
@@ -85,10 +89,20 @@ static void finger_game(const SDL_TouchFingerEvent &f, float *gx, float *gy)
 static int clamp_x(float gx) { int i = (int) gx; return i < 0 ? 0 : (i > 799 ? 799 : i); }
 static int clamp_y(float gy) { int i = (int) gy; return i < 0 ? 0 : (i > 599 ? 599 : i); }
 
-static void game_pos(const SDL_TouchFingerEvent &f, int *x, int *y)
+// Position the game acts on for a finger of the current one-finger gesture:
+// display coordinates mapped back through the map view's zoom/pan. A drag that
+// started in the map view stays in it.
+static void engine_pos(const SDL_TouchFingerEvent &f, int *x, int *y)
 {
 	float gx, gy;
 	finger_game(f, &gx, &gy);
+	if( start_in_view )
+	{
+		const float x1 = ZOOM_X1, x2 = ZOOM_X2 + 0.9f, y1 = ZOOM_Y1, y2 = ZOOM_Y2 + 0.9f;
+		gx = gx < x1 ? x1 : (gx > x2 ? x2 : gx);
+		gy = gy < y1 ? y1 : (gy > y2 ? y2 : gy);
+	}
+	android_view_to_engine(&gx, &gy);
 	*x = clamp_x(gx);
 	*y = clamp_y(gy);
 }
@@ -189,10 +203,11 @@ static void haptic_tick()
 		env->ExceptionClear();
 }
 
-static void centroid_game(float *gx, float *gy)
+static void two_finger_sample(float *mx, float *my, float *dist)
 {
-	*gx = (f1_gx + f2_gx) / 2;
-	*gy = (f1_gy + f2_gy) / 2;
+	*mx = (f1_gx + f2_gx) / 2;
+	*my = (f1_gy + f2_gy) / 2;
+	*dist = hypotf(f1_gx - f2_gx, f1_gy - f2_gy);
 }
 
 //------------------------------------------------------------------------
@@ -209,11 +224,15 @@ static void finger_down(const SDL_TouchFingerEvent &f)
 		long_press_armed = 0;
 		finger1 = f.fingerId;
 		down_time = SDL_GetTicks();
+		android_view_stop_fling();
 		finger_game(f, &start_gx, &start_gy);
 		f1_gx = start_gx;
 		f1_gy = start_gy;
-		start_lx = clamp_x(start_gx);
-		start_ly = clamp_y(start_gy);
+		float ex = start_gx, ey = start_gy;
+		start_in_view = android_view_contains(ex, ey);
+		android_view_to_engine(&ex, &ey);
+		start_lx = clamp_x(ex);
+		start_ly = clamp_y(ey);
 		// a new touch can land anywhere: no button is held, so nothing may
 		// confine the cursor
 		mouse.reset_boundary();
@@ -224,10 +243,10 @@ static void finger_down(const SDL_TouchFingerEvent &f)
 		state = TOUCH_TWO;
 		finger2 = f.fingerId;
 		finger_game(f, &f2_gx, &f2_gy);
-		centroid_game(&pan_last_x, &pan_last_y);
-		pan_acc_x = pan_acc_y = 0;
-		pan_total = 0;
+		two_finger_sample(&two_last_x, &two_last_y, &two_last_dist);
+		two_total = 0;
 		panned = 0;
+		view_gesture = android_view_gesture_begin(two_last_x, two_last_y, two_last_dist);
 	}
 	// a third finger, or a second one during a drag, is ignored
 }
@@ -243,7 +262,7 @@ static void finger_motion(const SDL_TouchFingerEvent &f)
 			move_cursor(start_lx, start_ly);
 			mouse.add_event(LEFT_BUTTON);
 			int x, y;
-			game_pos(f, &x, &y);
+			engine_pos(f, &x, &y);
 			move_cursor(x, y);
 			state = TOUCH_DRAG;
 		}
@@ -251,7 +270,7 @@ static void finger_motion(const SDL_TouchFingerEvent &f)
 	else if( state == TOUCH_DRAG && f.fingerId == finger1 )
 	{
 		int x, y;
-		game_pos(f, &x, &y);
+		engine_pos(f, &x, &y);
 		move_cursor(x, y);
 	}
 	else if( state == TOUCH_TWO && (f.fingerId == finger1 || f.fingerId == finger2) )
@@ -261,31 +280,16 @@ static void finger_motion(const SDL_TouchFingerEvent &f)
 		else
 			finger_game(f, &f2_gx, &f2_gy);
 
-		float cx, cy;
-		centroid_game(&cx, &cy);
-		float dx = cx - pan_last_x, dy = cy - pan_last_y;
-		pan_last_x = cx;
-		pan_last_y = cy;
-		pan_total += fabsf(dx) + fabsf(dy);
-		if( !panned && pan_total > 8.0f )
+		float mx, my, dist;
+		two_finger_sample(&mx, &my, &dist);
+		two_total += fabsf(mx - two_last_x) + fabsf(my - two_last_y) + fabsf(dist - two_last_dist);
+		two_last_x = mx;
+		two_last_y = my;
+		two_last_dist = dist;
+		if( !panned && two_total > 8.0f )
 			panned = 1;
-		if( panned )
-		{
-			// Drag the map with the fingers: moving right shows what is
-			// to the left. The game consumes mouse.scroll_x/y in
-			// World::detect_scroll() and resets them.
-			pan_acc_x -= dx;
-			pan_acc_y -= dy;
-			int sx = (int) (pan_acc_x / MAP_LOC_PIXELS);
-			int sy = (int) (pan_acc_y / MAP_LOC_PIXELS);
-			if( sx || sy )
-			{
-				pan_acc_x -= sx * MAP_LOC_PIXELS;
-				pan_acc_y -= sy * MAP_LOC_PIXELS;
-				mouse.scroll_x += sx;
-				mouse.scroll_y += sy;
-			}
-		}
+		if( view_gesture )
+			android_view_gesture_move(mx, my, dist);
 	}
 }
 
@@ -312,7 +316,7 @@ static void finger_up(const SDL_TouchFingerEvent &f)
 		if( f.fingerId == finger1 )
 		{
 			int x, y;
-			game_pos(f, &x, &y);
+			engine_pos(f, &x, &y);
 			move_cursor(x, y);
 			release_left();
 			park_cursor();
@@ -323,6 +327,9 @@ static void finger_up(const SDL_TouchFingerEvent &f)
 	case TOUCH_TWO:
 		if( f.fingerId == finger1 || f.fingerId == finger2 )
 		{
+			if( view_gesture )
+				android_view_gesture_end();
+			view_gesture = 0;
 			if( !panned && SDL_GetTicks() - down_time < TWO_FINGER_TAP_MS + LONG_PRESS_MS )
 			{
 				click(RIGHT_BUTTON, RIGHT_BUTTON_RELEASE, start_lx, start_ly);
@@ -360,7 +367,7 @@ int android_touch_event(SDL_Event *event)
 		return 1;
 
 	case SDL_MULTIGESTURE:
-		return 1;          // two-finger panning is done above
+		return 1;          // two-finger pan/zoom is done above
 
 	// Touches act only through the absolute mapping above. Drop any mouse
 	// events SDL or the device synthesizes from touches, so nothing can move
@@ -395,4 +402,6 @@ void android_touch_update()
 		long_press_armed = 1;
 		haptic_tick();
 	}
+
+	android_view_animate();
 }

@@ -44,6 +44,9 @@
 #include <OREMOTE.h>
 #include <ONEWS.h>
 #include <ConfigAdv.h>
+#ifdef __ANDROID__
+#include <android_glue.h>
+#endif
 
 
 //------------ Define static class variables ------------//
@@ -286,6 +289,9 @@ void World::next_day()
 //
 int World::detect()
 {
+#ifdef __ANDROID__
+   android_view_world_hook();   // smooth touch pan/zoom follows the engine view
+#endif
    if( map_matrix->detect() )
       return 1;
 

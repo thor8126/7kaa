@@ -23,4 +23,11 @@ void android_touch_update();
 // debug cross (see android_touch.cpp).
 void android_touch_draw_debug(SDL_Surface *surface);
 
+// Smooth pan / pinch zoom of the map view (android_view.cpp).
+// Called each frame by World::detect: scrolls the engine to follow the view.
+void android_view_world_hook();
+// Called by Vga::flip() after the frame is copied: draws the zoomed/panned
+// map view over it.
+void android_view_render(SDL_Renderer *renderer, SDL_Texture *texture);
+
 #endif
