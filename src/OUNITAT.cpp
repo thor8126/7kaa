@@ -40,6 +40,7 @@
 #include <OSYS.h>
 #include <OWARPT.h>
 #include <OAIWAR.h>
+#include <OUNITRES.h>
 #include <OREBUILD.h>
 #include <OBATREP.h>
 
@@ -797,8 +798,16 @@ void Unit::hit_wall(Unit* attackUnit, int targetXLoc, int targetYLoc, float atta
 */
 	//######## end trevor 25/6 #########//
 
+	int wallNationRecno = locPtr->power_nation_recno;
+
 	if( !locPtr->attack_wall((int)attackDamage) )
+	{
+		AiWarState::log( "WALL        a wall section of nation %d at %d,%d falls to %s of nation %d",
+							  wallNationRecno, targetXLoc, targetYLoc,
+							  attackUnit ? unit_res[attackUnit->unit_id]->name : "a missile", attackNationRecno );
+
 		world.correct_wall(targetXLoc, targetYLoc);
+	}
 }
 //---------- End of function Unit::hit_wall ----------//
 

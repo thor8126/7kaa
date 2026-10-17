@@ -64,6 +64,7 @@
 #include <OSERES.h>
 #include <OROCKRES.h>
 #include <OROCK.h>
+#include <OWALLRES.h>
 #include <OEFFECT.h>
 #include <OAUDIO.h>
 #include <OMUSIC.h>
@@ -154,6 +155,7 @@ int Game::init(int loadGameCall)
 	hill_res.init();
 	snow_res.init();
 	rock_res.init();
+	wall_res.init();		// the walls around villages, see OCIVIL.CPP
 	explored_mask.init(vga.vga_color_table);
    se_res.init1();
 	se_res.init2(&se_ctrl);
@@ -320,6 +322,7 @@ void Game::deinit(int loadGameCall)
 	hill_res.deinit();
 	snow_res.deinit();
 	rock_res.deinit();
+	wall_res.deinit();
 	explored_mask.deinit();
 	se_res.deinit();
 	talk_res.deinit();

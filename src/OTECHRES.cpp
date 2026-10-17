@@ -58,7 +58,7 @@ static CivilTechDef civil_tech_def_array[CIVIL_TECH_COUNT] =
 {
 	{ N_("Agriculture"),     2, 30, 0,                    0, UNIT_MAYA,           RANK_SOLDIER, { N_("Villagers farm the fields"), N_("More farmers, longer seasons") } },
 	{ N_("Medicine"),        2, 40, CIVIL_AGRICULTURE,    1, UNIT_PERSIAN_HEALER, RANK_SOLDIER, { N_("1 in 4 fallen soldiers saved"), N_("1 in 2 fallen soldiers saved") } },
-	{ N_("Engineering"),     2, 40, 0,                    0, UNIT_BALLISTA,       RANK_SOLDIER, { N_("Village watchtowers"), N_("Stronger watchtowers") } },
+	{ N_("Engineering"),     2, 40, 0,                    0, UNIT_BALLISTA,       RANK_SOLDIER, { N_("Village watchtowers"), N_("Village walls, stronger towers") } },
 	{ N_("Industry"),        2, 50, CIVIL_ENGINEERING,    1, UNIT_EXPLOSIVE_CART, RANK_SOLDIER, { N_("Dry mines dig deeper once"), N_("Dry mines dig deeper twice") } },
 	{ N_("Administration"),  2, 40, 0,                    0, UNIT_GREEK,          RANK_KING,    { N_("Village edicts"), N_("Stronger village edicts") } },
 	{ N_("Commerce"),        2, 40, CIVIL_ADMINISTRATION, 1, UNIT_CARAVAN,        RANK_SOLDIER, { N_("Road tolls and interest"), N_("Higher tolls and interest") } },

@@ -76,6 +76,7 @@ enum { TOWN_MENU_MAIN,
 		 TOWN_MENU_SET_AUTO_COLLECT_TAX,
 		 TOWN_MENU_SET_AUTO_GRANT,
 		 TOWN_MENU_EDICT,				// see OCIVIL.CPP
+		 TOWN_MENU_DEFENSE,			// the watchtower and the walls, see OCIVIL.CPP
 	  };
 
 #define BUTTON_LOYALTY_COUNT	8
@@ -106,12 +107,21 @@ static Button3D     button_civil_farm, button_civil_tower, button_civil_edict;
 static ButtonCustom button_edict_array[EDICT_TYPE_COUNT];
 static ButtonCustom button_edict_cancel;
 
+enum { DEFENSE_WATCHTOWER=1, DEFENSE_WALLS, DEFENSE_TYPE_COUNT=DEFENSE_WALLS };
+
+static ButtonCustom button_defense_array[DEFENSE_TYPE_COUNT];
+static ButtonCustom button_defense_cancel;
+
 static void disp_civil_buttons(Town* townPtr, int refreshFlag);
 static int  detect_civil_buttons(Town* townPtr);
 static void disp_civil_badge(Button3D* buttonPtr, const char* str);
 static void disp_edict_menu(Town* townPtr, int refreshFlag);
 static int  detect_edict_menu(Town* townPtr);
 static void i_disp_edict_button(ButtonCustom *button, int repaintBody);
+static void disp_defense_menu(Town* townPtr, int refreshFlag);
+static int  detect_defense_menu(Town* townPtr);
+static void i_disp_defense_button(ButtonCustom *button, int repaintBody);
+static void disp_menu_row(ButtonCustom *button, const char* iconName, const char* nameStr, int cost, const char* desStr);
 static int        queue_train_selected;
 static short      browse_race_recno=1, browse_race_town_recno=0;		// the town which the browse_race displays its info
 static short      recruit_race_count;
@@ -211,6 +221,10 @@ void Town::disp_info(int refreshFlag)
 		case TOWN_MENU_EDICT:
 			disp_edict_menu(this, refreshFlag);
 			break;
+
+		case TOWN_MENU_DEFENSE:
+			disp_defense_menu(this, refreshFlag);
+			break;
 	}
 }
 //----------- End of function Town::disp_info -----------//
@@ -260,6 +274,11 @@ void Town::detect_info()
 
 		case TOWN_MENU_EDICT:
 			if( detect_edict_menu(this) )
+				return;
+			break;
+
+		case TOWN_MENU_DEFENSE:
+			if( detect_defense_menu(this) )
 				return;
 			break;
 	}
@@ -722,7 +741,7 @@ int Town::detect_main_menu()
 //
 static void disp_civil_buttons(Town* townPtr, int refreshFlag)
 {
-	static int lastFarmState, lastTowerState, lastEdictState;		// what the buttons show, they are repainted when it changes
+	static int lastFarmState, lastEdictState;		// what the buttons show, they are repainted when it changes
 
 	if( remote.is_enable() || townPtr->nation_recno != nation_array.player_recno || townPtr->rebel_recno )
 	{
@@ -760,20 +779,14 @@ static void disp_civil_buttons(Town* townPtr, int refreshFlag)
 
 	x += BUTTON_ACTION_WIDTH;
 
-	//------ Engineering: the watchtower ------//
+	//------ Engineering: the defenses, the watchtower and the walls ------//
 
 	if( tech_res.civil_level(townPtr->nation_recno, CIVIL_ENGINEERING) )
 	{
-		int towerState = townPtr->has_watchtower ? 2 : civil_tech.can_build_watchtower(townPtr) ? 1 : 0;
-
-		if( refreshFlag == INFO_REPAINT || !button_civil_tower.init_flag || towerState != lastTowerState )
+		if( refreshFlag == INFO_REPAINT || !button_civil_tower.init_flag )
 		{
-			button_civil_tower.create( x, y, 'A', "TOWER" );
+			button_civil_tower.paint( x, y, 'A', "TOWER" );
 			button_civil_tower.set_help_code("");
-			button_civil_tower.enable_flag = (towerState == 1);		// darkened when it has been built or can't be afforded
-			button_civil_tower.paint();
-
-			lastTowerState = towerState;
 		}
 	}
 	else
@@ -889,27 +902,23 @@ static int detect_civil_buttons(Town* townPtr)
 
 	if( button_civil_tower.init_flag )
 	{
-		if( townPtr->has_watchtower )
-			snprintf( helpStr, sizeof(helpStr), "%s", _("Built. It shoots arrows at the enemies near the village.") );
-		else
-			snprintf( helpStr, sizeof(helpStr), _("Shoots arrows at the enemies near the village. Cost: $%d"), WATCHTOWER_COST );
+		snprintf( helpStr, sizeof(helpStr), "%s %s %s",
+					 townPtr->has_watchtower ? _("Watchtower built.") : _("No watchtower."),
+					 civil_tech.has_walls(townPtr) ? _("Walls built.") :
+					 tech_res.civil_level(townPtr->nation_recno, CIVIL_ENGINEERING) >= 2 ? _("No walls.") : _("Walls need Engineering II."),
+					 _("Click to build defenses.") );
 
-		help.set_custom_help( button_civil_tower.x1, button_civil_tower.y1, button_civil_tower.x2, button_civil_tower.y2, _("Watchtower"), helpStr );
+		help.set_custom_help( button_civil_tower.x1, button_civil_tower.y1, button_civil_tower.x2, button_civil_tower.y2, _("Defenses"), helpStr );
 	}
 
-	if( button_civil_tower.detect() )		// only when it can be built, it's disabled otherwise
+	if( button_civil_tower.detect() )
 	{
-		if( civil_tech.can_build_watchtower(townPtr) )
-		{
-			se_ctrl.immediate_sound("TURN_ON");
-			civil_tech.build_watchtower(townPtr);
-		}
-		else
-		{
-			se_ctrl.immediate_sound("TURN_OFF");
-		}
+		se_ctrl.immediate_sound("TURN_ON");
 
-		disp_civil_buttons(townPtr, INFO_REPAINT);
+		town_menu_mode  = TOWN_MENU_DEFENSE;
+		disable_refresh = 1;    // static var for disp_info() only
+		info.disp();
+		disable_refresh = 0;
 		return 1;
 	}
 
@@ -996,34 +1005,8 @@ static void disp_edict_menu(Town* townPtr, int refreshFlag)
 
 //--------- Begin of static function i_disp_edict_button ---------//
 //
-// An edict: its icon on a button shell, its name, its cost and what it
-// does, like a skill in the training menu (see i_disp_skill_button()).
-//
 static void i_disp_edict_button(ButtonCustom *button, int repaintBody)
 {
-	int x1 = button->x1, y1 = button->y1, x2 = button->x2, y2 = button->y2;
-
-	if( !button->pushed_flag )
-	{
-		if( repaintBody )
-		{
-			vga_util.blt_buf(x1, y1, x2, y2, 0);
-			vga_util.d3_panel2_up( x1, y1, x2, y2, 1 );
-		}
-		x2--;
-		y2--;
-	}
-	else
-	{
-		if( repaintBody )
-		{
-			vga_util.blt_buf(x1, y1, x2, y2, 0);
-			vga_util.d3_panel2_down( x1, y1, x2, y2, 1 );
-		}
-		x1++;
-		y1++;
-	}
-
 	if( !repaintBody )
 		return;
 
@@ -1031,36 +1014,7 @@ static void i_disp_edict_button(ButtonCustom *button, int repaintBody)
 	int   edictId = button->custom_para.value;
 	int   level	  = tech_res.civil_level(townPtr->nation_recno, CIVIL_ADMINISTRATION);
 
-	//------ its icon on a button shell ------//
-
 	static const char* iconNameArray[EDICT_TYPE_COUNT] = { "GRANT", "U_FARM", "DEFENSE1" };
-
-	char* shellPtr = image_button.get_ptr("BUTUP_A");
-	char* iconPtr  = image_button.get_ptr(iconNameArray[edictId-1]);
-
-	int shellX = x1+2, shellY = y1+(y2-y1-46)/2;
-
-	vga_front.put_bitmap_trans_decompress( shellX, shellY, shellPtr );
-	vga_front.put_bitmap_trans_decompress( shellX + (((short*)shellPtr)[0] - ((short*)iconPtr)[0])/2 - 2,
-														shellY + (((short*)shellPtr)[1] - ((short*)iconPtr)[1])/2 - 3, iconPtr );
-
-	//------ its name and cost ------//
-
-	font_bible.put( x1+56, y1+4, CivilTech::edict_name(edictId), 0, x2-4 );
-
-	int cost = civil_tech.edict_cost(townPtr, edictId);
-
-	if( cost )
-	{
-		String str;
-
-		str  = "$";
-		str += misc.format(cost);
-
-		font_san.put( x2-6-font_san.text_width(str), y1+8, str );
-	}
-
-	//------ what it does ------//
 
 	const char* desStr = "";
 
@@ -1079,12 +1033,178 @@ static void i_disp_edict_button(ButtonCustom *button, int repaintBody)
 			break;
 	}
 
+	disp_menu_row( button, iconNameArray[edictId-1], CivilTech::edict_name(edictId), civil_tech.edict_cost(townPtr, edictId), desStr );
+}
+//----------- End of static function i_disp_edict_button -----------//
+
+
+//--------- Begin of static function disp_menu_row ---------//
+//
+// A row of the edict and defense menus: an icon on a button shell, a name,
+// a cost and what it does, like a skill in the training menu (see
+// i_disp_skill_button()). Darkened when the button is disabled.
+//
+// <int> cost - 0 for none shown
+//
+static void disp_menu_row(ButtonCustom *button, const char* iconName, const char* nameStr, int cost, const char* desStr)
+{
+	int x1 = button->x1, y1 = button->y1, x2 = button->x2, y2 = button->y2;
+
+	vga_util.blt_buf(x1, y1, x2, y2, 0);
+
+	if( !button->pushed_flag )
+	{
+		vga_util.d3_panel2_up( x1, y1, x2, y2, 1 );
+		x2--;
+		y2--;
+	}
+	else
+	{
+		vga_util.d3_panel2_down( x1, y1, x2, y2, 1 );
+		x1++;
+		y1++;
+	}
+
+	//------ the icon on a button shell ------//
+
+	char* shellPtr = image_button.get_ptr("BUTUP_A");
+	char* iconPtr  = image_button.get_ptr(iconName);
+
+	int shellX = x1+2, shellY = y1+(y2-y1-46)/2;
+
+	vga_front.put_bitmap_trans_decompress( shellX, shellY, shellPtr );
+
+	if( iconPtr )
+	{
+		vga_front.put_bitmap_trans_decompress( shellX + (((short*)shellPtr)[0] - ((short*)iconPtr)[0])/2 - 2,
+															shellY + (((short*)shellPtr)[1] - ((short*)iconPtr)[1])/2 - 3, iconPtr );
+	}
+
+	//------ the name, the cost and what it does ------//
+
+	font_bible.put( x1+56, y1+4, nameStr, 0, x2-4 );
+
+	if( cost )
+	{
+		String str;
+
+		str  = "$";
+		str += misc.format(cost);
+
+		font_san.put( x2-6-font_san.text_width(str), y1+8, str );
+	}
+
 	font_san.put_paragraph( x1+56, y1+23, x2-4, y2-2, desStr );
 
 	if( !button->enable_flag )		// darkened like a disabled button
 		vga_front.adjust_brightness( x1+1, y1+1, x2-1, y2-1, -5 );
 }
-//----------- End of static function i_disp_edict_button -----------//
+//----------- End of static function disp_menu_row -----------//
+
+
+//--------- Begin of static function disp_defense_menu ---------//
+//
+// The defenses of the village: the watchtower and the walls, see OCIVIL.CPP.
+//
+static void disp_defense_menu(Town* townPtr, int refreshFlag)
+{
+	if( refreshFlag != INFO_REPAINT )
+		return;
+
+	String str;
+
+	str  = _("Defenses of ");
+	str += townPtr->town_name();
+
+	font_san.d3_put( INFO_X1, INFO_Y1, INFO_X2, INFO_Y1+18, str );
+
+	int y = INFO_Y1+24;
+
+	for( int i=0 ; i<DEFENSE_TYPE_COUNT ; i++ )
+	{
+		button_defense_array[i].create( INFO_X1, y, INFO_X2, y+EDICT_ROW_HEIGHT-1, i_disp_defense_button, ButtonCustomPara(townPtr, i+1) );
+
+		button_defense_array[i].enable_flag = i+1==DEFENSE_WATCHTOWER ? civil_tech.can_build_watchtower(townPtr)
+																						  : civil_tech.can_build_walls(townPtr);		// darkened when it can't be built
+		button_defense_array[i].paint();
+
+		y += EDICT_ROW_HEIGHT;
+	}
+
+	button_defense_cancel.paint( INFO_X1, y, INFO_X2, y+BUTTON_ACTION_HEIGHT*3/4-1,
+		ButtonCustom::disp_text_button_func, ButtonCustomPara((void*)_("Cancel"),0) );
+}
+//----------- End of static function disp_defense_menu -----------//
+
+
+//--------- Begin of static function i_disp_defense_button ---------//
+//
+static void i_disp_defense_button(ButtonCustom *button, int repaintBody)
+{
+	if( !repaintBody )
+		return;
+
+	Town* townPtr = (Town*) button->custom_para.ptr;
+
+	if( button->custom_para.value == DEFENSE_WATCHTOWER )
+	{
+		disp_menu_row( button, "TOWER", _("Watchtower"), townPtr->has_watchtower ? 0 : WATCHTOWER_COST,
+			townPtr->has_watchtower ? _("Built. Shoots arrows at nearby enemies.") : _("Shoots arrows at enemies near the village.") );
+	}
+	else
+	{
+		char desStr[100];
+		int  avgHitPoints;
+
+		civil_tech.wall_section_count(townPtr, &avgHitPoints);
+
+		if( civil_tech.has_walls(townPtr) )
+			snprintf( desStr, sizeof(desStr), _("Built, strength %d%%. Villagers repair them."), avgHitPoints );
+
+		else if( tech_res.civil_level(townPtr->nation_recno, CIVIL_ENGINEERING) < 2 )
+			snprintf( desStr, sizeof(desStr), "%s", _("Needs Engineering II.") );
+
+		else
+			snprintf( desStr, sizeof(desStr), "%s", _("Stone walls and gates around the village.") );
+
+		disp_menu_row( button, "WALLS", _("Walls"), civil_tech.has_walls(townPtr) ? 0 : WALL_COST, desStr );
+	}
+}
+//----------- End of static function i_disp_defense_button -----------//
+
+
+//--------- Begin of static function detect_defense_menu ---------//
+//
+static int detect_defense_menu(Town* townPtr)
+{
+	for( int i=0 ; i<DEFENSE_TYPE_COUNT ; i++ )
+	{
+		if( button_defense_array[i].detect() )		// only when it can be built, it's disabled otherwise
+		{
+			se_ctrl.immediate_sound("TURN_ON");
+
+			if( i+1 == DEFENSE_WATCHTOWER )
+				civil_tech.build_watchtower(townPtr);
+			else
+				civil_tech.build_walls(townPtr);
+
+			town_menu_mode = TOWN_MENU_MAIN;
+			info.disp();
+			return 1;
+		}
+	}
+
+	if( button_defense_cancel.detect() )
+	{
+		se_ctrl.immediate_sound("TURN_OFF");
+		town_menu_mode = TOWN_MENU_MAIN;
+		info.disp();
+		return 1;
+	}
+
+	return 0;
+}
+//----------- End of static function detect_defense_menu -----------//
 
 
 //--------- Begin of static function detect_edict_menu ---------//

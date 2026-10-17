@@ -42,7 +42,12 @@
 //                  and units in the field heal faster.
 // Engineering    - A village can build a watchtower, which shoots arrows at
 //                  enemies near the village every day. Level II: farther,
-//                  more and stronger arrows.
+//                  more and stronger arrows, and walls: a ring of stone
+//                  walls with four gates around the village (roads go
+//                  through them too). The walls block everyone, they start
+//                  weak and grow stronger over a month, and the villagers
+//                  repair them; enemies have to come in through the gates
+//                  or break through (see OW_WALL.CPP and WallRes).
 // Industry       - A mine that runs dry digs deeper for a new vein, once a
 //                  level.
 // Administration - A village can be given an edict for a year: a Festival
@@ -81,6 +86,9 @@
 #include <OMISC.h>
 #include <OSYS.h>
 #include <OROAD.h>
+#include <OWALLRES.h>
+#include <WALLTILE.h>
+#include <OREMOTE.h>
 #include <vector>
 #include "gettext.h"
 
@@ -131,6 +139,7 @@ static int  field_loc(Town* townPtr, int fieldId, int& xLoc, int& yLoc);
 static int  valid_field_count(Town* townPtr);
 static int  active_field_count(Town* townPtr);
 static int  find_work_loc(Town* townPtr, Unit* unitPtr, int& xLoc, int& yLoc);
+static int  is_frontline_town(Nation* nationPtr, Town* townPtr);
 static int  watchtower_effect_id();
 static char* field_bitmap(int growthStage);
 
@@ -1202,6 +1211,195 @@ void CivilTech::build_watchtower(Town* townPtr)
 //----------- End of function CivilTech::build_watchtower -----------//
 
 
+//--------- Begin of static function wall_ring ---------//
+//
+// The rectangle on which the walls of a village are built, see
+// World::build_wall().
+//
+static void wall_ring(Town* townPtr, int& x1, int& y1, int& x2, int& y2)
+{
+	x1 = townPtr->loc_x1 - WALL_SPACE_LOC;
+	y1 = townPtr->loc_y1 - WALL_SPACE_LOC;
+	x2 = townPtr->loc_x2 + WALL_SPACE_LOC;
+	y2 = townPtr->loc_y2 + WALL_SPACE_LOC;
+}
+//----------- End of static function wall_ring -----------//
+
+
+//--------- Begin of function CivilTech::wall_section_count ---------//
+//
+// [int*] avgHitPoints - the average hit points of the sections (0-100)
+// [int*] ringLength   - the no. of locations around the village where the walls go
+//
+// return : <int> the no. of wall sections around the village
+//
+int CivilTech::wall_section_count(Town* townPtr, int* avgHitPoints, int* ringLength)
+{
+	int x1, y1, x2, y2;
+
+	wall_ring(townPtr, x1, y1, x2, y2);
+
+	int count=0, hitPointsSum=0;
+
+	for( int y=y1-1 ; y<=y2+1 ; y++ )		// -1 and +1: the gates stick out
+	{
+		for( int x=x1-1 ; x<=x2+1 ; x++ )
+		{
+			if( x > x1 && x < x2 && y > y1 && y < y2 )		// inside the ring
+				continue;
+
+			if( x<0 || y<0 || x>=MAX_WORLD_X_LOC || y>=MAX_WORLD_Y_LOC )
+				continue;
+
+			Location* locPtr = world.get_loc(x, y);
+
+			if( locPtr->is_wall() )
+			{
+				count++;
+				hitPointsSum += locPtr->wall_abs_hit_point();
+			}
+		}
+	}
+
+	if( avgHitPoints )
+		*avgHitPoints = count ? hitPointsSum / count : 0;
+
+	if( ringLength )
+		*ringLength = (x2-x1+y2-y1)*2;
+
+	return count;
+}
+//----------- End of function CivilTech::wall_section_count -----------//
+
+
+//--------- Begin of function CivilTech::has_walls ---------//
+//
+// return : <int> 1 if at least half of the village's walls stand
+//
+int CivilTech::has_walls(Town* townPtr)
+{
+	int ringLength;
+
+	return wall_section_count(townPtr, NULL, &ringLength) >= ringLength/2;
+}
+//----------- End of function CivilTech::has_walls -----------//
+
+
+//--------- Begin of function CivilTech::can_build_walls ---------//
+//
+int CivilTech::can_build_walls(Town* townPtr, int checkCash)
+{
+	if( !townPtr->nation_recno || townPtr->rebel_recno || remote.is_enable() )
+		return 0;
+
+	if( tech_res.civil_level(townPtr->nation_recno, CIVIL_ENGINEERING) < 2 )
+		return 0;
+
+	int x1, y1, x2, y2;
+
+	wall_ring(townPtr, x1, y1, x2, y2);
+
+	if( x1-GATE_WIDTH < 0 || y1-GATE_WIDTH < 0 || x2+GATE_WIDTH >= MAX_WORLD_X_LOC || y2+GATE_WIDTH >= MAX_WORLD_Y_LOC )
+		return 0;		// too close to the edge of the map for the walls and their gates
+
+	if( has_walls(townPtr) )
+		return 0;
+
+	if( checkCash && nation_array[townPtr->nation_recno]->cash < WALL_COST )
+		return 0;
+
+	return 1;
+}
+//----------- End of function CivilTech::can_build_walls -----------//
+
+
+//--------- Begin of static function is_frontline_town ---------//
+//
+// return : <int> 1 if a village or building of a kingdom at war with the
+//          given nation is near the village
+//
+static int is_frontline_town(Nation* nationPtr, Town* townPtr)
+{
+	enum { FRONTLINE_DISTANCE = 25 };
+
+	for( int i=town_array.size() ; i>0 ; i-- )
+	{
+		if( town_array.is_deleted(i) )
+			continue;
+
+		Town* otherTown = town_array[i];
+
+		if( otherTown->nation_recno && otherTown->nation_recno != nationPtr->nation_recno &&
+			 nationPtr->get_relation_status(otherTown->nation_recno) == NATION_HOSTILE &&
+			 misc.points_distance(otherTown->center_x, otherTown->center_y, townPtr->center_x, townPtr->center_y) <= FRONTLINE_DISTANCE )
+		{
+			return 1;
+		}
+	}
+
+	for( int i=firm_array.size() ; i>0 ; i-- )
+	{
+		if( firm_array.is_deleted(i) )
+			continue;
+
+		Firm* firmPtr = firm_array[i];
+
+		if( firmPtr->nation_recno && firmPtr->nation_recno != nationPtr->nation_recno &&
+			 nationPtr->get_relation_status(firmPtr->nation_recno) == NATION_HOSTILE &&
+			 misc.points_distance(firmPtr->center_x, firmPtr->center_y, townPtr->center_x, townPtr->center_y) <= FRONTLINE_DISTANCE )
+		{
+			return 1;
+		}
+	}
+
+	return 0;
+}
+//----------- End of static function is_frontline_town -----------//
+
+
+//--------- Begin of function CivilTech::build_walls ---------//
+//
+// The walls go up around the village, with a gate on each side where
+// there is room. They start weak and grow stronger, see World::form_world_wall().
+//
+void CivilTech::build_walls(Town* townPtr)
+{
+	if( !can_build_walls(townPtr) )
+		return;
+
+	nation_array[townPtr->nation_recno]->add_expense( EXPENSE_FIRM, (float) WALL_COST );
+
+	int oldCount = wall_section_count(townPtr);
+
+	world.build_wall(townPtr->town_recno, 1);		// 1-the hit points they start with
+
+	//--- the walls start as foundations and rise as they grow stronger (the gates are built at once) ---//
+
+	int x1, y1, x2, y2;
+
+	wall_ring(townPtr, x1, y1, x2, y2);
+
+	for( int y=y1-1 ; y<=y2+1 ; y++ )
+	{
+		for( int x=x1-1 ; x<=x2+1 ; x++ )
+		{
+			if( x > x1 && x < x2 && y > y1 && y < y2 )
+				continue;
+
+			if( world.get_loc(x, y)->is_wall() )
+				world.form_wall(x, y, 0);
+		}
+	}
+
+	int ringLength;
+	int newCount = wall_section_count(townPtr, NULL, &ringLength);
+
+	AiWarState::log( "WALL        nation %d builds walls around town %d: %d sections (%d before, ring of %d locations)",
+						  townPtr->nation_recno, townPtr->town_recno, newCount, oldCount, ringLength );
+}
+//----------- End of function CivilTech::build_walls -----------//
+
+
 //--------- Begin of function CivilTech::process_watchtowers ---------//
 //
 // Every day each watchtower shoots its arrows at the nearest enemies.
@@ -1805,6 +2003,61 @@ void CivilTech::ai_think(Nation* nationPtr)
 
 		if( bestTown && bestRating >= 50 )
 			build_watchtower(bestTown);
+	}
+
+	//------- walls for a village in danger, Engineering II -------//
+
+	if( tech_res.civil_level(nationRecno, CIVIL_ENGINEERING) >= 2 &&
+		 nationPtr->cash > WALL_COST * 3 )
+	{
+		Town* bestTown = NULL;
+		int   bestRating = 0;
+
+		for( int i=0 ; i<nationPtr->ai_town_count ; i++ )
+		{
+			Town* townPtr = town_array[ nationPtr->ai_town_array[i] ];
+
+			if( !can_build_walls(townPtr) || townPtr->population < 15 )		// not worth it for a small village
+				continue;
+
+			int curRating = 0;
+
+			if( info.game_date < townPtr->last_being_attacked_date + 365 )		// attacked in the last year
+				curRating += 50;
+
+			if( isAtWar )
+				curRating += 20;
+
+			if( !townPtr->has_linked_own_camp )
+				curRating += 10;
+
+			if( townPtr->has_watchtower )		// the walls keep the enemies under its arrows
+				curRating += 10;
+
+			if( isAtWar && is_frontline_town(nationPtr, townPtr) )		// enemy villages or buildings nearby
+				curRating += 30;
+
+			curRating += townPtr->population / 5;		// a bigger village is worth more
+
+			if( curRating > bestRating )
+			{
+				bestRating = curRating;
+				bestTown = townPtr;
+			}
+		}
+
+		if( bestTown && bestRating >= 60 )
+		{
+			AiWarState::log( "WALL        nation %d decides to wall town %d (rating %d, population %d, at war %d)",
+								  nationRecno, bestTown->town_recno, bestRating, bestTown->population, isAtWar );
+
+			build_walls(bestTown);
+		}
+		else if( bestTown )
+		{
+			AiWarState::log( "WALL        nation %d: no village needs walls now (best town %d, rating %d < 60)",
+								  nationRecno, bestTown->town_recno, bestRating );
+		}
 	}
 
 	//------- edicts -------//

@@ -150,4 +150,10 @@ inline int is_wall_rubble(int w)
 #define GATE_LENGTH 8
 #define GATE_WIDTH 2
 
+// the gate towers and the gate pieces, which World::form_wall() leaves as they are
+inline int is_gate_tile(int w)
+{
+	return (w >= 0x01 && w <= 0x20) || (w >= 0x31 && w <= 0x50);
+}
+
 #endif

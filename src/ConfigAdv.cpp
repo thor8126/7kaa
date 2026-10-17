@@ -292,7 +292,7 @@ void ConfigAdv::reset()
 	vga_window_width = 0;
 	vga_window_height = 0;
 
-	wall_building_allowed = 0;
+	wall_building_allowed = 1;		// walls grow stronger over time, see OCIVIL.CPP
 
 	// after applying defaults, checksum is not required
 	checksum = 0;

@@ -29,6 +29,7 @@
 #include <OTOWN.h>
 #include <OREMOTE.h>
 #include <ONATIONA.h>
+#include <OUNIT.h>
 
 #define WALL_GROWTH_RATE 6
 
@@ -159,7 +160,7 @@ void World::build_wall_section(short x1, short y1, short x2, short y2,
 	for( northWallFirst = x1; northWallFirst < x2; ++northWallFirst)
 	{
 		if( (locPtr = get_loc(northWallFirst, y1))->can_build_wall() ||
-			( locPtr->is_wall() && locPtr->wall_town_recno() == townRecno) )
+			( locPtr->is_wall() && locPtr->wall_town_recno() == (townRecno & 0xFF)) )
 		{
 			//-------- find place for the north gate --------//
 			if( y1 >= GATE_WIDTH-1 && x2-x1 >= GATE_LENGTH)
@@ -209,7 +210,7 @@ void World::build_wall_section(short x1, short y1, short x2, short y2,
 	for( southWallFirst = x1; southWallFirst < x2; ++southWallFirst)
 	{
 		if( (locPtr = get_loc(southWallFirst, y2))->can_build_wall() ||
-			( locPtr->is_wall() && locPtr->wall_town_recno() == townRecno) )
+			( locPtr->is_wall() && locPtr->wall_town_recno() == (townRecno & 0xFF)) )
 		{
 			//---------- find place for the south gate ----------//
 			if( y2 <= max_y_loc-GATE_WIDTH+1 && x2-x1 >= GATE_LENGTH)
@@ -364,7 +365,7 @@ void World::open_west_gate(short x2, short y1, short townRecno)
 	//------ check if any west gate tile is built ---------//
 	Location *locPtr = get_loc(x2,y1+2);
 	if( locPtr->is_wall() && locPtr->wall_id() == WGATE_N &&
-		locPtr->wall_town_recno() == townRecno)
+		locPtr->wall_town_recno() == (townRecno & 0xFF))
 	{
 		for(short y = 3; y < GATE_LENGTH-3; ++y)
 			for(short x = 0; x < GATE_WIDTH; ++x)
@@ -481,7 +482,7 @@ void World::open_east_gate(short x1, short y1, short townRecno)
 	//------ check if any east gate tile is built ---------//
 	Location *locPtr = get_loc(x1,y1+2);
 	if( locPtr->is_wall() && locPtr->wall_id() == EGATE_N &&
-		locPtr->wall_town_recno() == townRecno)
+		locPtr->wall_town_recno() == (townRecno & 0xFF))
 	{
 		for(short y = 3; y < GATE_LENGTH-3; ++y)
 			for(short x = 0; x < GATE_WIDTH; ++x)
@@ -567,7 +568,7 @@ void World::build_north_wall(short x1, short x2, short y1, short townRecno,
 					// if startX-1 is a NTOWER (corner) , change it to NWTOWER
 					Location *leftLoc;
 					if( (leftLoc = get_loc(startX-1, y1))->wall_id() == NTOWER
-						&& leftLoc->wall_town_recno() == townRecno )
+						&& leftLoc->wall_town_recno() == (townRecno & 0xFF) )
 					{
 						leftLoc->remove_wall();
 						leftLoc->set_wall(NWTOWER, townRecno, initHp);
@@ -581,7 +582,7 @@ void World::build_north_wall(short x1, short x2, short y1, short townRecno,
 					// if endX+1 is a NTOWER (corner) , change it to NETOWER
 					Location *rightLoc;
 					if( (rightLoc = get_loc(endX+1,y1))->wall_id() == NTOWER
-						&& rightLoc->wall_town_recno() == townRecno)
+						&& rightLoc->wall_town_recno() == (townRecno & 0xFF))
 					{
 						rightLoc->remove_wall();
 						rightLoc->set_wall(NETOWER, townRecno, initHp);
@@ -617,7 +618,7 @@ void World::open_north_gate(short x1, short y2, short townRecno)
 	//------ check if any north gate tile is built ---------//
 	Location *locPtr = get_loc(x1+2,y2);
 	if( locPtr->is_wall() && locPtr->wall_id() == NGATE_W &&
-		locPtr->wall_town_recno() == townRecno)
+		locPtr->wall_town_recno() == (townRecno & 0xFF))
 	{
 		for(short x = 3; x < GATE_LENGTH-3; ++x)
 			for(short y = 0; y < GATE_WIDTH; ++y)
@@ -701,7 +702,7 @@ void World::build_south_wall(short x1, short x2, short y1, short townRecno,
 					// if startX-1 is a STOWER (corner) , change it to SWTOWER
 					Location *leftLoc;
 					if( (leftLoc = get_loc(startX-1, y1))->wall_id() == STOWER
-						&& leftLoc->wall_town_recno() == townRecno )
+						&& leftLoc->wall_town_recno() == (townRecno & 0xFF) )
 					{
 						leftLoc->remove_wall();
 						leftLoc->set_wall(SWTOWER, townRecno, initHp);
@@ -715,7 +716,7 @@ void World::build_south_wall(short x1, short x2, short y1, short townRecno,
 					// if endX+1 is a STOWER (corner) , change it to SETOWER
 					Location *rightLoc;
 					if( (rightLoc = get_loc(endX+1, y1))->wall_id() == STOWER
-						&& rightLoc->wall_town_recno() == townRecno)
+						&& rightLoc->wall_town_recno() == (townRecno & 0xFF))
 					{
 						rightLoc->remove_wall();
 						rightLoc->set_wall(SETOWER, townRecno, initHp);
@@ -752,7 +753,7 @@ void World::open_south_gate(short x1, short y1, short townRecno)
 	//------ check if any south gate tile is built ---------//
 	Location *locPtr = get_loc(x1+2,y1);
 	if( locPtr->is_wall() && locPtr->wall_id() == SGATE_W &&
-		locPtr->wall_town_recno() == townRecno)
+		locPtr->wall_town_recno() == (townRecno & 0xFF))
 	{
 		for(short x = 3; x < GATE_LENGTH-3; ++x)
 			for(short y = 0; y < GATE_WIDTH; ++y)
@@ -774,6 +775,9 @@ int World::form_wall(short x, short y, short maxRecur)
 
 	int wallTile = locPtr->wall_id();
 	int blockChanged = 0;
+
+	if( is_gate_tile(wallTile) )		// the shapes below are for walls one location thick, the gates keep the shapes they were built with
+		return 0;
 
 	int flag = 0;
 	if( y == 0 || get_loc(x,y-1)->is_wall())					// north square
@@ -944,6 +948,39 @@ int World::correct_wall(short x, short y, short maxRecur)
 }
 
 
+//---------- begin of static function wall_under_attack -----//
+//
+// return : <int> 1 if a unit of another kingdom next to the wall section is
+//          attacking, then the villagers don't repair it
+//
+static int wall_under_attack(int xLoc, int yLoc)
+{
+	int wallNationRecno = world.get_loc(xLoc, yLoc)->power_nation_recno;
+
+	for( int y=yLoc-2 ; y<=yLoc+2 ; y++ )
+	{
+		for( int x=xLoc-2 ; x<=xLoc+2 ; x++ )
+		{
+			if( x<0 || y<0 || x>=MAX_WORLD_X_LOC || y>=MAX_WORLD_Y_LOC )
+				continue;
+
+			Location* locPtr = world.get_loc(x, y);
+
+			if( !locPtr->has_unit(UNIT_LAND) )
+				continue;
+
+			Unit* unitPtr = unit_array[ locPtr->unit_recno(UNIT_LAND) ];
+
+			if( unitPtr->nation_recno != wallNationRecno && unitPtr->cur_action == SPRITE_ATTACK )
+				return 1;
+		}
+	}
+
+	return 0;
+}
+//---------- end of static function wall_under_attack -----//
+
+
 //---------- begin of function World::form_world_wall -----//
 void World::form_world_wall()
 {
@@ -1004,6 +1041,9 @@ void World::form_world_wall()
 				else if( locPtr->is_wall())
 				// ######## end Gilbert 7/3 ##########//
 				{
+					if( locPtr->wall_hit_point() > 0 && wall_under_attack(x, y) )		// no building or repairs under attack, see OCIVIL.CPP
+						continue;
+
 					int prevGrade = locPtr->wall_grade();
 					int newGrade;
 					if( locPtr->inc_wall_hit_point(WALL_GROWTH_RATE) == 0)

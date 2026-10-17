@@ -652,7 +652,7 @@ void Location::set_wall(int wallId, int townRecno, int hitPoints)
 		| (LOCATE_IS_WALL | LOCATE_SITE_RESERVED);
 
 	extra_para  = wallId;
-	cargo_recno = (hitPoints<<8) + townRecno;
+	cargo_recno = (hitPoints<<8) + (townRecno & 0xFF);		// only the low byte of the town recno is kept
 }
 //------------ End of function Location::set_wall ------------//
 

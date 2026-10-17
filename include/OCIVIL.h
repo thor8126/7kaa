@@ -48,6 +48,7 @@ enum { FARM_BLOCK_NO_AGRICULTURE=1, FARM_BLOCK_OFF, FARM_BLOCK_SEASON, FARM_BLOC
 
 #define EDICT_DAYS					365		// an edict lasts a year
 #define WATCHTOWER_COST				800
+#define WALL_COST						1200		// the walls around a village, Engineering II
 #define MAX_MEDIC_EVACUATION		50			// fallen soldiers being carried back to forts at the same time
 
 //------- Define class CivilTech -------//
@@ -82,6 +83,10 @@ public:
 
 	int	can_build_watchtower(Town* townPtr, int checkCash=1);
 	void	build_watchtower(Town* townPtr);
+	int	wall_section_count(Town* townPtr, int* avgHitPoints=0, int* ringLength=0);
+	int	has_walls(Town* townPtr);
+	int	can_build_walls(Town* townPtr, int checkCash=1);
+	void	build_walls(Town* townPtr);
 
 	//------ Industry: deep mines ------//
 

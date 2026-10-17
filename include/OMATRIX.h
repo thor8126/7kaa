@@ -213,7 +213,7 @@ public:
 	int	is_wall()			{ return (loc_flag & LOCATE_BLOCK_MASK) == LOCATE_IS_WALL; }
 	int	can_build_wall()
 			{ return !cargo_recno && (loc_flag & LOCATE_WALK_LAND) &&
-			!(loc_flag & (LOCATE_BLOCK_MASK | LOCATE_SITE_MASK)) && !has_site(); }
+			!(loc_flag & (LOCATE_BLOCK_MASK | LOCATE_SITE_MASK)) && !has_site() && !has_road(); }
 	void	set_wall(int wallId, int townRecno, int hitPoints);
 	void	set_wall_creating();
 	void	set_wall_destructing();
@@ -221,7 +221,7 @@ public:
 	int	wall_id()			{ if( is_wall() ) return extra_para; else return 0; }
 	int	wall_nation_recno() { return power_nation_recno; }
 	int	wall_hit_point()	{ return cargo_recno >> 8; }
-	int	wall_town_recno()	{ return cargo_recno || 0xFF; }
+	int	wall_town_recno()	{ return cargo_recno & 0xFF; }
 	//---------------------------------------------------//
 	// initial 0, 1 to 100:creating, -1 to -100: destructing
 	// except 0 or 100, hit point slowly increase by 1

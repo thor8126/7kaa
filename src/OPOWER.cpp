@@ -876,6 +876,24 @@ int Power::detect_action()
 
 			retFlag = 1;
 		}
+		else if( targetWall )
+		{
+			//------- attack the wall of another kingdom or of nobody, see OCIVIL.CPP -------//
+
+			int wallNationRecno = world.get_loc(curXLoc, curYLoc)->wall_nation_recno();
+
+			if( nationPtr && wallNationRecno != activeUnit->nation_recno &&
+				 ( !wallNationRecno || nationPtr->get_relation_should_attack(wallNationRecno) || shiftPressed ) &&
+				 activeUnit->attack_count > 0 )
+			{
+				if(nation_array.player_recno==nation_divide_order[natCount])
+					unit_array.attack(curXLoc, curYLoc, 0, nationSelectedArray, nationSelectedCount, COMMAND_PLAYER, 0);
+			}
+			else
+				unit_array.move_to(curXLoc, curYLoc, 0, nationSelectedArray, nationSelectedCount, COMMAND_PLAYER);
+
+			retFlag = 1;
+		}
 		else
 		{
 			//--------- if no target selected, just move to the clicked location --------//

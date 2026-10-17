@@ -281,6 +281,13 @@ void UnitArray::attack(int targetXLoc, int targetYLoc, int divided, short* selec
 			targetNationRecno = townPtr->nation_recno;
 		}
 
+		//---- a wall section, attacked where it is (see OCIVIL.CPP) -----//
+
+		else if( locPtr->is_wall() )
+		{
+			targetNationRecno = locPtr->wall_nation_recno();
+		}
+
 		else
 			return;
 	}

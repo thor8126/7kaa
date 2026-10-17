@@ -8,6 +8,7 @@ New entries:
   EDICT              village edict (Administration): the scroll of VSECRET with a seal
   REPEAT             repeat production (war factory, harbor)
   CIVRES             an open book: research civil technologies (Tower of Science)
+  WALLS              village walls (Engineering II), in the village's defense menu
   MARMY-U, MARMY-D   small map buttons, up and down: select the army
   MROAD-U, MROAD-D   build roads
   MIDLE-U, MIDLE-D   next idle unit
@@ -15,7 +16,8 @@ New entries:
 
 usage: make_ui_icons.py I_BUTTON.RES PAL_STD.RES [preview.png]
 
-The script refuses to run twice on the same file.
+Icons already in the file are left as they are, so the script can be run
+again to add icons added to it later.
 """
 import struct
 import sys
@@ -201,6 +203,21 @@ def draw_book(d, s):
         d.line([(21.5 * s, (y - 0.4) * s), (31.5 * s, (y + 0.6) * s)], fill=0, width=int(1.2 * s))
 
 
+def draw_walls(d, s):
+    # a stretch of wall with crenellations between two towers, and a gate
+    for x0 in (1, 29):                                          # the towers, taller
+        d.rectangle([x0 * s, 5 * s, (x0 + 8) * s, 29 * s], fill=255)
+        for cx in (x0, x0 + 3.2, x0 + 6.4):
+            d.rectangle([cx * s, 1.5 * s, (cx + 1.8) * s, 5.5 * s], fill=255)
+    d.rectangle([9 * s, 11 * s, 29 * s, 29 * s], fill=255)      # the wall
+    for cx in (10.5, 15, 19.5, 24):
+        d.rectangle([cx * s, 7.5 * s, (cx + 2.6) * s, 11.5 * s], fill=255)
+    d.pieslice([14.5 * s, 17 * s, 23.5 * s, 26 * s], 180, 360, fill=0)   # the gate
+    d.rectangle([14.5 * s, 21.5 * s, 23.5 * s, 29 * s], fill=0)
+    for x0 in (4, 32):                                          # arrow slits
+        d.rectangle([x0 * s, 11 * s, (x0 + 1.4) * s, 16 * s], fill=0)
+
+
 def draw_small_army(d, s):      # crossed swords with guards and hilts
     for flip in (0, 1):
         def P(x, y):
@@ -257,16 +274,18 @@ def overlay(base, icon, ox, oy):
 # ---------- build ----------
 entries = read_res(res_path)
 names = {n for n, _ in entries}
-NEW = ["TOWER", "EDICT", "REPEAT", "CIVRES", "MARMY-U", "MARMY-D", "MROAD-U", "MROAD-D",
+NEW = ["TOWER", "EDICT", "REPEAT", "CIVRES", "WALLS", "MARMY-U", "MARMY-D", "MROAD-U", "MROAD-D",
        "MIDLE-U", "MIDLE-D", "MDEF-U", "MDEF-D"]
-if names & set(NEW):
-    sys.exit("already done: " + ", ".join(sorted(names & set(NEW))))
+missing = [n for n in NEW if n not in names]
+if not missing:
+    sys.exit("already done: all the icons are in " + res_path)
 blobs = dict(entries)
 
 new_icons = {}
 new_icons["TOWER"] = engrave(mask_from_drawing(30, 36, draw_tower))
 new_icons["REPEAT"] = engrave(mask_from_drawing(34, 32, draw_repeat))
 new_icons["CIVRES"] = engrave(mask_from_drawing(37, 29, draw_book))
+new_icons["WALLS"] = engrave(mask_from_drawing(38, 30, draw_walls))
 
 # the edict: the scroll of the "view secret report" icon with a wax seal on it
 w, h, vs = decode(blobs["VSECRET"])
@@ -290,13 +309,13 @@ for name, fn in (("MARMY", draw_small_army), ("MROAD", draw_small_road),
     new_icons[name + "-U"] = overlay(small_up, icon, 3, 3)
     new_icons[name + "-D"] = overlay(small_dn, icon, 4, 4)
 
-for name in NEW:
+for name in missing:
     rows = new_icons[name]
     entries.append((name, encode(len(rows[0]), len(rows), rows)))
     assert decode(entries[-1][1])[2] == rows, name     # the encoding round trips
 
 write_res(res_path, entries)
-print("added", ", ".join(NEW))
+print("added", ", ".join(missing))
 
 # ---------- preview: each icon on a button shell ----------
 if preview_path:
@@ -305,7 +324,7 @@ if preview_path:
         im.putdata([pal[c] if c != TRANSPARENT else bg for r in rows for c in r])
         return im
     tiles = []
-    for name in ["TOWER", "EDICT", "REPEAT", "CIVRES", "RESEARCH", "U_FARM"]:
+    for name in ["TOWER", "WALLS", "EDICT", "REPEAT", "CIVRES", "RESEARCH"]:
         rows = new_icons.get(name) or decode(blobs[name])[2]
         icon_h, icon_w = len(rows), len(rows[0])
         tx, ty = (51 - icon_w) // 2 - 2, (46 - icon_h) // 2 - 3
