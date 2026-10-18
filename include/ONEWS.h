@@ -96,6 +96,8 @@ enum { NEWS_DIPLOMACY=1,
 		 NEWS_MINE_DUG_DEEPER,		// a mine that ran dry has dug deeper, see OCIVIL.CPP
 		 NEWS_EDICT_ENDED,			// the edict of a village has ended, see OCIVIL.CPP
 		 NEWS_HARVEST_IN,				// the harvest has been brought in at the end of the farming season, see OCIVIL.CPP
+		 NEWS_PACT_BROKEN,			// a kingdom has broken a peace pact, see NationBase::break_peace_pact()
+		 NEWS_GRUDGE,					// an AI kingdom holds a grudge against the player, see AiWarState
 	  };
 
 //------- Define struct News ---------//
@@ -188,6 +190,8 @@ public:
 	void  mine_dug_deeper();
 	void  edict_ended();
 	void  harvest_in();
+	void  pact_broken();
+	void  grudge();
 	void  battle_report();
 };
 #pragma pack()
@@ -272,6 +276,8 @@ public:
 	void  mine_dug_deeper(int rawId, int xLoc, int yLoc);
 	void  edict_ended(int townRecno, int edictId);
 	void  harvest_in(int townRecno, int foodQty, int townCount);
+	void  pact_broken(int breakerNationRecno, int victimNationRecno);
+	void  grudge(int nationRecno, int grudgeLevel);
 	void  battle_report(int xLoc, int yLoc, int townNameId, int enemyNationRecno, int ownUnitLost, int ownFirmLost, int enemyUnitLost, int enemyFirmLost);
 
 	//--------------------------------------------//

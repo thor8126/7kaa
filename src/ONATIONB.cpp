@@ -1421,6 +1421,8 @@ void NationBase::break_peace_pact(int victimNationRecno)
 {
 	AiWarState::log( "TREATY      nation %d breaks its peace pact with %d", nation_recno, victimNationRecno );
 
+	news_array.pact_broken( nation_recno, victimNationRecno );
+
 	get_relation(victimNationRecno)->peace_pact_end_date = 0;
 
 	if( !nation_array.is_deleted(victimNationRecno) )

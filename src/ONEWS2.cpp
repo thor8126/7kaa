@@ -1126,6 +1126,41 @@ void NewsArray::harvest_in(int townRecno, int foodQty, int townCount)
 //------- End of function NewsArray::harvest_in -----//
 
 
+//------ Begin of function NewsArray::pact_broken -----//
+//
+// A kingdom has broken a peace pact, see NationBase::break_peace_pact().
+//
+void NewsArray::pact_broken(int breakerNationRecno, int victimNationRecno)
+{
+	News* newsPtr = add_news( NEWS_PACT_BROKEN, NEWS_NORMAL, breakerNationRecno, victimNationRecno );
+
+	if( !newsPtr )
+		return;
+
+	newsPtr->short_para1 = breakerNationRecno == nation_array.player_recno ? 1 :
+								  victimNationRecno == nation_array.player_recno ? 2 : 0;
+}
+//------- End of function NewsArray::pact_broken -----//
+
+
+//------ Begin of function NewsArray::grudge -----//
+//
+// An AI kingdom's grudge against the player has grown, see AiWarState::add_grudge().
+//
+// <int> grudgeLevel - 1: it won't forget, 2: it has sworn revenge
+//
+void NewsArray::grudge(int nationRecno, int grudgeLevel)
+{
+	News* newsPtr = add_news( NEWS_GRUDGE, NEWS_NORMAL, nationRecno );
+
+	if( !newsPtr )
+		return;
+
+	newsPtr->short_para1 = grudgeLevel;
+}
+//------- End of function NewsArray::grudge -----//
+
+
 //------ Begin of function NewsArray::battle_report -----//
 //
 // The losses of a battle the player fought, see OBATREP.CPP.

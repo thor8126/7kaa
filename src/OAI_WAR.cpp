@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <OAIWAR.h>
+#include <ONEWS.h>
 #include <OCONFIG.h>
 #include <ONATION.h>
 #include <OUNIT.h>
@@ -346,6 +347,37 @@ int AiWarState::weighted_pick(const int* ratingArray, int count, int closePercen
 //-------- End of function AiWarState::weighted_pick --------//
 
 
+//------- Begin of function AiWarState::add_grudge -------//
+//
+// The harm another nation did adds to the grudge held against it. When an
+// AI kingdom's grudge against the player passes a level, the player is told.
+//
+void AiWarState::add_grudge(int nationRecno, int againstNationRecno, float amount)
+{
+	AiMemory* memPtr = get_memory(nationRecno, againstNationRecno);
+
+	if( !memPtr )
+		return;
+
+	float oldGrudge = memPtr->grudge;
+
+	memPtr->grudge = MIN( (float) MAX_GRUDGE, memPtr->grudge + amount );
+
+	if( againstNationRecno == nation_array.player_recno && !nation_array.is_deleted(nationRecno) && nation_array[nationRecno]->is_ai() )
+	{
+		int level = memPtr->grudge >= 80.0f ? 2 : memPtr->grudge >= 40.0f ? 1 : 0;
+		int oldLevel = oldGrudge >= 80.0f ? 2 : oldGrudge >= 40.0f ? 1 : 0;
+
+		if( level > oldLevel )
+		{
+			log( "MEMORY      nation %d's grudge against the player %d reaches %.0f", nationRecno, againstNationRecno, memPtr->grudge );
+			news_array.grudge( nationRecno, level );
+		}
+	}
+}
+//-------- End of function AiWarState::add_grudge --------//
+
+
 //------- Begin of function AiWarState::offensive_result -------//
 //
 // Called when an offensive of an AI nation on a town ends, see
@@ -605,9 +637,7 @@ void AiWarState::unit_killed(int attackerNationRecno, Unit* targetUnit)
 
 	//--- memories: a grudge against the killer, and a recent loss others may take advantage of ---//
 
-	AiMemory* memPtr = get_memory(victimNationRecno, attackerNationRecno);
-
-	memPtr->grudge = MIN( (float) MAX_GRUDGE, memPtr->grudge + warValue );
+	add_grudge( victimNationRecno, attackerNationRecno, warValue );
 
 	recent_losses[victimNationRecno-1] += warValue;
 }
@@ -628,9 +658,7 @@ void AiWarState::firm_destroyed(int attackerNationRecno, int victimNationRecno)
 
 	add_weariness( victimNationRecno, attackerNationRecno, FIRM_LOST_WEARINESS );
 
-	AiMemory* memPtr = get_memory(victimNationRecno, attackerNationRecno);
-
-	memPtr->grudge = MIN( (float) MAX_GRUDGE, memPtr->grudge + 4.0f );
+	add_grudge( victimNationRecno, attackerNationRecno, 4.0f );
 }
 //-------- End of function AiWarState::firm_destroyed --------//
 
@@ -651,7 +679,7 @@ void AiWarState::town_captured(int fromNationRecno, int toNationRecno, int townX
 
 	AiMemory* memPtr = get_memory(fromNationRecno, toNationRecno);
 
-	memPtr->grudge = MIN( (float) MAX_GRUDGE, memPtr->grudge + 20.0f );
+	add_grudge( fromNationRecno, toNationRecno, 20.0f );
 	memPtr->lost_town_x = townXLoc;
 	memPtr->lost_town_y = townYLoc;
 

@@ -95,6 +95,8 @@ static NewsInfo news_info_array[] =
 	{ &News::mine_dug_deeper, 0 },
 	{ &News::edict_ended, 0 },
 	{ &News::harvest_in, 0 },
+	{ &News::pact_broken, 1 },
+	{ &News::grudge, 1 },
 };
 
 //------- Define static variables --------//
@@ -1880,6 +1882,46 @@ void News::harvest_in()
 	}
 }
 //------- End of function News::harvest_in -----//
+
+
+//------ Begin of function News::pact_broken -----//
+//
+// king_name1() - the kingdom that broke the pact
+// king_name2() - the kingdom it was made with
+// short_para1  - 1 if the player broke it, 2 if it was broken with the player
+//
+void News::pact_broken()
+{
+	if( short_para1 == 1 )
+		// TRANSLATORS: You have broken your peace pact with <King>'s Kingdom<Color>. Every kingdom trusts you less.
+		snprintf(str, MAX_STR_LEN+1, _("You have broken your peace pact with %s's Kingdom%s. Every kingdom trusts you less."), king_name2(), nation_color_str2());
+
+	else if( short_para1 == 2 )
+		// TRANSLATORS: <King>'s Kingdom<Color> has broken its peace pact with you!
+		snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s has broken its peace pact with you!"), king_name1(), nation_color_str1());
+
+	else
+		// TRANSLATORS: <King>'s Kingdom<Color> has broken its peace pact with <King>'s Kingdom<Color>.
+		snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s has broken its peace pact with %s's Kingdom%s."), king_name1(), nation_color_str1(), king_name2(), nation_color_str2());
+}
+//------- End of function News::pact_broken -----//
+
+
+//------ Begin of function News::grudge -----//
+//
+// king_name1() - the kingdom holding the grudge
+// short_para1  - 1: it won't forget, 2: it has sworn revenge
+//
+void News::grudge()
+{
+	if( short_para1 >= 2 )
+		// TRANSLATORS: <King>'s Kingdom<Color> has sworn revenge on you.
+		snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s has sworn revenge on you."), king_name1(), nation_color_str1());
+	else
+		// TRANSLATORS: <King>'s Kingdom<Color> will not forget the harm you have done to it.
+		snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s will not forget the harm you have done to it."), king_name1(), nation_color_str1());
+}
+//------- End of function News::grudge -----//
 
 
 //------ Begin of function News::nation_name1 -----//

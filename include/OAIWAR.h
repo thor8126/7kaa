@@ -159,6 +159,7 @@ public:
 	void			firm_destroyed(int attackerNationRecno, int victimNationRecno);
 	void			town_captured(int fromNationRecno, int toNationRecno, int townXLoc, int townYLoc);
 	void			offensive_result(int nationRecno, int targetNationRecno, int won, int xLoc, int yLoc, const char* reasonStr);
+	void			add_grudge(int nationRecno, int againstNationRecno, float amount);
 	void			peace_refused(int nationRecno, int refusingNationRecno);
 	void			next_day();
 
