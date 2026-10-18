@@ -84,6 +84,29 @@ int Nation::think_capture_independent()
 
 	std::priority_queue<CaptureTown> captureTownQueue;
 
+	//--- how hard a village it takes on: by peacefulness and strategy, more for aggressive styles and for a kingdom that has hardly grown ---//
+
+	int maxResistance = 50 - pref_peacefulness/5;		// 30 to 50 depending on peacefulness
+
+	if( ai_war_state.get_strategy(nation_recno) == AI_STRATEGY_EXPAND )
+		maxResistance += 15;		// a nation going for expansion takes on harder villages
+
+	switch( ai_style() )
+	{
+		case AI_STYLE_WARLORD:		maxResistance += 10; break;
+		case AI_STYLE_OPPORTUNIST:	maxResistance += 5;  break;
+	}
+
+	int yearsPlayed = (info.game_date - info.game_start_date) / 365;
+
+	if( yearsPlayed >= 2 && ai_town_count <= 2 + yearsPlayed/2 )		// it has hardly grown
+		maxResistance += 15;
+
+	maxResistance = MIN( maxResistance, 85 );
+
+	int candidateCount=0, tooHardCount=0, contestedCount=0, noBaseCount=0;
+	int easiestTooHard = 100;
+
 	//--- find the town that makes most sense to capture ---//
 
 	int 	townRecno;
@@ -108,7 +131,10 @@ int Nation::think_capture_independent()
 		//------ only if we have a presence/a base town in this region -----//
 
 		if( !has_base_town_in_region(townPtr->region_id) )
+		{
+			noBaseCount++;
 			continue;
+		}
 
 		//---- check if there are already camps linked to this town ----//
 
@@ -160,7 +186,10 @@ int Nation::think_capture_independent()
 		}
 
 		if( i>=0 )			// there is already a camp linked to this town and we don't want to get involved with its capturing plan
+		{
+			contestedCount++;
 			continue;
+		}
 
 		//------ no linked camps interfering with potential capture ------//
 
@@ -169,17 +198,21 @@ int Nation::think_capture_independent()
 		int averageResistance = townPtr->average_resistance(nation_recno);
 		int minResistance 	 = MIN( averageResistance, targetResistance );
 
-		int maxResistance = 50 - pref_peacefulness/5;		// 30 to 50 depending on peacefulness
-
-		if( ai_war_state.get_strategy(nation_recno) == AI_STRATEGY_EXPAND )
-			maxResistance += 15;		// a nation going for expansion takes on harder villages
-
-
 		if( minResistance < maxResistance )
 		{
 			captureTownQueue.push({townRecno, minResistance, captureUnitRecno});
+			candidateCount++;
+		}
+		else
+		{
+			tooHardCount++;
+			easiestTooHard = MIN( easiestTooHard, minResistance );
 		}
 	}
+
+	AiWarState::log( "CAPTURE     nation %d (%s, %d towns): %d independent villages it can take (resistance below %d), %d too hard (easiest %d), %d already being captured, %d on land it has no base on",
+						  nation_recno, AiWarState::style_name(ai_style()), ai_town_count, candidateCount, maxResistance,
+						  tooHardCount, tooHardCount ? easiestTooHard : 0, contestedCount, noBaseCount );
 
 	//------- try to capture the town in their resistance order ----//
 

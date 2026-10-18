@@ -25,6 +25,8 @@
 #include <OTOWN.h>
 #include <OF_CAMP.h>
 #include <ONATION.h>
+#include <OAIWAR.h>
+#include <OINFO.h>
 
 //--------- Begin of function Nation::think_military --------//
 
@@ -34,6 +36,7 @@ void Nation::think_military()
 
 	if( yearly_food_change() < 0 )
 	{
+		AiWarState::log( "MILITARY    nation %d: no new forts, its food is falling (%.0f a year, food %.0f)", nation_recno, yearly_food_change(), food );
 		think_close_camp();		// think about closing down an existing one
 		return;
 	}
@@ -81,6 +84,10 @@ void Nation::think_military()
 	}
 
 	add_action(buildXLoc, buildYLoc, bestTownPtr->loc_x1, bestTownPtr->loc_y1, ACTION_AI_BUILD_FIRM, FIRM_CAMP);
+
+	AiWarState::log( "MILITARY    nation %d (%s) builds a new fort next to town %d (forts %d, soldiers and weapons %d, at war %d)",
+						  nation_recno, AiWarState::style_name(ai_style()), bestTownPtr->town_recno, ai_camp_count,
+						  total_human_count+total_weapon_count, total_enemy_count() > 0 );
 }
 
 //--------- Begin of function Nation::think_military --------//
@@ -102,8 +109,22 @@ int Nation::ai_should_expand_military()
 
 	//--- check whether the current military force is already big enough ---//
 
-	if( ai_camp_count * 9 > total_jobless_population * (50+pref_military_development) / 150 )		// (50 to 150) / 150
+	//--- at war, for a military strategy and for a warlord, more soldiers are kept per jobless villager ---//
+
+	int forcePercent = 100;
+
+	if( total_enemy_count() > 0 )
+		forcePercent += 50;
+
+	if( ai_war_state.get_strategy(nation_recno) == AI_STRATEGY_MILITARY || ai_style() == AI_STYLE_WARLORD )
+		forcePercent += 30;
+
+	if( ai_camp_count * 9 > total_jobless_population * (50+pref_military_development) / 150 * forcePercent / 100 )		// (50 to 150) / 150
+	{
+		AiWarState::log( "MILITARY    nation %d: has enough forts (%d) for its %d jobless villagers (force %d%%)",
+							  nation_recno, ai_camp_count, total_jobless_population, forcePercent );
 		return 0;
+	}
 
 	//---- see if any of the camps are still needed soldiers -----//
 

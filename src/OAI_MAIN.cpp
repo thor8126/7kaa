@@ -238,7 +238,40 @@ void Nation::init_personalty()
 //
 void Nation::init_style()
 {
-	int styleId = misc.random(AI_STYLE_COUNT);
+	//--- the styles are dealt evenly among the AI kingdoms of a game: the less a style is taken, the likelier ---//
+
+	static const int baseWeightArray[AI_STYLE_COUNT] = { 3, 2, 2, 2, 3 };		// warlord, merchant, builder, schemer, opportunist
+	int styleCountArray[AI_STYLE_COUNT] = { 0, 0, 0, 0, 0 };
+
+	for( int i=nation_array.size() ; i>0 ; i-- )
+	{
+		if( i != nation_recno && !nation_array.is_deleted(i) && nation_array[i]->is_ai() )
+			styleCountArray[ ai_war_state.get_style(i) ]++;
+	}
+
+	int weightArray[AI_STYLE_COUNT], totalWeight = 0;
+
+	for( int s=0 ; s<AI_STYLE_COUNT ; s++ )
+	{
+		int baseWeight = config.ai_aggressiveness <= OPTION_LOW ? 2 : baseWeightArray[s];
+
+		if( config.ai_aggressiveness >= OPTION_VERY_HIGH && (s == AI_STYLE_WARLORD || s == AI_STYLE_OPPORTUNIST) )
+			baseWeight += 2;
+
+		weightArray[s] = baseWeight * 100 / (1 + styleCountArray[s]*3);
+		totalWeight += weightArray[s];
+	}
+
+	int styleId = 0;
+	int pickWeight = misc.random(totalWeight);
+
+	for( styleId=0 ; styleId<AI_STYLE_COUNT-1 ; styleId++ )
+	{
+		pickWeight -= weightArray[styleId];
+
+		if( pickWeight < 0 )
+			break;
+	}
 
 	switch( styleId )
 	{
@@ -253,7 +286,8 @@ void Nation::init_style()
 
 		case AI_STYLE_MERCHANT:
 			pref_trading_tendency     = 70 + misc.random(31);
-			pref_military_development = misc.random(41);
+			pref_military_development = 25 + misc.random(26);
+			pref_inc_pop_by_capture   = 40 + misc.random(31);
 			pref_peacefulness         = 50 + misc.random(51);
 			pref_allying_tendency     = 50 + misc.random(51);
 			pref_honesty              = 50 + misc.random(51);
@@ -261,8 +295,8 @@ void Nation::init_style()
 			break;
 
 		case AI_STYLE_BUILDER:
-			pref_military_development = misc.random(41);
-			pref_inc_pop_by_capture   = misc.random(41);
+			pref_military_development = 30 + misc.random(26);
+			pref_inc_pop_by_capture   = 40 + misc.random(31);
 			pref_repair_concern       = 60 + misc.random(41);
 			pref_loyalty_concern      = 50 + misc.random(51);
 			pref_town_harmony         = 50 + misc.random(51);

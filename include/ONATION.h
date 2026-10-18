@@ -593,6 +593,7 @@ public:
 	int			war_target_rating(int nationRecno);
 	int			opportunity_rating(int targetNationRecno, char* reasonStr=NULL, int reasonLen=0);
 	void			think_opportunity();
+	int			local_war_odds(int targetNationRecno, int& localOurs, int& localTheirs);
 	int			is_frontline_town(Town* townPtr);
 	int			think_feint(Town* mainTargetTown);		// see OAI_RAID.CPP
 	int			send_raid_party(FirmCamp* firmCamp, int partySize, int targetXLoc, int targetYLoc, int targetUnitRecno);

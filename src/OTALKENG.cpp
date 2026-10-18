@@ -962,6 +962,45 @@ void TalkMsg::give_tech()
 		tech += misc.roman_number(talk_para2);
 	}
 
+	//--- the civil technologies are not in the message arrays, which only have the original ones, see OCIVIL.CPP ---//
+
+	if( tech_res[talk_para1]->civil_id )
+	{
+		String techStr;
+
+		techStr  = tech_res[talk_para1]->tech_des();
+		techStr += tech;
+
+		if( reply_type == REPLY_WAITING || !should_disp_reply )
+		{
+			if( viewing_nation_recno == from_nation_recno )
+				// TRANSLATORS: You offer <Technology> technology to <King>'s Kingdom<Color>.
+				snprintf(str, MAX_STR_LEN+1, _("You offer %s technology to %s's Kingdom%s."), techStr.str_buf, TO_NATION, TO_COLOR);
+			else
+				// TRANSLATORS: <King>'s Kingdom<Color> offers <Technology> technology to you.
+				snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s offers %s technology to you."), FROM_NATION, FROM_COLOR, techStr.str_buf);
+		}
+		else if( viewing_nation_recno == from_nation_recno )
+		{
+			if( reply_type == REPLY_ACCEPT )
+				// TRANSLATORS: <King>'s Kingdom<Color> accepts your gift of <Technology> technology.
+				snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s accepts your gift of %s technology."), TO_NATION, TO_COLOR, techStr.str_buf);
+			else
+				// TRANSLATORS: <King>'s Kingdom<Color> rejects your gift of <Technology> technology.
+				snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s rejects your gift of %s technology."), TO_NATION, TO_COLOR, techStr.str_buf);
+		}
+		else
+		{
+			if( reply_type == REPLY_ACCEPT )
+				// TRANSLATORS: You accept the gift of <Technology> technology from <King>'s Kingdom<Color>.
+				snprintf(str, MAX_STR_LEN+1, _("You accept the gift of %s technology from %s's Kingdom%s."), techStr.str_buf, FROM_NATION, FROM_COLOR);
+			else
+				// TRANSLATORS: You reject the gift of <Technology> technology from <King>'s Kingdom<Color>.
+				snprintf(str, MAX_STR_LEN+1, _("You reject the gift of %s technology from %s's Kingdom%s."), techStr.str_buf, FROM_NATION, FROM_COLOR);
+		}
+		return;
+	}
+
 	if( reply_type == REPLY_WAITING || !should_disp_reply )
 	{
 		if( viewing_nation_recno == from_nation_recno )
@@ -1124,6 +1163,54 @@ void TalkMsg::demand_tech()
 		 >= NATION_FRIENDLY )
 	{
 		friendlyRequest = true;
+	}
+
+	//--- the civil technologies are not in the message arrays, which only have the original ones, see OCIVIL.CPP ---//
+
+	if( tech_res[talk_para1]->civil_id )
+	{
+		const char* techStr = tech_res[talk_para1]->tech_des();
+
+		if( reply_type == REPLY_WAITING || !should_disp_reply )
+		{
+			if( viewing_nation_recno == from_nation_recno )
+			{
+				if( friendlyRequest )
+					// TRANSLATORS: You request the latest <Technology> technology from <King>'s Kingdom<Color>.
+					snprintf(str, MAX_STR_LEN+1, _("You request the latest %s technology from %s's Kingdom%s."), techStr, TO_NATION, TO_COLOR);
+				else
+					// TRANSLATORS: You demand the latest <Technology> technology from <King>'s Kingdom<Color>.
+					snprintf(str, MAX_STR_LEN+1, _("You demand the latest %s technology from %s's Kingdom%s."), techStr, TO_NATION, TO_COLOR);
+			}
+			else
+			{
+				if( friendlyRequest )
+					// TRANSLATORS: <King>'s Kingdom<Color> requests the latest <Technology> technology from you.
+					snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s requests the latest %s technology from you."), FROM_NATION, FROM_COLOR, techStr);
+				else
+					// TRANSLATORS: <King>'s Kingdom<Color> demands the latest <Technology> technology from you.
+					snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s demands the latest %s technology from you."), FROM_NATION, FROM_COLOR, techStr);
+			}
+		}
+		else if( viewing_nation_recno == from_nation_recno )
+		{
+			if( reply_type == REPLY_ACCEPT )
+				// TRANSLATORS: <King>'s Kingdom<Color> agrees to transfer its latest <Technology> technology to you.
+				snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s agrees to transfer its latest %s technology to you."), TO_NATION, TO_COLOR, techStr);
+			else
+				// TRANSLATORS: <King>'s Kingdom<Color> refuses to transfer its latest <Technology> technology to you.
+				snprintf(str, MAX_STR_LEN+1, _("%s's Kingdom%s refuses to transfer its latest %s technology to you."), TO_NATION, TO_COLOR, techStr);
+		}
+		else
+		{
+			if( reply_type == REPLY_ACCEPT )
+				// TRANSLATORS: You agree to transfer your latest <Technology> technology to <King>'s Kingdom<Color>.
+				snprintf(str, MAX_STR_LEN+1, _("You agree to transfer your latest %s technology to %s's Kingdom%s."), techStr, FROM_NATION, FROM_COLOR);
+			else
+				// TRANSLATORS: You refuse to transfer your latest <Technology> technology to <King>'s Kingdom<Color>.
+				snprintf(str, MAX_STR_LEN+1, _("You refuse to transfer your latest %s technology to %s's Kingdom%s."), techStr, FROM_NATION, FROM_COLOR);
+		}
+		return;
 	}
 
 	//------------------------------------------//

@@ -435,8 +435,8 @@ void i_disp_civil_research_button(ButtonCustom *button, int repaintBody)
 		str += misc.roman_number(researchVersion);
 	}
 
-	font_san.put( x1+TECH_SMALL_ICON_WIDTH+10, y1+3, str, 0, x2-2 );
-	font_small.put( x1+TECH_SMALL_ICON_WIDTH+10, y1+19, techInfo->level_des(researchVersion), 0, x2-2 );
+	font_san.put( x1+TECH_SMALL_ICON_WIDTH+10, y1+1, str, 0, x2-2 );
+	font_small.put( x1+TECH_SMALL_ICON_WIDTH+10, y1+15, techInfo->level_des(researchVersion), 0, x2-2 );		// clear of the bottom edge of the row
 }
 //--------- End of static function i_disp_civil_research_button ---------//
 

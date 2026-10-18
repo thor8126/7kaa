@@ -52,6 +52,8 @@
 #include <OTOWN.h>
 #include <OFIRM.h>
 #include <OUNIT.h>
+#include <OUNITRES.h>
+#include <OF_CAMP.h>
 #include <OINFO.h>
 #include <OAIWAR.h>
 #include <OMISC.h>
@@ -313,7 +315,7 @@ int Nation::war_target_rating(int nationRecno)
 		if( nation_array.is_deleted(i) || i==nation_recno || i==nationRecno )
 			continue;
 
-		if( get_relation_status(i) >= NATION_FRIENDLY && common_threat_rating(i) > 0 &&
+		if( get_relation_status(i) >= NATION_NEUTRAL && common_threat_rating(i) > 0 &&
 			 nationRecno == leaderNationRecno &&
 			 nation_array[i]->get_relation_status(nationRecno) != NATION_HOSTILE )		// those at war with it are co-belligerents already
 		{
@@ -334,15 +336,30 @@ int Nation::war_target_rating(int nationRecno)
 			minOddsPercent = 50;
 	}
 
-	if( config_adv.nation_ai_posture && ourSideMilitary*100 < theirMilitary*minOddsPercent )
+	//--- a runaway leader must be stopped before it is too late: worse odds are accepted, more by bold styles ---//
+
+	if( nationRecno == leaderNationRecno && targetNation->overall_rank_rating() >= overall_rank_rating() + 30 )
+		minOddsPercent = MIN( minOddsPercent, ai_style()==AI_STYLE_WARLORD || ai_style()==AI_STYLE_OPPORTUNIST ? 50 : 60 );
+
+	//--- a war against a stronger kingdom isn't hopeless where its border is weak: the forces near its town closest to us ---//
+
+	int localOurs=0, localTheirs=0;
+	int localOdds = local_war_odds(nationRecno, localOurs, localTheirs);		// percent, 0 if no town of it within reach
+
+	int localAdvantage = localOdds >= 150 && localOurs >= 150;		// clearly stronger there, with a real force
+
+	if( config_adv.nation_ai_posture && ourSideMilitary*100 < theirMilitary*minOddsPercent && !localAdvantage )
 	{
-		AiWarState::log( "WAR TARGET  nation %d rates %d%s: hopeless (our side %d = own %d + co-belligerents %d + partners %d, theirs as we know %d, needs %d%%)",
+		AiWarState::log( "WAR TARGET  nation %d rates %d%s: hopeless (our side %d = own %d + co-belligerents %d + partners %d, theirs as we know %d, needs %d%%; near its closest town ours %d, theirs %d)",
 							  nation_recno, nationRecno, isHuman ? " (human)" : "", ourSideMilitary, ownMilitary,
-							  coBelligerentMilitary, partnerMilitary, theirMilitary, minOddsPercent );
+							  coBelligerentMilitary, partnerMilitary, theirMilitary, minOddsPercent, localOurs, localTheirs );
 		return 0;
 	}
 
 	int oddsRating = MAX( -40, MIN( 40, (ourSideMilitary - theirMilitary)/2 ) );
+
+	if( localAdvantage )		// a strike at its weak border
+		oddsRating = MAX( oddsRating, MIN( 30, (localOdds-100)/5 ) );
 
 	//------ the leading kingdom, which the trailing kingdoms should stop ------//
 
@@ -411,6 +428,106 @@ int Nation::war_target_rating(int nationRecno)
 	return totalRating;
 }
 //----------- End of function Nation::war_target_rating -----------//
+
+
+//--------- Begin of function Nation::local_war_odds ---------//
+//
+// The odds near the given nation's town closest to us on the same land:
+// our forts within reach of it against its forts there that we have seen
+// and its units there that we see now, by combat strength.
+//
+// <int&> localOurs, localTheirs - the strength of both sides there
+//
+// return : <int> our strength there in percent of theirs, 0 if no town of
+//          the nation we know of is within reach
+//
+int Nation::local_war_odds(int targetNationRecno, int& localOurs, int& localTheirs)
+{
+	enum { LOCAL_REACH = 40 };
+
+	localOurs = localTheirs = 0;
+
+	//------ its town closest to one of ours ------//
+
+	Town* closestTown = NULL;
+	int   minDistance = 0x7FFF;
+
+	for( int i=town_array.size() ; i>0 ; i-- )
+	{
+		if( town_array.is_deleted(i) )
+			continue;
+
+		Town* townPtr = town_array[i];
+
+		if( townPtr->nation_recno != targetNationRecno || !ai_has_seen_town(townPtr) )
+			continue;
+
+		for( int j=0 ; j<ai_town_count ; j++ )
+		{
+			Town* ownTown = town_array[ ai_town_array[j] ];
+
+			if( ownTown->region_id != townPtr->region_id )
+				continue;
+
+			int curDistance = misc.points_distance( ownTown->center_x, ownTown->center_y, townPtr->center_x, townPtr->center_y );
+
+			if( curDistance < minDistance )
+			{
+				minDistance = curDistance;
+				closestTown = townPtr;
+			}
+		}
+	}
+
+	if( !closestTown || minDistance > LOCAL_REACH*2 )
+		return 0;
+
+	//------ the forts and units of both sides near it ------//
+
+	for( int i=firm_array.size() ; i>0 ; i-- )
+	{
+		if( firm_array.is_deleted(i) )
+			continue;
+
+		Firm* firmPtr = firm_array[i];
+
+		if( firmPtr->firm_id != FIRM_CAMP || firmPtr->under_construction )
+			continue;
+
+		int curDistance = misc.points_distance( firmPtr->center_x, firmPtr->center_y, closestTown->center_x, closestTown->center_y );
+
+		if( firmPtr->nation_recno == nation_recno && curDistance <= LOCAL_REACH*2 )		// our forts can march there
+			localOurs += ((FirmCamp*)firmPtr)->total_combat_level();
+
+		else if( firmPtr->nation_recno == targetNationRecno && curDistance <= LOCAL_REACH && ai_has_seen_firm(firmPtr) )
+			localTheirs += ((FirmCamp*)firmPtr)->total_combat_level();
+	}
+
+	for( int i=unit_array.size() ; i>0 ; i-- )
+	{
+		if( unit_array.is_deleted(i) )
+			continue;
+
+		Unit* unitPtr = unit_array[i];
+
+		if( unitPtr->nation_recno != targetNationRecno || !unitPtr->is_visible() || unitPtr->unit_mode == UNIT_MODE_OVERSEE ||
+			 (!unitPtr->race_id && unit_res[unitPtr->unit_id]->unit_class != UNIT_CLASS_WEAPON) )
+		{
+			continue;
+		}
+
+		if( misc.points_distance( unitPtr->next_x_loc(), unitPtr->next_y_loc(), closestTown->center_x, closestTown->center_y ) <= LOCAL_REACH &&
+			 ai_sees_unit(unitPtr) )
+		{
+			localTheirs += unitPtr->unit_power();
+		}
+	}
+
+	localTheirs += closestTown->population;		// its villagers defend it too
+
+	return localTheirs > 0 ? localOurs * 100 / localTheirs : 1000;
+}
+//----------- End of function Nation::local_war_odds -----------//
 
 
 //--------- Begin of function Nation::opportunity_rating ---------//
