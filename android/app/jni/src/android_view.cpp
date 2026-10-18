@@ -20,7 +20,7 @@
 //
 // - Where the window reaches beyond the game's view (zoomed out, or by part of
 //   a location while panning), android_view_disp_zoom_begin() (called at the
-//   start of Sys::disp_zoom) draws the missing areas first, as extra passes of
+//   start of Sys::disp_zoom) draws the missing areas (plus a margin) first, as extra passes of
 //   the normal map drawing at other positions (terrain, units, buildings, fog
 //   and names; no weather and no build marker, which keep state or follow the
 //   mouse), into a larger picture. Vga::flip() then lays the game's real view
@@ -54,10 +54,19 @@ static const float LOC = ZOOM_LOC_WIDTH;                   // 32 pixels
 static const float K_MIN = 0.5f, K_MAX = 3.0f;
 static const Uint32 ACTIVE_MS = 300;    // view counts as showing this long after the last hook call
 
-// Larger picture for the extra passes: the biggest window plus alignment.
-static const int BIG_W = (int) (ZOOM_WIDTH / 0.5f) + 2 * ZOOM_LOC_WIDTH;
-static const int BIG_H = (int) (ZOOM_HEIGHT / 0.5f) + 2 * ZOOM_LOC_HEIGHT;
+// Extra passes cover the window plus this margin, so small moves of the
+// window before the next drawing (the game reads input while it draws) show
+// map, not black.
+static const int PASS_MARGIN = 2 * ZOOM_LOC_WIDTH;
+// Larger picture for the extra passes: the biggest window, margins, alignment.
+static const int BIG_W = (int) (ZOOM_WIDTH / 0.5f) + 2 * PASS_MARGIN + ZOOM_LOC_WIDTH;
+static const int BIG_H = (int) (ZOOM_HEIGHT / 0.5f) + 2 * PASS_MARGIN + ZOOM_LOC_HEIGHT;
 static const int MAX_PASSES = 16;
+// The game draws a new frame only on game ticks (a few per second), but the
+// screen is shown many times in between. While the window moves, ask for a
+// redraw at most this often so the extra passes follow it (else newly shown
+// edges are black until the next tick: flashing).
+static const Uint32 REDRAW_MS = 15;
 
 static float k = 1.0f;                  // zoom
 static float ox, oy;                    // window origin relative to the game's view
@@ -84,6 +93,9 @@ static SDL_Renderer *bigtex_renderer;
 static int big_valid;                   // big8 belongs to the last drawn frame
 static int big_x, big_y;                // world pixel of big8's top-left corner
 static int big_failed;
+
+static float drawn_wx0 = -1e9f, drawn_wy0, drawn_k;   // window when last drawn (world px)
+static Uint32 drawn_time;
 
 //------------------------------------------------------------------------
 
@@ -211,6 +223,18 @@ void android_view_world_hook()
 
 	if( moved )
 		sys.zoom_need_redraw = 1;     // as World::detect_scroll does
+
+	// The window moved since the map was last drawn and reaches beyond the
+	// game's view: redraw now rather than at the next game tick, so the extra
+	// passes follow it.
+	float wx0 = cur_tx * LOC + ox, wy0 = cur_ty * LOC + oy;
+	float gx0 = cur_tx * LOC, gy0 = cur_ty * LOC;
+	int beyond = wx0 < gx0 || wy0 < gy0 || wx0 + VW / k > gx0 + VW || wy0 + VH / k > gy0 + VH;
+	if( beyond && (fabsf(wx0 - drawn_wx0) > 0.5f || fabsf(wy0 - drawn_wy0) > 0.5f || k != drawn_k) &&
+		 SDL_GetTicks() - drawn_time >= REDRAW_MS )
+	{
+		sys.zoom_need_redraw = 1;
+	}
 }
 
 //------------------------------------------------------------------------
@@ -276,12 +300,21 @@ void android_view_disp_zoom_begin()
 	float wx0 = cur_tx * LOC + ox, wy0 = cur_ty * LOC + oy;
 	float wx1 = wx0 + VW / k,      wy1 = wy0 + VH / k;
 	float gx0 = cur_tx * LOC,      gy0 = cur_ty * LOC;
+	drawn_wx0 = wx0;
+	drawn_wy0 = wy0;
+	drawn_k = k;
+	drawn_time = SDL_GetTicks();
 	if( wx0 >= gx0 && wy0 >= gy0 && wx1 <= gx0 + VW && wy1 <= gy0 + VH )
 		return;            // the game's own view covers the window
 
 	if( !ensure_big() )
 		return;
 
+	// cover the window plus a margin
+	wx0 -= PASS_MARGIN;
+	wy0 -= PASS_MARGIN;
+	wx1 += PASS_MARGIN;
+	wy1 += PASS_MARGIN;
 	big_x = (int) floorf(wx0 / LOC) * ZOOM_LOC_WIDTH;
 	big_y = (int) floorf(wy0 / LOC) * ZOOM_LOC_HEIGHT;
 	SDL_FillRect(big8, NULL, V_BLACK);
