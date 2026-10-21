@@ -133,6 +133,7 @@ static int loaded_game_version;
 #define FIRST_VERSION_WITH_TOWN_WALLS		225		// earlier saved games have smaller town records, without Town::wall_built
 #define FIRST_VERSION_WITH_AI_MIND			226		// earlier saved games don't have the AI's styles, memories and learning (AiWarState)
 #define FIRST_VERSION_WITH_VETERANS			227		// earlier saved games have smaller worker records, without Worker::battle_score
+#define FIRST_VERSION_WITH_BAATEZU			228		// earlier saved games have one unit type fewer, without the Baatezu
 
 bool GameFile::read_file_same_version = true;
 
@@ -259,6 +260,9 @@ int GameFile::read_file(File* filePtr)
 
 	if(load_file_game_version < FIRST_VERSION_WITH_VETERANS)
 		return -1;		// worker records saved before veterans are of a different size
+
+	if(load_file_game_version < FIRST_VERSION_WITH_BAATEZU)
+		return -1;		// the arrays saved for each unit type are of a different size
 
 	read_file_same_version = ( load_file_game_version/100==GAME_VERSION/100 );
 	loaded_game_version = load_file_game_version;

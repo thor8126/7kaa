@@ -83,6 +83,7 @@ enum { UNIT_NORMAN=1,
 		 UNIT_ZULU_GOD,
 		 UNIT_F_BALLISTA,
 		 UNIT_SUPPLY_WAGON,		// see OUNITSUP.CPP
+		 UNIT_BAATEZU,				// a winged Fryhtan, see tools/make_baatezu.py
 		 UNIT_LAST					// keep this line after the last unit
 	  };
 
