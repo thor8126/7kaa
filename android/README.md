@@ -79,6 +79,10 @@ normal map drawing (terrain, units, buildings, fog and names) and stitched
 around it. Weather and the building outline are only drawn in the game's own
 view. Taps on those extra areas move the game's view there first (the picture
 stays put), so orders and building placement act exactly under the finger.
+Messages and buttons the game shows over the map (news at the bottom, the
+Army/Road/Defend/Idle buttons, the tutorial) are not zoomed: they stay at
+their normal size and place, and taps on them work as usual. The window never
+goes past the edges of the map.
 Zoomed far out, the phone draws the map up to nine times per frame. If it gets
 slow, zoom in a little.
 

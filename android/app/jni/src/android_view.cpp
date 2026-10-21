@@ -27,6 +27,19 @@
 //   (with selection box and messages) on top and shows the window scaled into
 //   the map view (android_view_render). Nothing beyond the map is drawn.
 //
+// - Messages, buttons and labels the game draws over the map view (news at
+//   the bottom, the Army/Road/Defend/Idle buttons, the tutorial, the frame
+//   rate) are not map: they stay at their normal size and place. The map is
+//   captured right after it is drawn, before those go on top
+//   (android_view_map_drawn, called in Sys::disp_zoom after
+//   info.draw_selected); whatever differs from it on screen is drawn
+//   unzoomed over the zoomed map, and taps there go to it unmapped.
+//
+// - The selection box is drawn here, in screen coordinates, from the game's
+//   own frame (MouseCursor no longer draws it on Android).
+//
+// - The window never shows anything beyond the edges of the map.
+//
 // - Touches in the map view are mapped back through the same transform.
 //   A touch on a part outside the game's view first moves the game's view to
 //   include it (android_view_request; the picture stays put), so taps,
@@ -34,9 +47,11 @@
 
 #include <android/log.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <COLOR.h>
+#include <OMOUSECR.h>
 #include <OSYS.h>
 #include <OVGABUF.h>
 #include <OWORLD.h>
@@ -97,6 +112,22 @@ static int big_failed;
 static float drawn_wx0 = -1e9f, drawn_wy0, drawn_k;   // window when last drawn (world px)
 static Uint32 drawn_time;
 
+static float map_w_px, map_h_px;        // size of the map (world pixels)
+static int map_pending;                 // big8 prepared, waiting for the map snapshot
+static Uint32 map_gen;                  // incremented with every map snapshot
+
+// texture upload state of big32/bigtex
+static Uint32 up_gen = (Uint32) -1, up_pal = (Uint32) -1;
+static SDL_Rect up_rect;
+
+// overlays: what the game drew over the map view (messages, buttons...)
+static SDL_Surface *ovl32;              // ARGB, transparent where the map shows
+static SDL_Texture *ovltex;
+static SDL_Renderer *ovltex_renderer;
+static Uint8 ovl_mask[ZOOM_WIDTH * ZOOM_HEIGHT];   // 1 = overlay pixel
+static int ovl_valid;                   // ovl_mask matches what is on screen
+static Uint32 ovl_gen = (Uint32) -1, ovl_time;
+
 //------------------------------------------------------------------------
 
 static int active()
@@ -122,25 +153,32 @@ static float margin_y() { return VH - VH / k; }
 static float rest_x() { return margin_x() / 2; }
 static float rest_y() { return margin_y() / 2; }
 
-// One axis of clamp_origin(). Normally the origin may drift up to a location
-// from its rest position before the hook scrolls the game's view after it.
-// When the game's view is at the start of the map (atLo), the window may not
-// begin before it (origin >= 0); at the end of the map (atHi) it may not reach
-// past it (origin <= margin).
-static void clamp_axis(float *o, float *v, float rest, float margin, int atLo, int atHi)
+// One axis of clamp_origin().
+//  - The origin may drift up to a location from its rest position before the
+//    hook scrolls the game's view after it. Not at the map's edges, where the
+//    game's view cannot scroll further (atLo/atHi).
+//  - The window never shows anything beyond the edges of the map (mapSize,
+//    viewOrigin = the game's view in world pixels).
+static void clamp_axis(float *o, float *v, float rest, float viewOrigin, float winSize,
+                       float mapSize, int atLo, int atHi)
 {
-	float lo = rest - LOC, hi = rest + LOC;
-	if( atLo )
+	float lo = atLo ? -1e9f : rest - LOC;
+	float hi = atHi ?  1e9f : rest + LOC;
+	if( mapSize > 0.0f )
 	{
-		lo = 0.0f;
-		if( hi < 0.0f ) hi = 0.0f;
+		float mlo = -viewOrigin;                      // window starts at the map's start
+		float mhi = mapSize - winSize - viewOrigin;   // window ends at the map's end
+		if( mlo > mhi )
+			mlo = mhi = (mlo + mhi) / 2;             // map smaller than the window: centre
+		if( lo < mlo ) lo = mlo;
+		if( hi > mhi ) hi = mhi;
+		if( lo > hi )
+		{
+			lo = mlo;                                 // the map's edges win
+			hi = mhi;
+		}
 	}
-	if( atHi )
-	{
-		hi = margin;
-		if( lo > margin ) lo = margin;
-	}
-	if( lo > hi )
+	else if( lo > hi )
 		lo = hi = (lo + hi) / 2;
 	float n = clampf(*o, lo, hi);
 	if( n != *o )
@@ -150,8 +188,8 @@ static void clamp_axis(float *o, float *v, float rest, float margin, int atLo, i
 
 static void clamp_origin()
 {
-	clamp_axis(&ox, &vx, rest_x(), margin_x(), at_left, at_right);
-	clamp_axis(&oy, &vy, rest_y(), margin_y(), at_top, at_bottom);
+	clamp_axis(&ox, &vx, rest_x(), cur_tx * LOC, VW / k, map_w_px, at_left, at_right);
+	clamp_axis(&oy, &vy, rest_y(), cur_ty * LOC, VH / k, map_h_px, at_top, at_bottom);
 }
 
 //------------------------------------------------------------------------
@@ -218,6 +256,8 @@ void android_view_world_hook()
 	at_top    = zm->top_y_loc <= 0;
 	at_right  = zm->top_x_loc + zm->disp_x_loc >= zm->max_x_loc;
 	at_bottom = zm->top_y_loc + zm->disp_y_loc >= zm->max_y_loc;
+	map_w_px  = zm->max_x_loc * LOC;
+	map_h_px  = zm->max_y_loc * LOC;
 	if( !hold )
 		clamp_origin();
 
@@ -292,8 +332,11 @@ void android_view_disp_zoom_begin()
 	cur_tx = drawn_tx = zm->top_x_loc;
 	cur_ty = drawn_ty = zm->top_y_loc;
 	big_valid = 0;
+	map_pending = 0;
 
 	if( !active() || sys.view_mode != MODE_NORMAL )
+		return;
+	if( !ensure_big() )
 		return;
 
 	// the window in world pixels, and the game's view
@@ -304,29 +347,31 @@ void android_view_disp_zoom_begin()
 	drawn_wy0 = wy0;
 	drawn_k = k;
 	drawn_time = SDL_GetTicks();
-	if( wx0 >= gx0 && wy0 >= gy0 && wx1 <= gx0 + VW && wy1 <= gy0 + VH )
-		return;            // the game's own view covers the window
+	int need_passes = !(wx0 >= gx0 && wy0 >= gy0 && wx1 <= gx0 + VW && wy1 <= gy0 + VH);
 
-	if( !ensure_big() )
-		return;
-
-	// cover the window plus a margin
-	wx0 -= PASS_MARGIN;
-	wy0 -= PASS_MARGIN;
-	wx1 += PASS_MARGIN;
-	wy1 += PASS_MARGIN;
-	big_x = (int) floorf(wx0 / LOC) * ZOOM_LOC_WIDTH;
-	big_y = (int) floorf(wy0 / LOC) * ZOOM_LOC_HEIGHT;
+	// big8 covers the window plus a margin, and the game's view (for the map
+	// snapshot); if both do not fit, the window
+	float ux0 = fminf(wx0 - PASS_MARGIN, gx0), ux1 = fmaxf(wx1 + PASS_MARGIN, gx0 + VW);
+	float uy0 = fminf(wy0 - PASS_MARGIN, gy0), uy1 = fmaxf(wy1 + PASS_MARGIN, gy0 + VH);
+	if( ux1 - ux0 + LOC > BIG_W ) ux0 = wx0 - PASS_MARGIN;
+	if( uy1 - uy0 + LOC > BIG_H ) uy0 = wy0 - PASS_MARGIN;
+	big_x = (int) floorf(ux0 / LOC) * ZOOM_LOC_WIDTH;
+	big_y = (int) floorf(uy0 / LOC) * ZOOM_LOC_HEIGHT;
 	SDL_FillRect(big8, NULL, V_BLACK);
+	map_pending = 1;           // android_view_map_drawn() adds the game's view
+
+	if( !need_passes )
+		return;            // the game's own view covers the window
 
 	int maxTx = zm->max_x_loc - zm->disp_x_loc;
 	int maxTy = zm->max_y_loc - zm->disp_y_loc;
 	int done_x[MAX_PASSES], done_y[MAX_PASSES], passes = 0;
+	int px0 = (int) floorf((wx0 - PASS_MARGIN) / LOC), py0 = (int) floorf((wy0 - PASS_MARGIN) / LOC);
 
 	busy = 1;
-	for( int py = big_y / ZOOM_LOC_HEIGHT; py * LOC < wy1; py += zm->disp_y_loc )
+	for( int py = py0; py * LOC < wy1 + PASS_MARGIN; py += zm->disp_y_loc )
 	{
-		for( int px = big_x / ZOOM_LOC_WIDTH; px * LOC < wx1; px += zm->disp_x_loc )
+		for( int px = px0; px * LOC < wx1 + PASS_MARGIN; px += zm->disp_x_loc )
 		{
 			int tx = clampi(px, 0, maxTx), ty = clampi(py, 0, maxTy);
 			if( tx == cur_tx && ty == cur_ty )
@@ -356,7 +401,6 @@ void android_view_disp_zoom_begin()
 
 	if( passes )
 		sys.zoom_need_redraw = 1;    // the passes overwrote the saved terrain
-	big_valid = 1;
 
 	static int last_passes = -1;
 	if( passes != last_passes )
@@ -364,6 +408,19 @@ void android_view_disp_zoom_begin()
 		LOGI("map view drawn with %d extra pass(es), zoom %.2f", passes, k);
 		last_passes = passes;
 	}
+}
+
+// In Sys::disp_zoom, after the map (terrain, units, buildings, fog, names,
+// the selected building's frame) and before the messages and buttons that go
+// over it: take the game's own view into big8.
+void android_view_map_drawn()
+{
+	if( !map_pending )
+		return;
+	map_pending = 0;
+	copy_view_to_big(drawn_tx, drawn_ty);
+	big_valid = 1;
+	map_gen++;
 }
 
 int android_view_busy()
@@ -374,82 +431,200 @@ int android_view_busy()
 //------------------------------------------------------------------------
 // Vga::flip: show the window.
 
+static int ensure_textures(SDL_Renderer *ren)
+{
+	if( !bigtex || bigtex_renderer != ren )
+	{
+		if( bigtex )
+			SDL_DestroyTexture(bigtex);
+		bigtex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_RGB888,
+			SDL_TEXTUREACCESS_STREAMING, BIG_W, BIG_H);
+		bigtex_renderer = ren;
+		up_gen = (Uint32) -1;
+		if( !bigtex )
+			LOGI("cannot create the zoom texture: %s", SDL_GetError());
+	}
+	if( !ovl32 )
+		ovl32 = SDL_CreateRGBSurfaceWithFormat(0, ZOOM_WIDTH, ZOOM_HEIGHT, 32, SDL_PIXELFORMAT_ARGB8888);
+	if( !ovltex || ovltex_renderer != ren )
+	{
+		if( ovltex )
+			SDL_DestroyTexture(ovltex);
+		ovltex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888,
+			SDL_TEXTUREACCESS_STREAMING, ZOOM_WIDTH, ZOOM_HEIGHT);
+		ovltex_renderer = ren;
+		ovl_gen = (Uint32) -1;
+		if( ovltex )
+			SDL_SetTextureBlendMode(ovltex, SDL_BLENDMODE_BLEND);
+		else
+			LOGI("cannot create the overlay texture: %s", SDL_GetError());
+	}
+	return bigtex && ovl32 && ovltex;
+}
+
+// Overlays: pixels of the game's view on screen (front) that differ from the
+// map snapshot in big8 are what the game drew over the map.
+static void build_overlay(SDL_Surface *front)
+{
+	SDL_Color *pal = front->format->palette->colors;
+	int bx = drawn_tx * ZOOM_LOC_WIDTH - big_x, by = drawn_ty * ZOOM_LOC_HEIGHT - big_y;
+	int count = 0;
+	for( int y = 0; y < ZOOM_HEIGHT; y++ )
+	{
+		const Uint8 *f = (const Uint8*) front->pixels + (ZOOM_Y1 + y) * front->pitch + ZOOM_X1;
+		int my = by + y;
+		const Uint8 *m = (my >= 0 && my < BIG_H) ? (const Uint8*) big8->pixels + my * big8->pitch : NULL;
+		Uint32 *o = (Uint32*) ((Uint8*) ovl32->pixels + y * ovl32->pitch);
+		Uint8 *mk = ovl_mask + y * ZOOM_WIDTH;
+		for( int x = 0; x < ZOOM_WIDTH; x++ )
+		{
+			int mx = bx + x;
+			int diff = m && mx >= 0 && mx < BIG_W && f[x] != m[mx];
+			mk[x] = (Uint8) diff;
+			if( diff )
+			{
+				SDL_Color c = pal[f[x]];
+				o[x] = 0xFF000000u | ((Uint32) c.r << 16) | ((Uint32) c.g << 8) | c.b;
+				count++;
+			}
+			else
+				o[x] = 0;
+		}
+	}
+	SDL_UpdateTexture(ovltex, NULL, ovl32->pixels, ovl32->pitch);
+	ovl_valid = 1;
+
+	static int last_count = -1;
+	if( (count == 0) != (last_count == 0) || abs(count - last_count) > 5000 )
+	{
+		LOGI("overlay over the map view: %d pixels", count);
+		last_count = count;
+	}
+}
+
+// The selection box, from the game's own frame (engine coordinates).
+static void draw_selection_box(SDL_Renderer *ren, SDL_Surface *front)
+{
+	if( !mouse_cursor.frame_flag || !mouse_cursor.frame_shown )
+		return;
+	float x1 = VX + (mouse_cursor.frame_x1 - VX - ox) * k;
+	float y1 = VY + (mouse_cursor.frame_y1 - VY - oy) * k;
+	float x2 = VX + (mouse_cursor.frame_x2 - VX - ox) * k;
+	float y2 = VY + (mouse_cursor.frame_y2 - VY - oy) * k;
+	x1 = clampf(x1, VX, VX + VW - 1); x2 = clampf(x2, VX, VX + VW - 1);
+	y1 = clampf(y1, VY, VY + VH - 1); y2 = clampf(y2, VY, VY + VH - 1);
+	SDL_Color c = { 255, 255, 0, 255 };
+	if( front && front->format->palette )
+		c = front->format->palette->colors[OWN_SELECT_FRAME_COLOR];
+	SDL_SetRenderDrawColor(ren, c.r, c.g, c.b, 255);
+	SDL_FRect r1 = { x1, y1, x2 - x1 + 1, y2 - y1 + 1 };
+	SDL_FRect r2 = { x1 + 1, y1 + 1, x2 - x1 - 1, y2 - y1 - 1 };
+	SDL_RenderDrawRectF(ren, &r1);
+	if( r2.w > 0 && r2.h > 0 )
+		SDL_RenderDrawRectF(ren, &r2);
+}
+
 void android_view_render(SDL_Renderer *ren, SDL_Texture *tex, SDL_Surface *front)
 {
 	if( !active() )
+	{
+		ovl_valid = 0;
 		return;
+	}
 
 	// window and the drawn game view, in world pixels
 	float wx0 = cur_tx * LOC + ox, wy0 = cur_ty * LOC + oy;
 	float ww = VW / k, wh = VH / k;
 	float gx0 = drawn_tx * LOC, gy0 = drawn_ty * LOC;
+	int transformed = !(k == 1.0f && wx0 == gx0 && wy0 == gy0);
 
-	if( k == 1.0f && wx0 == gx0 && wy0 == gy0 )
-		return;            // nothing to change: the frame already shows it
-
-	SDL_Rect view = { ZOOM_X1, ZOOM_Y1, ZOOM_WIDTH, ZOOM_HEIGHT };
-	SDL_RenderSetClipRect(ren, &view);
-	SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);   // off the map / not drawn: black
-	SDL_RenderFillRect(ren, &view);
-
-	int inside = wx0 >= gx0 && wy0 >= gy0 && wx0 + ww <= gx0 + VW && wy0 + wh <= gy0 + VH;
-
-	if( !inside && big_valid && big8 && front )
+	if( transformed )
 	{
-		//---- composite: extra passes + the game's real view on top ----//
+		SDL_Rect view = { ZOOM_X1, ZOOM_Y1, ZOOM_WIDTH, ZOOM_HEIGHT };
+		SDL_RenderSetClipRect(ren, &view);
+		SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);   // off the map / not drawn: black
+		SDL_RenderFillRect(ren, &view);
 
-		if( big8->format->palette != front->format->palette )
-			SDL_SetSurfacePalette(big8, front->format->palette);
-
-		SDL_Rect fsrc = { ZOOM_X1, ZOOM_Y1, ZOOM_WIDTH, ZOOM_HEIGHT };
-		SDL_Rect fdst = { (int) gx0 - big_x, (int) gy0 - big_y, ZOOM_WIDTH, ZOOM_HEIGHT };
-		SDL_BlitSurface(front, &fsrc, big8, &fdst);
-
-		float sx = wx0 - big_x, sy = wy0 - big_y;
-		int x0 = clampi((int) floorf(sx), 0, BIG_W), x1 = clampi((int) ceilf(sx + ww), 0, BIG_W);
-		int y0 = clampi((int) floorf(sy), 0, BIG_H), y1 = clampi((int) ceilf(sy + wh), 0, BIG_H);
-		if( x1 > x0 && y1 > y0 )
+		if( big_valid && big8 && front && front->format->palette && ensure_textures(ren) )
 		{
-			if( !bigtex || bigtex_renderer != ren )
+			//---- the map, zoomed: from the passes and the snapshot ----//
+
+			if( big8->format->palette != front->format->palette )
+				SDL_SetSurfacePalette(big8, front->format->palette);
+			Uint32 pal_version = front->format->palette->version;
+
+			float sx = wx0 - big_x, sy = wy0 - big_y;
+			int x0 = clampi((int) floorf(sx), 0, BIG_W), x1 = clampi((int) ceilf(sx + ww), 0, BIG_W);
+			int y0 = clampi((int) floorf(sy), 0, BIG_H), y1 = clampi((int) ceilf(sy + wh), 0, BIG_H);
+
+			static Uint32 last_gap_log;
+			if( (sx < 0 || sy < 0 || sx + ww > BIG_W || sy + wh > BIG_H) &&
+				 SDL_GetTicks() - last_gap_log > 2000 )
 			{
-				if( bigtex )
-					SDL_DestroyTexture(bigtex);
-				bigtex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_RGB888,
-					SDL_TEXTUREACCESS_STREAMING, BIG_W, BIG_H);
-				bigtex_renderer = ren;
-				if( !bigtex )
-					LOGI("cannot create the zoom-out texture: %s", SDL_GetError());
+				LOGI("window reaches beyond the drawn area by (%.0f,%.0f)-(%.0f,%.0f) px: black there",
+					-sx, -sy, sx + ww - BIG_W, sy + wh - BIG_H);
+				last_gap_log = SDL_GetTicks();
 			}
-			if( bigtex )
+
+			if( x1 > x0 && y1 > y0 )
 			{
 				SDL_Rect r = { x0, y0, x1 - x0, y1 - y0 };
-				SDL_BlitSurface(big8, &r, big32, &r);
-				SDL_UpdateTexture(bigtex, &r,
-					(Uint8*) big32->pixels + r.y * big32->pitch + r.x * 4, big32->pitch);
+				if( up_gen != map_gen || up_pal != pal_version ||
+					 r.x != up_rect.x || r.y != up_rect.y || r.w != up_rect.w || r.h != up_rect.h )
+				{
+					SDL_BlitSurface(big8, &r, big32, &r);
+					SDL_UpdateTexture(bigtex, &r,
+						(Uint8*) big32->pixels + r.y * big32->pitch + r.x * 4, big32->pitch);
+					up_gen = map_gen;
+					up_pal = pal_version;
+					up_rect = r;
+				}
 				SDL_FRect dst = { VX + (x0 - sx) * k, VY + (y0 - sy) * k,
 				                  (x1 - x0) * k, (y1 - y0) * k };
 				SDL_RenderCopyF(ren, bigtex, &r, &dst);
 			}
+
+			//---- messages and buttons over the map: at their normal place ----//
+
+			Uint32 now = SDL_GetTicks();
+			if( ovl_gen != map_gen || now - ovl_time > 100 )
+			{
+				build_overlay(front);
+				ovl_gen = map_gen;
+				ovl_time = now;
+			}
+			SDL_RenderCopy(ren, ovltex, NULL, &view);
 		}
+		else
+		{
+			//---- no prepared picture yet: zoom the frame as it is ----//
+
+			static Uint32 last_fallback_log;
+			if( SDL_GetTicks() - last_fallback_log > 2000 )
+			{
+				LOGI("zoomed view shown without the prepared picture (valid %d)", big_valid);
+				last_fallback_log = SDL_GetTicks();
+			}
+			ovl_valid = 0;
+			float sx = VX + (wx0 - gx0), sy = VY + (wy0 - gy0);   // in frame pixels
+			int x0 = clampi((int) floorf(sx), ZOOM_X1, ZOOM_X1 + ZOOM_WIDTH);
+			int x1 = clampi((int) ceilf(sx + ww), ZOOM_X1, ZOOM_X1 + ZOOM_WIDTH);
+			int y0 = clampi((int) floorf(sy), ZOOM_Y1, ZOOM_Y1 + ZOOM_HEIGHT);
+			int y1 = clampi((int) ceilf(sy + wh), ZOOM_Y1, ZOOM_Y1 + ZOOM_HEIGHT);
+			if( x1 > x0 && y1 > y0 )
+			{
+				SDL_Rect src = { x0, y0, x1 - x0, y1 - y0 };
+				SDL_FRect dst = { VX + (x0 - sx) * k, VY + (y0 - sy) * k,
+				                  (x1 - x0) * k, (y1 - y0) * k };
+				SDL_RenderCopyF(ren, tex, &src, &dst);
+			}
+		}
+		SDL_RenderSetClipRect(ren, NULL);
 	}
 	else
-	{
-		//---- the window lies in the drawn game view (or no passes yet) ----//
+		ovl_valid = 0;
 
-		float sx = VX + (wx0 - gx0), sy = VY + (wy0 - gy0);   // in frame pixels
-		int x0 = clampi((int) floorf(sx), ZOOM_X1, ZOOM_X1 + ZOOM_WIDTH);
-		int x1 = clampi((int) ceilf(sx + ww), ZOOM_X1, ZOOM_X1 + ZOOM_WIDTH);
-		int y0 = clampi((int) floorf(sy), ZOOM_Y1, ZOOM_Y1 + ZOOM_HEIGHT);
-		int y1 = clampi((int) ceilf(sy + wh), ZOOM_Y1, ZOOM_Y1 + ZOOM_HEIGHT);
-		if( x1 > x0 && y1 > y0 )
-		{
-			SDL_Rect src = { x0, y0, x1 - x0, y1 - y0 };
-			SDL_FRect dst = { VX + (x0 - sx) * k, VY + (y0 - sy) * k,
-			                  (x1 - x0) * k, (y1 - y0) * k };
-			SDL_RenderCopyF(ren, tex, &src, &dst);
-		}
-	}
-	SDL_RenderSetClipRect(ren, NULL);
+	draw_selection_box(ren, front);
 }
 
 //------------------------------------------------------------------------
@@ -460,10 +635,34 @@ int android_view_contains(float x, float y)
 	return x >= VX && x < VX + VW && y >= VY && y < VY + VH;
 }
 
+// Is a message, button or label the game drew over the map at (or right
+// next to) display point (x, y)?
+static int on_overlay(float x, float y)
+{
+	if( !ovl_valid )
+		return 0;
+	int px = (int) (x - VX), py = (int) (y - VY);
+	for( int dy = -4; dy <= 4; dy++ )
+	{
+		int yy = py + dy;
+		if( yy < 0 || yy >= ZOOM_HEIGHT )
+			continue;
+		for( int dx = -4; dx <= 4; dx++ )
+		{
+			int xx = px + dx;
+			if( xx >= 0 && xx < ZOOM_WIDTH && ovl_mask[yy * ZOOM_WIDTH + xx] )
+				return 1;
+		}
+	}
+	return 0;
+}
+
 int android_view_to_engine(float *x, float *y)
 {
 	if( !active() || !android_view_contains(*x, *y) )
 		return 0;
+	if( on_overlay(*x, *y) )
+		return 0;          // a message or button shown at its normal place
 	float qx = ox + (*x - VX) / k, qy = oy + (*y - VY) / k;
 	if( qx < 0 || qx >= VW || qy < 0 || qy >= VH )
 		return -1;

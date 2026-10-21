@@ -360,7 +360,7 @@ void MouseCursor::process_frame(int curX, int curY)
 {
 	//---- restore the screen area overwritten by the last frame ---//
 
-	if( frame_shown )
+	if( frame_shown && !cursor_never_drawn() )
 	{
 		vga_front.fast_put_bitmap( frame_x1, frame_y1, frame_top_save_scr    );
 		vga_front.fast_put_bitmap( frame_x1, frame_y2, frame_bottom_save_scr );
@@ -422,7 +422,10 @@ void MouseCursor::process_frame(int curX, int curY)
 
 	//------- save the screen area and display the frame ------//
 
-	disp_frame(&vga_front);
+	if( cursor_never_drawn() )
+		frame_shown = 1;	// Android draws the selection box itself (android_view.cpp)
+	else
+		disp_frame(&vga_front);
 }
 //----------- End of function MouseCursor::process_frame -------//
 
@@ -460,7 +463,7 @@ void MouseCursor::disp_back_buf(int bltX1, int bltY1, int bltX2, int bltY2)
 
 	//-------- display frame on the back buffer ----//
 
-	if( frame_flag )
+	if( frame_flag && !cursor_never_drawn() )
 		disp_frame(&vga_back);
 
 	//----- display mouse cursor on the back buffer ----//

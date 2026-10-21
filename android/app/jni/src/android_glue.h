@@ -29,6 +29,10 @@ void android_view_world_hook();
 // Called at the start of Sys::disp_zoom: draws the parts of the map the shown
 // window needs beyond the game's own view (zoomed out / while panning).
 void android_view_disp_zoom_begin();
+// Called in Sys::disp_zoom right after the map is drawn, before messages and
+// buttons go over it: the map is taken for zooming; what is drawn over it
+// later stays unzoomed.
+void android_view_map_drawn();
 // Called by Vga::flip() after the frame is copied: draws the zoomed/panned
 // map view over it. front = vga_front's surface (8-bit, game palette).
 void android_view_render(SDL_Renderer *renderer, SDL_Texture *texture, SDL_Surface *front);

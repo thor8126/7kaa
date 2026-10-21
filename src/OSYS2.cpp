@@ -1158,6 +1158,10 @@ void Sys::disp_zoom()
 
 	info.draw_selected();
 
+#ifdef __ANDROID__
+	android_view_map_drawn();    // the map, before messages and buttons go on top
+#endif
+
 	//-------- display news messages ---------//
 
 	news_array.disp();
