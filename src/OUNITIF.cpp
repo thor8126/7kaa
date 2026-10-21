@@ -1197,7 +1197,22 @@ void Unit::disp_unit_info(int dispY1, int refreshFlag)
 
 	if( !is_civilian() && rank_id != RANK_KING )
 	{
-		font_san.field( x, y, _("Contribution"), x+92, nation_contribution, 1, INFO_X2-2, refreshFlag);
+		if( veteran_rank() > 0 )		// its battle record and its veteran rank, see Unit::veteran_rank()
+		{
+			String str;
+
+			str  = misc.format(nation_contribution);
+			str += " (";
+			str += _("Veteran");
+			str += " ";
+			str += misc.roman_number(veteran_rank());
+			str += ")";
+
+			font_san.field( x, y, _("Battle Hits"), x+92, str, INFO_X2-2, refreshFlag);
+		}
+		else
+			font_san.field( x, y, _("Battle Hits"), x+92, nation_contribution, 1, INFO_X2-2, refreshFlag);
+
 		y+=16;
 	}
 

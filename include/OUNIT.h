@@ -134,7 +134,10 @@ enum { ATTACK_DIR = 8 };      // define number of attacking direction
 
 enum { MAX_TEAM_MEMBER = 9 }; // maximum no. of units a general/king can lead
 
-enum { MAX_NATION_CONTRIBUTION = 10000 };		// there is an upper limit nation_contribution as it is a <short>  
+enum { MAX_NATION_CONTRIBUTION = 10000 };
+
+enum { MAX_VETERAN_RANK = 6,				// a medal for each rank, see Unit::veteran_rank()
+		 VETERAN_DAMAGE_PERCENT = 5 };		// there is an upper limit nation_contribution as it is a <short>  
 
 //---------- used in set_move_to_surround -----------//
 
@@ -375,6 +378,8 @@ public:
 	virtual void draw_outlined();
 			  void draw_selected();
 			  void draw_skill_icon();
+	int			veteran_rank();
+	static int	veteran_rank_of(int battleScore);
 
 			  void set_spy(int spyRecno);
 			  void set_name(uint16_t newNameId);

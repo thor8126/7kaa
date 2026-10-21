@@ -1050,6 +1050,8 @@ void Firm::assign_worker(int workerUnitRecno)
 		workerPtr->extra_para = 0;
 	}
 
+	workerPtr->battle_score = unit_res[unitPtr->unit_id]->unit_class == UNIT_CLASS_HUMAN ? unitPtr->nation_contribution : 0;		// for veterans, see Unit::veteran_rank()
+
 	workerPtr->init_potential();
 
 	//------ if the recruited worker is a spy -----//
@@ -2498,6 +2500,9 @@ int Firm::create_worker_unit(Worker& thisWorker)
 	}
 	else if( unitPtr->race_id )
 	{
+		if( unit_res[unitPtr->unit_id]->unit_class == UNIT_CLASS_HUMAN )
+			unitPtr->nation_contribution = thisWorker.battle_score;		// a veteran stays one, see Unit::veteran_rank()
+
 		unitPtr->cur_power = thisWorker.extra_para;
 
 		if( unitPtr->cur_power < 0 )
@@ -3713,6 +3718,7 @@ Worker::Worker()
     worker_loyalty = 0;
     hit_points = 0;
     extra_para = 0;
+    battle_score = 0;
 }
 //--------- End of function Worker::Worker -----------//
 

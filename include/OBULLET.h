@@ -40,6 +40,7 @@
 //------ define the parent type ------//
 enum	{	BULLET_BY_UNIT = 1,
 			BULLET_BY_FIRM,
+			BULLET_BY_TOWN,		// a village watchtower, see Bullet::init_tower_arrow()
 		};
 
 //----------- Define class Bullet -----------//
@@ -69,6 +70,7 @@ public:
 	Bullet();
 
 	virtual void 	init(char parentType, short parentRecno, short targetXLoc, short targetYLoc, char targetMobileType);
+	void				init_tower_arrow(int nationRecno, int fromX, int fromY, short targetXLoc, short targetYLoc, float damage, int spriteId);
 	void 	process_move();
 	int	process_die();
 	void 	hit_target(short x, short y);

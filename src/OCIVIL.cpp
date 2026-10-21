@@ -89,6 +89,8 @@
 #include <OWALLRES.h>
 #include <WALLTILE.h>
 #include <OREMOTE.h>
+#include <OBULLET.h>
+#include <OSPRTRES.h>
 #include <vector>
 #include "gettext.h"
 
@@ -139,7 +141,7 @@ static int  field_loc(Town* townPtr, int fieldId, int& xLoc, int& yLoc);
 static int  valid_field_count(Town* townPtr);
 static int  active_field_count(Town* townPtr);
 static int  find_work_loc(Town* townPtr, Unit* unitPtr, int& xLoc, int& yLoc);
-static int  watchtower_effect_id();
+static int  watchtower_arrow_sprite_id();
 static char* field_bitmap(int growthStage);
 
 
@@ -1813,26 +1815,36 @@ void CivilTech::process_watchtowers()
 				if( !is_watchtower_target(townPtr, unitPtr) )
 					continue;
 
-				//---- shoot ----//
+				//---- shoot: an arrow flies from the top right of the village, where the tower is, and hits when it lands ----//
 
-				int effectId = watchtower_effect_id();
+				int arrowSpriteId = watchtower_arrow_sprite_id();
 
-				if( effectId )
-					Effect::create(effectId, unitPtr->cur_x, unitPtr->cur_y, SPRITE_IDLE, unitPtr->cur_dir, 2, 0);
+				if( arrowSpriteId )
+				{
+					Bullet* bulletPtr;
 
-				unitPtr->hit_target( NULL, unitPtr, (float) damage + 1, townPtr->nation_recno );		// +1: Unit::hit_target() takes off a default armor of 4/ATTACK_SLOW_DOWN
+					bullet_array.create_bullet( arrowSpriteId, &bulletPtr );
+
+					bulletPtr->init_tower_arrow( townPtr->nation_recno,
+						(townPtr->loc_x2+1) * ZOOM_LOC_WIDTH - 16, townPtr->loc_y1 * ZOOM_LOC_HEIGHT - 8,
+						unitPtr->next_x_loc(), unitPtr->next_y_loc(), (float) damage + 1, arrowSpriteId );		// +1: Unit::hit_target() takes off a default armor of 4/ATTACK_SLOW_DOWN
+				}
+				else		// no arrow sprite: a hit at once
+				{
+					unitPtr->hit_target( NULL, unitPtr, (float) damage + 1, townPtr->nation_recno );
+
+					if( unitPtr->hit_points <= 0 )
+						killCount++;
+				}
 
 				hitCount++;
-
-				if( unitPtr->hit_points <= 0 )
-					killCount++;
 			}
 		}
 
 		if( hitCount )
 		{
-			AiWarState::log( "TOWER       town %d of nation %d shoots %d arrows (level %d, %d damage), %d enemies fall",
-								  townPtr->town_recno, townPtr->nation_recno, hitCount, level, damage, killCount );
+			AiWarState::log( "TOWER       town %d of nation %d shoots %d arrows (level %d, %d damage each when it hits)",
+								  townPtr->town_recno, townPtr->nation_recno, hitCount, level, damage );
 		}
 	}
 }
@@ -1864,36 +1876,27 @@ int CivilTech::is_watchtower_target(Town* townPtr, Unit* unitPtr)
 //
 // The hit effect of an attack of a war machine, shown where an arrow hits.
 //
-static int watchtower_effect_id()
+static int watchtower_arrow_sprite_id()
 {
-	static int effectId = -1;
+	static int arrowSpriteId = -1;
 
-	if( effectId >= 0 )
-		return effectId;
+	if( arrowSpriteId >= 0 )
+		return arrowSpriteId;
 
-	effectId = 0;
+	arrowSpriteId = 0;
 
-	static short unitIdArray[] = { UNIT_BALLISTA, UNIT_F_BALLISTA, UNIT_CATAPULT, UNIT_CANNON, UNIT_FLAMETHROWER };
-
-	for( int i=0 ; i<(int)(sizeof(unitIdArray)/sizeof(unitIdArray[0])) && !effectId ; i++ )
+	for( int i=1 ; i<=sprite_res.sprite_info_count ; i++ )		// the archers' arrow
 	{
-		UnitInfo* unitInfo = unit_res[unitIdArray[i]];
-
-		for( int j=0 ; j<unitInfo->attack_count ; j++ )
+		if( strncmp(sprite_res[i]->sprite_code, "NO_ARROW", 8) == 0 )
 		{
-			AttackInfo* attackInfo = unit_res.get_attack_info(unitInfo->first_attack+j);
-
-			if( attackInfo->effect_id )
-			{
-				effectId = attackInfo->effect_id;
-				break;
-			}
+			arrowSpriteId = i;
+			break;
 		}
 	}
 
-	AiWarState::log( "TOWER       arrows are shown with effect %d", effectId );
+	AiWarState::log( "TOWER       watchtowers shoot arrow sprite %d", arrowSpriteId );
 
-	return effectId;
+	return arrowSpriteId;
 }
 //----------- End of static function watchtower_effect_id -----------//
 

@@ -115,6 +115,7 @@ public:
 	char  worker_loyalty;		// only for firms with live_in_town being 0
 	short hit_points;
 	short extra_para;			// weapon version for weapons and power attack points for human units
+	short battle_score;		// a human unit's battle record (Unit::nation_contribution), see Unit::veteran_rank()
 
 	short	max_hit_points();
 	int   loyalty();

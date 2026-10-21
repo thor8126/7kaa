@@ -876,9 +876,46 @@ float Unit::actual_damage()
 		attackDamage += attackDamage * leaderUnit->skill.skill_level / 100;
 	}
 
+	//--- a veteran hits harder, see veteran_rank() ---//
+
+	attackDamage += attackDamage * veteran_rank() * VETERAN_DAMAGE_PERCENT / 100;
+
 	return (float) attackDamage / ATTACK_SLOW_DOWN;		// lessen all attacking damages, thus slowing down all battles.
 }
 //------------ End of function Unit::actual_damage --------------//
+
+
+//--------- Begin of function Unit::veteran_rank_of ---------//
+//
+// The veteran rank of a fighter with the given battle record (successful
+// hits in battle, see gain_experience()): 0 for none, 1 to MAX_VETERAN_RANK.
+// Each rank is shown with a medal and adds VETERAN_DAMAGE_PERCENT to the
+// damage done (see actual_damage()).
+//
+int Unit::veteran_rank_of(int battleScore)
+{
+	static const short rankScoreArray[MAX_VETERAN_RANK] = { 20, 50, 100, 200, 400, 800 };
+
+	int rank = 0;
+
+	while( rank < MAX_VETERAN_RANK && battleScore >= rankScoreArray[rank] )
+		rank++;
+
+	return rank;
+}
+//----------- End of function Unit::veteran_rank_of -----------//
+
+
+//--------- Begin of function Unit::veteran_rank ---------//
+//
+int Unit::veteran_rank()
+{
+	if( unit_res[unit_id]->unit_class != UNIT_CLASS_HUMAN || !race_id || rank_id == RANK_KING )
+		return 0;
+
+	return veteran_rank_of(nation_contribution);		// for human units, the hits it made in battle
+}
+//----------- End of function Unit::veteran_rank -----------//
 
 
 //--------- Begin of function Unit::gain_experience ---------//

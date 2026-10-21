@@ -122,6 +122,62 @@ void Bullet::init(char parentType, short parentRecno, short targetXLoc, short ta
 //----------- End of function Bullet::init -----------//
 
 
+//--------- Begin of function Bullet::init_tower_arrow --------//
+//
+// An arrow shot by the watchtower of a village (see OCIVIL.CPP), flying
+// from the top of the village to a location. It has no parent unit, so
+// it hits for the nation it was shot for (see hit_target()).
+//
+// <int> fromX, fromY      - the pixel position it is shot from
+// <int> targetX/YLoc      - the location it is shot at
+// <float> damage          - the damage it does when it hits a unit there
+// <int> spriteId          - the arrow sprite
+//
+void Bullet::init_tower_arrow(int nationRecno, int fromX, int fromY, short targetXLoc, short targetYLoc, float damage, int spriteId)
+{
+	enum { TOWER_ARROW_SPEED = 16 };
+
+	parent_type  = BULLET_BY_TOWN;
+	parent_recno = 0;
+	target_mobile_type = UNIT_LAND;
+
+	attack_damage = damage;
+	damage_radius = 48;			// full damage where it lands, half at 48 pixels (see attenuated_damage())
+	nation_recno  = nationRecno;
+	fire_radius   = 0;
+
+	sprite_id   = spriteId;
+	sprite_info = sprite_res[sprite_id];
+
+	sprite_info->load_bitmap_res();
+
+	cur_action = SPRITE_MOVE;
+	cur_frame  = 1;
+
+	origin_x = cur_x = fromX;
+	origin_y = cur_y = fromY;
+
+	set_dir( fromX, fromY, targetXLoc * ZOOM_LOC_WIDTH, targetYLoc * ZOOM_LOC_HEIGHT );
+
+	SpriteFrame* spriteFrame = cur_sprite_frame();
+
+	target_x_loc = targetXLoc;
+	target_y_loc = targetYLoc;
+
+	go_x = target_x_loc * ZOOM_LOC_WIDTH  + ZOOM_LOC_WIDTH/2  - spriteFrame->offset_x - spriteFrame->width/2;
+	go_y = target_y_loc * ZOOM_LOC_HEIGHT + ZOOM_LOC_HEIGHT/2 - spriteFrame->offset_y - spriteFrame->height/2;
+
+	mobile_type = UNIT_LAND;
+
+	int xStep = (go_x - cur_x)/TOWER_ARROW_SPEED;
+	int yStep = (go_y - cur_y)/TOWER_ARROW_SPEED;
+
+	total_step = MAX(1, MAX(abs(xStep), abs(yStep)));
+	cur_step   = 0;
+}
+//----------- End of function Bullet::init_tower_arrow -----------//
+
+
 //--------- Begin of function Bullet::process_move --------//
 
 void Bullet::process_move()

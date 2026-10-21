@@ -439,6 +439,18 @@ void Unit::draw_skill_icon()
 
 	int y=dispY1-3;
 
+	//--- a veteran's medal at the left of the hit bar, see Unit::veteran_rank() ---//
+
+	int veteranRank = veteran_rank();
+
+	if( veteranRank > 0 )
+	{
+		char medalName[] = "MEDAL1";
+		medalName[5] = '0' + veteranRank;
+
+		world.zoom_matrix->put_bitmap_clip( dispX1-12, dispY1-3, image_icon.get_ptr(medalName) );
+	}
+
 	if(*str)
 	{
 		world.zoom_matrix->put_bitmap_clip(dispX1+maxHitBarWidth+1,
