@@ -71,10 +71,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes="Latest Android build of commit ${GITHUB_SHA::7} ($(date -u '+%Y-%m-%d %H:%M UTC')). Install: download 7kaa-android.apk on the phone and open it (allow installing unknown apps)."
-          gh release delete android-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create android-latest "$RUNNER_TEMP/7kaa-android.apk" \
-            --target "$GITHUB_SHA" --prerelease \
-            --title "Android APK (latest build)" --notes "$notes"
+          # A few tries: the GitHub API occasionally refuses a request.
+          for i in 1 2 3; do
+            gh release delete android-latest --yes --cleanup-tag 2>/dev/null || true
+            if gh release create android-latest "$RUNNER_TEMP/7kaa-android.apk" \
+                 --target "$GITHUB_SHA" --prerelease \
+                 --title "Android APK (latest build)" --notes "$notes"; then
+              exit 0
+            fi
+            echo "release attempt $i failed, retrying"
+            sleep 15
+          done
+          exit 1
 
       - name: Replace apk/7kaa-android.apk in the repository
         run: |
