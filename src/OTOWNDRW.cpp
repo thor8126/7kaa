@@ -68,9 +68,11 @@ void Town::draw(int displayLayer)
 
 		world.zoom_matrix->put_bitmap_remap_clip( townX1, townY1, townLayout->ground_bitmap_ptr );
 
-		civil_tech.draw_town_extras(this, displayLayer);		// the fields being farmed, see OCIVIL.CPP
+		civil_tech.draw_town_extras(this, displayLayer);		// the streets of a growing village and the fields being farmed, see OCIVIL.CPP
 		return;
 	}
+
+	civil_tech.draw_town_extras(this, 8);		// the watchtower, behind the houses, see OCIVIL.CPP
 
 	//-------- draw plants, buildings and flags --------//
 
@@ -103,7 +105,7 @@ void Town::draw(int displayLayer)
 		}
 	}
 
-	civil_tech.draw_town_extras(this, displayLayer);		// the watchtower, see OCIVIL.CPP
+	civil_tech.draw_town_extras(this, displayLayer);		// the banners of a big village, see OCIVIL.CPP
 }
 //-------- End of function Town::draw -----------//
 

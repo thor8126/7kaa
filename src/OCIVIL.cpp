@@ -91,6 +91,8 @@
 #include <OREMOTE.h>
 #include <OBULLET.h>
 #include <OSPRTRES.h>
+#include <OGAME.h>
+#include <OVGA.h>
 #include <vector>
 #include "gettext.h"
 
@@ -109,6 +111,7 @@
 #define WATCHTOWER_RANGE					6			// locations from the village at level I, +2 a level
 #define WATCHTOWER_DAMAGE					15			// hit points per arrow at level I, +10 a level
 #define WATCHTOWER_ARROWS					2			// arrows a day at level I, +1 a level
+#define WATCHTOWER_BASE_Y					44			// pixels below the top of the village where the tower stands
 
 #define DEEP_VEIN_QTY						10000
 
@@ -854,13 +857,50 @@ int CivilTech::find_field_loc(Town* townPtr, int& xLoc, int& yLoc)
 
 //--------- Begin of function CivilTech::draw_town_extras ---------//
 //
-// Called by Town::draw(). Draw the fields being farmed under everything
-// else (layer 4), and the watchtower over the village (layer 1).
+// Called by Town::draw(). Under everything else (layer 4): the streets of
+// a growing village and the fields being farmed. Before the houses
+// (layer 8): the watchtower. Over the village (layer 1): the banners of
+// a big village.
 //
 void CivilTech::draw_town_extras(Town* townPtr, int displayLayer)
 {
+	enum { STREETS_POPULATION = 35,		// a village this big has cobbled streets,
+			 SQUARE_POPULATION  = 60,		// a square with a well,
+			 BANNERS_POPULATION = 80 };	// and banners at its corners
+
+	int townX1 = townPtr->loc_x1 * ZOOM_LOC_WIDTH - world.view_top_x + ZOOM_X1;
+	int townY1 = townPtr->loc_y1 * ZOOM_LOC_HEIGHT - world.view_top_y + ZOOM_Y1;
+	int townWidth  = STD_TOWN_LOC_WIDTH  * ZOOM_LOC_WIDTH;
+	int townHeight = STD_TOWN_LOC_HEIGHT * ZOOM_LOC_HEIGHT;
+
 	if( displayLayer == 4 )
 	{
+		//--- a growing village gets streets, a big one a square too ---//
+
+		if( townPtr->population >= STREETS_POPULATION )
+		{
+			char* bitmapPtr = image_spict.get_ptr("TWNPAVE");
+
+			if( bitmapPtr )
+			{
+				world.zoom_matrix->put_bitmap_remap_clip( townX1 + (townWidth - get_bitmap_width(bitmapPtr))/2,
+					townY1 + (townHeight - get_bitmap_height(bitmapPtr))/2, bitmapPtr, NULL, 1 );		// 1-the bitmap is compressed
+			}
+		}
+
+		if( townPtr->population >= SQUARE_POPULATION )
+		{
+			char* bitmapPtr = image_spict.get_ptr("TWNPLAZA");
+
+			if( bitmapPtr )
+			{
+				world.zoom_matrix->put_bitmap_remap_clip( townX1 + (townWidth - get_bitmap_width(bitmapPtr))/2,
+					townY1 + (townHeight - get_bitmap_height(bitmapPtr))/2, bitmapPtr, NULL, 1 );
+			}
+		}
+
+		//--- the fields being farmed ---//
+
 		int fieldCount = active_field_count(townPtr);
 
 		if( !fieldCount )
@@ -891,16 +931,33 @@ void CivilTech::draw_town_extras(Town* townPtr, int displayLayer)
 			}
 		}
 	}
-	else if( displayLayer == 1 && townPtr->has_watchtower )
+	else if( displayLayer == 8 && townPtr->has_watchtower )
 	{
-		//--- no picture of a tower in the game: a ballista over the top right corner of the village ---//
+		//--- a round stone tower at the top right corner of the village, its roof and pennant in the nation's colour ---//
 
-		char* iconPtr = unit_res[UNIT_BALLISTA]->get_small_icon_ptr(RANK_SOLDIER);
+		char* bitmapPtr = image_spict.get_ptr("WTOWER");
 
-		int drawX = (townPtr->loc_x2+1) * ZOOM_LOC_WIDTH  - world.view_top_x + ZOOM_X1 - 24;
-		int drawY = townPtr->loc_y1 * ZOOM_LOC_HEIGHT - world.view_top_y + ZOOM_Y1 - 12;
+		if( bitmapPtr )
+		{
+			char* colorRemapTable = game.get_color_remap_table(townPtr->nation_recno, 0);
 
-		world.zoom_matrix->put_bitmap_clip(drawX, drawY, iconPtr);
+			world.zoom_matrix->put_bitmap_remap_clip( townX1 + townWidth - get_bitmap_width(bitmapPtr) - 4,
+				townY1 + WATCHTOWER_BASE_Y - get_bitmap_height(bitmapPtr), bitmapPtr, colorRemapTable, 1 );		// 1-the bitmap is compressed
+		}
+	}
+	else if( displayLayer == 1 && townPtr->nation_recno && townPtr->population >= BANNERS_POPULATION )
+	{
+		//--- a big village flies its banner at the two lower corners too ---//
+
+		char flagName[] = "FLAG-1";		// waving like the village's own flag, see Town::draw_flag()
+
+		flagName[5] = '1' + (char) ((sys.frame_count+townPtr->town_recno+3)%8) / 2;
+
+		char* flagPtr = image_spict.get_ptr(flagName);
+		char* colorRemapTable = game.get_color_remap_table(townPtr->nation_recno, 0);
+
+		world.zoom_matrix->put_bitmap_remap_clip( townX1 + 2 - 9, townY1 + townHeight + 2 - 97, flagPtr, colorRemapTable, 1 );
+		world.zoom_matrix->put_bitmap_remap_clip( townX1 + townWidth - 2 - 9, townY1 + townHeight + 2 - 97, flagPtr, colorRemapTable, 1 );
 	}
 }
 //----------- End of function CivilTech::draw_town_extras -----------//
@@ -1826,7 +1883,7 @@ void CivilTech::process_watchtowers()
 					bullet_array.create_bullet( arrowSpriteId, &bulletPtr );
 
 					bulletPtr->init_tower_arrow( townPtr->nation_recno,
-						(townPtr->loc_x2+1) * ZOOM_LOC_WIDTH - 16, townPtr->loc_y1 * ZOOM_LOC_HEIGHT - 8,
+						(townPtr->loc_x2+1) * ZOOM_LOC_WIDTH - 26, townPtr->loc_y1 * ZOOM_LOC_HEIGHT + WATCHTOWER_BASE_Y - 90,		// the arrow slits at the top of the tower
 						unitPtr->next_x_loc(), unitPtr->next_y_loc(), (float) damage + 1, arrowSpriteId );		// +1: Unit::hit_target() takes off a default armor of 4/ATTACK_SLOW_DOWN
 				}
 				else		// no arrow sprite: a hit at once

@@ -34,102 +34,6 @@
 #include <OUNIT.h>
 #include <OCONFIG.h>
 #include <OUNITRES.h>
-#include <OROAD.h>
-
-//------- Begin of static function wagon_remap_table -------//
-//
-// Supply wagons use the caravan sprite, see OUNITSUP.CPP. They are drawn
-// as a military pack train: the bundles, which a caravan has in its
-// nation's colours (codes 0xE0 to 0xE7), are olive army supplies, and
-// golden trimmings and light cloth are olive and khaki. The camel keeps
-// its colours, as do the outline and shadow. The nation is shown by the
-// pennant, see Unit::draw_supply_wagon_extras().
-//
-// <char*> colorRemapTable - the nation's color remap table
-//
-// return : <char*> the color remap table for drawing a supply wagon
-//
-static char* wagon_remap_table(char* colorRemapTable)
-{
-	#define FIRST_RESERVED_COLOR	0xE0
-
-	static unsigned char wagonColor[FIRST_RESERVED_COLOR];
-	static unsigned char packColor[8];		// for the nation colour codes 0xE0 to 0xE7
-	static int           wagonColorInit=0;
-	static char          wagonRemapTable[256];
-
-	if( !wagonColorInit )
-	{
-		const SDL_Color* gamePal = vga.get_game_pal();
-
-		for( int i=0 ; i<FIRST_RESERVED_COLOR ; i++ )
-		{
-			int r = gamePal[i].r, g = gamePal[i].g, b = gamePal[i].b;
-			int maxC = MAX(r, MAX(g, b)), minC = MIN(r, MIN(g, b));
-			int lum = (r*30 + g*59 + b*11) / 100;
-			int tr = r, tg = g, tb = b;
-
-			if( r >= g && g > b && maxC > 90 && (maxC-minC)*100 > maxC*45 && g*100 > r*70 )		// gold and yellow: olive
-			{
-				tr = lum * 62 / 100;
-				tg = lum * 78 / 100;
-				tb = lum * 34 / 100;
-			}
-			else if( lum > 170 && (maxC-minC) < 40 )		// light cloth: khaki
-			{
-				tr = lum * 86 / 100;
-				tg = lum * 84 / 100;
-				tb = lum * 62 / 100;
-			}
-			else
-			{
-				wagonColor[i] = (unsigned char) i;
-				continue;
-			}
-
-			int bestColor = i, bestDiff = 0x7FFFFFFF;
-
-			for( int j=0 ; j<FIRST_RESERVED_COLOR ; j++ )
-			{
-				if( j == 0 )		// transparent
-					continue;
-
-				int dr = gamePal[j].r-tr, dg = gamePal[j].g-tg, db = gamePal[j].b-tb;
-				int diff = dr*dr*30 + dg*dg*59 + db*db*11;
-
-				if( diff < bestDiff )
-				{
-					bestDiff  = diff;
-					bestColor = j;
-				}
-			}
-
-			wagonColor[i] = (unsigned char) bestColor;
-		}
-
-		//--- the bundles: olive shades as light as the nation colour shades of the first scheme ---//
-
-		static int packLum[8] = { 150, 120, 95, 70, 140, 112, 88, 64 };
-
-		for( int k=0 ; k<8 ; k++ )
-			packColor[k] = (unsigned char) road_res.pick_color( packLum[k]*62/100, packLum[k]*78/100, packLum[k]*34/100 );
-
-		wagonColorInit = 1;
-	}
-
-	for( int i=0 ; i<256 ; i++ )
-	{
-		if( i < FIRST_RESERVED_COLOR )
-			wagonRemapTable[i] = colorRemapTable[wagonColor[i]];
-		else if( i < FIRST_RESERVED_COLOR+8 )
-			wagonRemapTable[i] = packColor[i-FIRST_RESERVED_COLOR];
-		else
-			wagonRemapTable[i] = colorRemapTable[i];
-	}
-
-	return wagonRemapTable;
-}
-//-------- End of static function wagon_remap_table --------//
 
 #ifdef NO_DEBUG_UNIT
 #undef err_when
@@ -182,9 +86,6 @@ void Unit::draw()
 
 	char* colorRemapTable = game.get_color_remap_table(nation_recno, 0); 		// selected_flag);
 
-	if( unit_id == UNIT_SUPPLY_WAGON )
-		colorRemapTable = wagon_remap_table(colorRemapTable);
-
 	//---- only portion of the sprite is inside the view area ------//
 
 	if( x1 < 0 || x2 >= ZOOM_WIDTH || y1 < 0 || y2 >= ZOOM_HEIGHT )
@@ -218,11 +119,6 @@ void Unit::draw()
 												bitmapPtr, colorRemapTable );
 		}
 	}
-
-	//---- a supply wagon flies its nation's pennant and shows its range when selected, see OUNITSUP.CPP ----//
-
-	if( unit_id == UNIT_SUPPLY_WAGON )
-		draw_supply_wagon_extras( x1+ZOOM_X1, y1+ZOOM_Y1, spriteFrame->width );
 
 	//---- display additional info for selected units ----//
 
@@ -487,41 +383,6 @@ int Unit::is_shealth()
 //----------- End of function Unit::is_visible ----------//
 
 
-//--------- Begin of function Unit::draw_supply_wagon_extras ---------//
-//
-// A pennant in the nation's colour over the supply wagon. The area it
-// supplies is shown by draw_supply_wagon_range_on_zoom_map() (OWORLD_Z.CPP)
-// when the player's wagon is selected.
-//
-// <int> dispX1, dispY1 - the top left of the sprite on the screen
-// <int> spriteWidth    - the width of the sprite frame
-//
-void Unit::draw_supply_wagon_extras(int dispX1, int dispY1, int spriteWidth)
-{
-	if( !nation_recno || nation_array.is_deleted(nation_recno) )
-		return;
-
-	int flagColor = (unsigned char) nation_array[nation_recno]->nation_color;
-	static int poleColor  = road_res.pick_color(64, 44, 24);		// dark wood
-	static int shadeColor = road_res.pick_color(40, 28, 16);
-
-	int poleX = dispX1 + spriteWidth/2;
-	int poleY1 = dispY1 - 6, poleY2 = dispY1 + 10;
-
-	if( poleX >= ZOOM_X1 && poleX+10 <= ZOOM_X2 && poleY1 >= ZOOM_Y1 && poleY2 <= ZOOM_Y2 )
-	{
-		vga_back.bar( poleX, poleY1, poleX, poleY2, poleColor );
-
-		for( int i=0 ; i<6 ; i++ )		// a triangle pointing right, with a dark edge at the bottom
-		{
-			int w = 9 - i*3/2;
-			vga_back.bar( poleX+1, poleY1+i, poleX+w, poleY1+i, i<5 ? flagColor : shadeColor );
-		}
-	}
-}
-//----------- End of function Unit::draw_supply_wagon_extras ----------//
-
-
 //--------- Begin of function Unit::draw_outlined ---------//
 //
 void Unit::draw_outlined()
@@ -556,9 +417,6 @@ void Unit::draw_outlined()
 	//------- get the color remap table for this sprite ------//
 
 	char* colorRemapTable = game.get_color_remap_table(nation_recno, 1);
-
-	if( unit_id == UNIT_SUPPLY_WAGON )
-		colorRemapTable = wagon_remap_table(colorRemapTable);
 
 	//---- only portion of the sprite is inside the view area ------//
 

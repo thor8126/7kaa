@@ -2,8 +2,8 @@
 and grey copies of the Caravan's large and small icons appended to
 I_UNITLI.RES and I_UNITSI.RES.
 
-The wagon uses the Caravan's sprite, drawn in grey by the game (see
-wagon_remap_table() in OUNITDRW.CPP).
+The wagon first used the Caravan's sprite; tools/make_ox_cart.py has
+since given it its own sprite (an ox cart) and its own icons.
 
 usage: make_supply_wagon.py UNIT.DBF I_UNITLI.RES I_UNITSI.RES PAL_STD.RES
 

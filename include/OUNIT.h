@@ -762,7 +762,6 @@ public:
 	int   supply_wagon_follow(int targetXLoc, int targetYLoc);
 	void  disp_supply_wagon_info(int dispY1, int refreshFlag);
 	int	is_supplying_nation_of(int nationRecno);
-	void	draw_supply_wagon_extras(int dispX1, int dispY1, int spriteWidth);
 
 protected:
 };
